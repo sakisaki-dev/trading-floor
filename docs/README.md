@@ -1,6 +1,6 @@
 # Retro Vault Sandbox: AI bots in a card market
 
-**Status:** design guidelines plus a working rule-bot prototype (no AI yet).
+**Status:** a working engine, page and AI runner (section 16). The AI runner has only been dry-run so far: no real API run yet.
 **Prototype:** [The Trading Floor](https://claude.ai/artifact/NDU1spHL5uiHtUyo5BDmzF) (private artifact). Its source is
 [`trading-floor.html`](trading-floor.html) in this folder. Sections 12–15 cover what it taught us and what we hadn't
 considered.
@@ -371,3 +371,121 @@ presets and controls.
 - **Order book depth:** a ladder for one card, so a corner or a thin market is visible.
 - **Reasons on the floor:** when an LLM bot acts, a short speech bubble with its one-line reason.
 - **Real vs nominal:** prices deflated by the money supply, so inflation isn't mistaken for skill.
+
+---
+
+## 16. Prototype 1: the real design, ready for AI bots
+
+Section 12 described prototype 0, which simulated seasons. Prototype 1 replaces it. **No seasons are simulated.**
+The players' stats are the real ones. The world is a fixed pool of cards, and every card has a hidden value (the
+site's card value ÷ 20, in coins) that no bot ever sees.
+
+### Files (all in [`sandbox/`](../../sandbox))
+
+| File | What it is |
+|---|---|
+| `engine.mjs` | The world. Plain JS, no dependencies, deterministic for a seed. The page and the AI runner both use it, so a replay is exactly what ran. |
+| `build_library.py` → `data/library.json` | Every player's research page (all stats, career rates, awards, OVR, skill, grade, Career Legacy, three "plays like" comparisons), plus the hidden value, which only the engine reads. Rebuild after a site update: `npm run library`. |
+| `run.mjs`, `configs/pilot.json`, `prompts/system.md` | The AI runner: one model call per AI bot per week, structured JSON output, a dollar cap, and replayable logs. |
+| `build_page.mjs` → [`docs/sandbox/trading-floor.html`](trading-floor.html) | The page: live rule bots, or replay of an AI run. Published as [The Trading Floor](https://claude.ai/artifact/NDU1spHL5uiHtUyo5BDmzF). |
+
+### What every bot can do (each one is logged)
+
+| Action | How it works |
+|---|---|
+| Buy and sell cards | Weekly call auction per player: all crossing orders fill at one price, and the seller pays a 4% fee. |
+| Auction a card | List up to 2 a week with a reserve. The next week every bot may send one sealed bid. The highest bid wins and pays the second-highest bid (or the reserve, if higher). |
+| Rip packs | Packs mint from the finite pool, priced at their expected hidden value + 25%. |
+| Research a player | Spend a pass to read the library page. 3 passes a week, expiring weekly, at most 6 used a week. |
+| Trade passes | A weekly call auction just for passes. |
+| Write notes | An estimate plus up to 240 characters of facts. Notes go stale after 12 weeks, and a bot keeps at most 25. |
+| Share notes | Swap your 3 freshest notes for another bot's, if it accepts. |
+| Steal notes | Copy a bot's freshest notes. 35% chance of being caught: the victim flags you and stops sharing, and so do its friends. |
+| Play games | Higher or Lower and Over / Under, about a position the bot chose last week. Winning pays free packs. |
+| Trade game tickets | 3 tickets a week, tradable, at most 6 games a week. |
+| Talk (off by default) | One public post and two private messages a week, 280 characters each. |
+| Memo | 600 characters carried to next week. It is an AI bot's only memory. |
+
+**Logs:** `journal.jsonl` holds every action in the world: trades, auction listings and results, packs and their
+pulls, research, swaps, thefts (caught or not), games, pass and ticket trades, posts, messages, births and
+eliminations. `decisions.jsonl` holds every AI call: observation size, parsed actions, token usage, cost and
+errors. `run.json` holds the per-week frames plus each AI bot's memo, so the page can replay the run.
+
+### How to run it
+
+```bash
+cd sandbox && npm install
+node run.mjs --config configs/pilot.json --dry --weeks 40   # free: a scripted stand-in plays the AI seats
+export ANTHROPIC_API_KEY=...                                  # or `ant auth login`
+npm run pilot                                                 # 10 Haiku 5.5 bots, 120 weeks, stops at $5
+node run.mjs --config configs/pilot.json --messages           # the same with bot talk switched on
+```
+
+Then open the Trading Floor page, choose **AI run** and pick `sandbox/runs/<id>/run.json`. `runs/` is
+git-ignored, because a 120-week run is about 30 MB of journal.
+
+**Expected cost of the pilot:** each call is about 5–6K input tokens and 1–3K output, so roughly $0.002 on Haiku
+5.5. Ten bots for 120 weeks is 1,200 calls, about $2–3. Sonnet seats cost about 20× more and Opus about 40× more,
+so promote only a few.
+
+**Dry-run check (done):** 40 weeks, 400 calls, 0 errors. Every decision is logged and the replay works on the page.
+The scripted stand-ins mostly finish in the bottom half, which is the floor a real model has to beat.
+
+### What the rule-bot runs show (seed 88, 400 weeks)
+
+- **Prices stay close to hidden value** (about 0.9–1.06×) once research, games and anchors are in.
+- **Passes settle at about 3–5 coins and tickets at about 2.5:** the market's price for information.
+- **About 30 note swaps a week.** Thieves get flagged (one ended up refused by 11 bots), but they don't end up poorer
+  on average, because rule bots barely use notes. AI bots, which act on notes, should make theft matter more.
+- **Games:** once a bot picks a topic, bots with 10 or more fresh notes win about 50% more game packs than bots with
+  under 3. Without topics, questions were spread over all 203 players and knowledge barely helped.
+- **Game packs are printed wealth:** with games on, average worth is about 2.5× higher. A decision for you
+  (below).
+- **Value bots shrink across generations** (16 down to as few as 5): rule-bot research is noisy (6–35% error). A
+  baseline worth watching, not tuning away.
+
+### Keeping the games skill-based (anti-farming)
+
+**Built in:**
+1. **A ticket is spent the moment a game starts.** No restarts and no free retries until the run looks good.
+2. **The engine judges every answer, in order.** Higher or Lower stops at the first miss.
+3. **Payouts self-balance.** Every 4 weeks each game's bar moves (needed streak, number of legs) so its average
+   payout per ticket returns to the same target (0.06 packs). No game stays the easy one to farm.
+4. **Floors.** Bars never drop below 4 in a row or 3 legs, so guessing never pays well.
+5. **Topics.** The bot chooses a position and questions come from it, so focused research is the skill.
+6. **Finite access.** 3 tickets a week, at most 6 games. Tickets are tradable, so a bot that knows little should
+   sell its tickets to one that knows more.
+
+**Ideas still to add:**
+7. **Pay above chance, not per win.** Reward only the part of a result that beats a coin flip (a 5-in-a-row streak
+   has a 1-in-32 chance by luck).
+8. **Tournaments.** Rank the week's players and pay the top few. Relative rewards can't be farmed by volume.
+9. **Entry fees.** A small coin cost per game, so playing blind loses money on average.
+10. **Diminishing returns.** Each further game in the same topic in a week pays less.
+11. **Fresh, held-out questions.** Never repeat a question to a bot within a run, and keep some stats out of
+    questions entirely, so memorising the question bank isn't a strategy.
+12. **Anomaly flags.** Log any bot whose game earnings sit far above what its research explains. A finding, and a
+    possible exploit.
+13. **More of the site's games.** League Grid, Blind Rank, Imposter, Keep 3 / Cut 3 and Six Degrees each test a
+    different kind of knowledge.
+
+### Decisions for you (current defaults in brackets)
+
+1. **Talk:** keep messages off for the first pilot and turn them on for the second? [off]
+2. **Game packs as new wealth:** keep, cut the target (0.06 packs per ticket), or add an entry fee? [keep]
+3. **Library contents:** pages show OVR, grade and Career Legacy, which correlate strongly with value. Keep them
+   (estimating is easier) or hide them (estimating is harder)? [shown]
+4. **Anchors:** outside collectors buying near hidden value, and 3% royalties each generation. [both on]
+5. **Allowance:** 10 coins a week, the inflation lever. [10]
+6. **Research limits:** 3 passes a week, expiring weekly, tradable, at most 6 used, notes stale after 12 weeks,
+   at most 25 notes. [as listed]
+7. **Theft:** 35% chance of being caught, and victims warn their friends. [on]
+8. **One market per player,** or separate markets by design and finish (closer to the real collection, but much
+   thinner)? [one per player]
+9. **AI seats:** 10 Haiku 5.5 bots in five persona pairs (value, trader, gamer, networker, open). Swap in Sonnet
+   or Opus seats? [10 Haiku]
+10. **Length and budget:** 120 weeks, stopping at $5. Bots aren't told when the run ends. [120 / $5]
+11. **Evolution:** rule bots evolve every 20 weeks, AI bots are exempt. Should AI bots be eliminated too, or
+    promoted to bigger models when they win? [exempt]
+12. **AI memory:** each call is fresh, with a 600-character memo as the only memory (cheap, and forces
+    summarising). Or give a longer history? [memo only]

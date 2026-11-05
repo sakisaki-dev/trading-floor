@@ -1,0 +1,175 @@
+<div class="wrap">
+  <header>
+    <span class="kicker gold">Retro Vault · Sandbox lab · prototype 1</span>
+    <h1>The <em>Trading</em> Floor</h1>
+    <p>About a hundred bots trade cards from a fixed pool for the 203 real Retro Vault players. Nothing about the players is simulated. Every card has a hidden value that no bot sees, so bots must research players in the library (three passes a week), trade their passes, and swap or steal each other's notes. Bots earn free packs by playing Arcade quizzes about the players, so what they know is what they earn. The rule bots here are free. AI bots join through the Node runner, and their runs replay on this page.</p>
+  </header>
+
+  <div class="controls" role="group" aria-label="Simulation controls">
+    <div class="group">
+      <button class="primary" id="play" type="button">Pause</button>
+      <button id="step" type="button">Step a week</button>
+      <button id="reset" type="button">Restart</button>
+    </div>
+    <div class="group seg" role="group" aria-label="Speed">
+      <button type="button" data-speed="1" aria-pressed="true">1×</button>
+      <button type="button" data-speed="4" aria-pressed="false">4×</button>
+      <button type="button" data-speed="16" aria-pressed="false">16×</button>
+    </div>
+    <div class="group">
+      <label class="kicker" for="preset">Market</label>
+      <select id="preset"></select>
+      <label class="kicker" for="seed">Seed</label>
+      <input id="seed" type="number" value="88" min="1" max="99999">
+    </div>
+    <div class="slider"><label for="fee">Trade fee <b id="feeV"></b></label><input id="fee" type="range" min="0" max="10" step="0.5" value="4"></div>
+    <div class="slider"><label for="allowance">Weekly allowance <b id="allowanceV"></b></label><input id="allowance" type="range" min="0" max="100" step="5" value="10"></div>
+    <div class="slider"><label for="packEdge">Pack house edge <b id="packEdgeV"></b></label><input id="packEdge" type="range" min="0" max="60" step="5" value="25"></div>
+    <div class="slider"><label for="passesPerWeek">Research passes a week <b id="passesPerWeekV"></b></label><input id="passesPerWeek" type="range" min="0" max="6" step="1" value="3"></div>
+    <div class="slider"><label for="knowledgeWeeks">Notes go stale after <b id="knowledgeWeeksV"></b></label><input id="knowledgeWeeks" type="range" min="2" max="40" step="1" value="12"></div>
+    <div class="slider"><label for="detectChance">Theft caught <b id="detectChanceV"></b></label><input id="detectChance" type="range" min="0" max="100" step="5" value="35"></div>
+    <div class="group">
+      <label class="toggle"><input type="checkbox" id="passesTradable" checked> Passes tradable</label>
+      <label class="toggle"><input type="checkbox" id="sharing" checked> Note sharing</label>
+      <label class="toggle"><input type="checkbox" id="stealing" checked> Note stealing</label>
+      <label class="toggle"><input type="checkbox" id="gossip" checked> Victims warn friends</label>
+      <label class="toggle"><input type="checkbox" id="games" checked> Arcade games</label>
+      <label class="toggle"><input type="checkbox" id="outsideCollectors" checked> Outside collectors</label>
+      <label class="toggle"><input type="checkbox" id="royalties" checked> Royalties</label>
+      <label class="toggle"><input type="checkbox" id="evolve" checked> Evolution</label>
+      <label class="toggle"><input type="checkbox" id="leagueUpdates"> League updates (test)</label>
+    </div>
+    <div class="group replay">
+      <label class="kicker" for="runFile">AI run</label>
+      <input id="runFile" type="file" accept=".json,application/json">
+      <button id="liveBtn" type="button" hidden>Back to live</button>
+    </div>
+  </div>
+
+  <div class="hyp" id="hyp"></div>
+
+  <div class="chips">
+    <div class="chip"><span>Week</span><b id="cWeek">–</b><small id="cWeekS"></small></div>
+    <div class="chip"><span>Price ÷ hidden value</span><b id="cBub">–</b><small id="cBubS"></small></div>
+    <div class="chip"><span>Wealth gap (Gini)</span><b id="cGini">–</b><small id="cGiniS"></small></div>
+    <div class="chip"><span>Trades this week</span><b id="cTrades">–</b><small id="cTradesS"></small></div>
+    <div class="chip"><span>Research pass price</span><b id="cPass">–</b><small id="cPassS"></small></div>
+    <div class="chip"><span>Richest bot</span><b id="cTop">–</b><small id="cTopS"></small></div>
+  </div>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="floor-h">
+      <div class="panel__head">
+        <h2 id="floor-h">The floor</h2>
+        <p>Each dot is a bot in its strategy's lane. Further right means richer (log scale), and bigger dots hold more cards. Lines are this week's trades. A dashed ring marks a thief, and a red ring a bot that five or more others have flagged.</p>
+      </div>
+      <canvas id="floor" aria-label="Every bot plotted by net worth, one lane per strategy"></canvas>
+      <div class="tip" id="floorTip" hidden></div>
+    </section>
+
+    <div class="stack">
+      <section class="panel" aria-labelledby="mk-h">
+        <div class="panel__head"><h2 id="mk-h">Market vs hidden value</h2></div>
+        <div class="legend"><span><i class="line" style="background:var(--gold)"></i>Traded price index</span><span><i class="dash"></i>Hidden value index</span></div>
+        <canvas id="market" aria-label="Price index and hidden value index over time, both starting at 100"></canvas>
+        <div class="tip" id="marketTip" hidden></div>
+      </section>
+      <section class="panel" aria-labelledby="gini-h">
+        <div class="panel__head"><h2 id="gini-h">Wealth gap</h2><p>Gini coefficient: 0 means every bot is equal, 1 means one bot owns everything.</p></div>
+        <canvas id="gini" aria-label="Gini coefficient of bot net worth over time"></canvas>
+        <div class="tip" id="giniTip" hidden></div>
+      </section>
+    </div>
+  </div>
+
+  <div class="row3">
+    <section class="panel" aria-labelledby="rs-h">
+      <div class="panel__head"><h2 id="rs-h">Research market</h2></div>
+      <p class="muted" style="font-size:13px">What a research pass sells for, in coins. Bots that don't research (momentum, arbitrage, most of the herd) sell their passes to bots that do.</p>
+      <canvas id="pass" aria-label="Research pass price over time"></canvas>
+      <div class="tip" id="passTip" hidden></div>
+      <div id="researched" class="muted" style="font-size:13px"></div>
+    </section>
+    <section class="panel" aria-labelledby="nt-h">
+      <div class="panel__head"><h2 id="nt-h">Notes: shared and stolen</h2></div>
+      <div class="legend"><span><i class="line" style="background:#3987e5"></i>Swaps a week</span><span><i class="line" style="background:#e66767"></i>Thefts a week</span></div>
+      <canvas id="notes" aria-label="Note swaps and thefts per week"></canvas>
+      <div class="tip" id="notesTip" hidden></div>
+      <div class="tablewrap"><table id="social"><thead><tr><th>Social style</th><th class="num">Bots</th><th class="num">Avg worth</th><th class="num">Flagged by</th></tr></thead><tbody></tbody></table></div>
+    </section>
+    <section class="panel" aria-labelledby="st-h">
+      <div class="panel__head"><h2 id="st-h">Who owns the wealth</h2></div>
+      <div class="legend" id="stratLegend"></div>
+      <canvas id="strat" aria-label="Share of total wealth by strategy over time"></canvas>
+      <div class="tip" id="stratTip" hidden></div>
+    </section>
+  </div>
+
+  <div class="row3">
+    <section class="panel" aria-labelledby="lb-h">
+      <div class="panel__head"><h2 id="lb-h">Leaderboard</h2></div>
+      <div class="tablewrap"><table id="lb"><thead><tr><th>Bot</th><th class="num">Worth</th><th class="num">Cash</th><th class="num">Notes</th><th>Style</th></tr></thead><tbody></tbody></table></div>
+    </section>
+    <section class="panel" aria-labelledby="sp-h">
+      <div class="panel__head"><h2 id="sp-h">Hottest cards</h2></div>
+      <div class="legend"><span><i class="line" style="background:var(--gold)"></i>Price</span><span><i class="dash"></i>Hidden value</span><span>Tap one to open its library page</span></div>
+      <div class="cards" id="spot"></div>
+    </section>
+    <section class="panel" aria-labelledby="lib-h">
+      <div class="panel__head"><h2 id="lib-h">The library</h2></div>
+      <p class="muted" style="font-size:13px">One research pass shows a bot this page. The hidden value is never on it.</p>
+      <label class="kicker" for="libPick">Player</label>
+      <select id="libPick"></select>
+      <div id="libPage"></div>
+    </section>
+  </div>
+
+  <div class="grid">
+    <section class="panel" aria-labelledby="tk-h">
+      <div class="panel__head"><h2 id="tk-h">Ticker</h2><p>Bubbles, crashes, corners, flagged thieves, pools running out, and evolution.</p></div>
+      <div class="ticker" id="ticker"></div>
+    </section>
+    <section class="panel" aria-labelledby="how-h">
+      <div class="panel__head"><h2 id="how-h">The strategies</h2></div>
+      <div class="tablewrap"><table><tbody id="archTable"></tbody></table></div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="act-h">
+    <div class="panel__head"><h2 id="act-h">Activity log</h2><p>Every action is logged. This shows the latest 40 of this week's (a full run's journal is in <span class="mono">journal.jsonl</span>).</p></div>
+    <div class="group seg" role="group" aria-label="Filter the activity log" id="actFilter">
+      <button type="button" data-f="all" aria-pressed="true">All</button>
+      <button type="button" data-f="trade" aria-pressed="false">Trades</button>
+      <button type="button" data-f="auction" aria-pressed="false">Auctions</button>
+      <button type="button" data-f="research" aria-pressed="false">Research</button>
+      <button type="button" data-f="notes" aria-pressed="false">Notes</button>
+      <button type="button" data-f="game" aria-pressed="false">Games</button>
+      <button type="button" data-f="pack" aria-pressed="false">Packs</button>
+      <button type="button" data-f="talk" aria-pressed="false">Talk</button>
+      <button type="button" data-f="ai" aria-pressed="false">AI</button>
+    </div>
+    <div class="ticker" id="activity"></div>
+  </section>
+
+  <div class="notes">
+    <section class="panel" aria-labelledby="look-h">
+      <h2 id="look-h">What to look for</h2>
+      <ul>
+        <li><b>Information has a price.</b> The research pass price shows what knowing a player is worth. Turn off "Passes tradable" and compare who gets rich.</li>
+        <li><b>Cooperation vs theft.</b> The social table compares sharers, reciprocators and thieves. Lower "Theft caught" and theft pays more. Raise it and thieves end up isolated, flagged by most of the floor.</li>
+        <li><b>Stale knowledge.</b> Shorten how long notes last and value bots trade on worse information. Prices drift further from hidden value.</li>
+        <li><b>Bubbles need fuel.</b> "Momentum mania" and "Anchors off" show prices leaving hidden value and coming back hard.</li>
+        <li><b>Knowledge earns.</b> Bots pick a position before each game, and questions are about players at that position. Focused research wins more packs. The game bars rise whenever a game pays too well, so farming the easy one stops working.</li>
+        <li><b>Scarcity.</b> The pool is finite. When a star's pool runs out, the only copies left are the ones in circulation.</li>
+      </ul>
+    </section>
+    <section class="panel" aria-labelledby="miss-h">
+      <h2 id="miss-h">Still simplified</h2>
+      <ul>
+        <li><b>One market per player.</b> Designs, finishes, kits, parallels and autographs are pooled into a single card per player for now.</li>
+        <li><b>Rule bots don't read the library.</b> They get its hidden value plus noise (their research error). AI bots read the actual page and write their own estimate.</li>
+        <li><b>Notes can't be faked yet.</b> Shared notes are honest copies. Lying in notes (selling a bad tip) is the next layer.</li>
+      </ul>
+    </section>
+  </div>
+</div>

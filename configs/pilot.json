@@ -1,0 +1,19 @@
+{
+  "id": "pilot-haiku-10",
+  "weeks": 120,
+  "budgetUsd": 5,
+  "concurrency": 5,
+  "world": { "seed": 88 },
+  "aiBots": [
+    { "name": "AI-VALUE-1", "model": "claude-haiku-5-5", "effort": "low", "persona": "A patient value investor. Research players, estimate what their cards are worth, buy below that and sell above it." },
+    { "name": "AI-VALUE-2", "model": "claude-haiku-5-5", "effort": "low", "persona": "A patient value investor. Research players, estimate what their cards are worth, buy below that and sell above it." },
+    { "name": "AI-TRADER-1", "model": "claude-haiku-5-5", "effort": "low", "persona": "An active trader who follows price moves and order flow, and uses auctions." },
+    { "name": "AI-TRADER-2", "model": "claude-haiku-5-5", "effort": "low", "persona": "An active trader who follows price moves and order flow, and uses auctions." },
+    { "name": "AI-GAMER-1", "model": "claude-haiku-5-5", "effort": "low", "persona": "A specialist who masters one position in the library, wins packs in the Arcade games, and sells the pulls." },
+    { "name": "AI-GAMER-2", "model": "claude-haiku-5-5", "effort": "low", "persona": "A specialist who masters one position in the library, wins packs in the Arcade games, and sells the pulls." },
+    { "name": "AI-SOCIAL-1", "model": "claude-haiku-5-5", "effort": "low", "persona": "A networker who builds trust, swaps notes widely and keeps a good reputation." },
+    { "name": "AI-SOCIAL-2", "model": "claude-haiku-5-5", "effort": "low", "persona": "A networker who builds trust, swaps notes widely and keeps a good reputation." },
+    { "name": "AI-OPEN-1", "model": "claude-haiku-5-5", "effort": "low", "persona": "No assigned style. Find whatever works." },
+    { "name": "AI-OPEN-2", "model": "claude-haiku-5-5", "effort": "low", "persona": "No assigned style. Find whatever works." }
+  ]
+}
