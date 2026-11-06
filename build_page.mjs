@@ -18,6 +18,8 @@ const head = `<title>Vault Trading Floor</title>
 // smooth while the bots think. The sources are embedded as strings ("</" escaped so they can't close the script tag).
 const asStr = (x) => JSON.stringify(x).replace(/<\//g, '<\\/');
 const html = head + read('page/style.css') + '\n' + read('page/body.html') + '\n<script>\nconst LIBRARY = ' + library + ';\nconst ENGINE_SRC = ' + asStr(engine) + ';\nconst WORKER_SRC = ' + asStr(read('page/worker.js')) + ';\n' + engine + '\n' + read('page/ui.js') + '\n</script>\n';
+// The page's script must parse as one script (the engine and ui.js share one scope: a name declared twice breaks it)
+{ const script = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>')); try { new Function(script); } catch (e) { console.error('page script does not parse:', e.message); process.exit(1); } }
 const out = path.join(here, '..', 'docs', 'sandbox', 'trading-floor.html');
 fs.writeFileSync(out, html);
 console.log(`page: ${path.relative(path.join(here, '..'), out)} (${html.length.toLocaleString()} bytes)`);

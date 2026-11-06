@@ -37,11 +37,16 @@ export const DEFAULTS = {
   lifespan: [6, 14],
   heirs: 2,
   populationCap: 1.15, // heirs beyond this × the starting population push the poorest bots out of the market
-  // Intrinsic value: 'ovrWalk' (default) starts every card at the site's price for it (its value × its rarity) and moves
-  // it 1% of that a week, up with probability 0.5 + (OVR − 80) / 50 (between walkMin and walkMax), else down; never
-  // below 1% of where it started. 'formula' follows the site's value formula season by season instead.
+  // Intrinsic value: 'ovrWalk' (default) starts every card at the site's price for it (its value × its rarity). Each week
+  // it rises by a percentage with probability walkUp, else falls by the same percentage. The size of that move comes
+  // from the card's risk rating: ±walkVolLow at riskLo or below, ±walkVolHigh at riskHi or above, in between in a line.
+  // With every card rising 55% of weeks, riskier cards earn more on average but swing far harder. The risk rating
+  // starts at the player's OVR and then follows the card's own record: riskPerDoubling points up for every doubling of
+  // its value since it entered the market (down for every halving), plus or minus any change in his real OVR from new
+  // seasons. A low card that keeps rising becomes a safe, slow one; a top card that crashes becomes risky.
+  // Never below 1% of where it started. 'formula' follows the site's value formula season by season instead.
   valueModel: 'ovrWalk',
-  walkPct: 0.01, walkMin: 0.15, walkMax: 0.85, // each weekly tick is 1% of the card's starting value
+  walkUp: 0.55, walkVolLow: 0.10, walkVolHigh: 0.01, riskLo: 60, riskHi: 95, riskPerDoubling: 10,
   startSeason: 'latest', // 'latest' opens the market at the present (site prices and price history imported); 'first' replays from Y79
   priceOnly: false, // a card is worth only what someone pays: no hidden value anywhere in the world (no royalties, packs priced
                     // from market prices, no valuation contest, research shows what a card has traded for). Real seasons still
@@ -1380,7 +1385,7 @@ export function frame(W, { full = false } = {}) {
     f.vol = W.players.map((c) => c.volH[c.volH.length - 1] || 0);
     f.aiDetail = Object.fromEntries(W.bots.filter((b) => b.kind === 'ai').map((b) => [b.name, { cash: Math.round(b.cash), debt: Math.round(b.debt || 0), realized: Math.round(b.stats.realized || 0), positions: [...b.h].map(([id, q]) => [id, q, r1(avgCost(b, id) ?? 0)]), notes: [...b.notes].map(([id, n]) => [id, r1(n.est), n.week]) }]));
     f.aiLog = W.journal.filter((j) => WHO.some((k) => typeof j[k] === 'string' && W.bots.find((b) => b.kind === 'ai' && b.name === j[k])));
-    f.circ = W.players.map((c) => circOf(W, c)); f.pool = W.players.map((c) => c.pool); f.ovr = W.players.map((c) => W.era?.[c.id]?.ovr ?? null);
+    f.circ = W.players.map((c) => circOf(W, c)); f.pool = W.players.map((c) => c.pool); f.ovr = W.players.map((c) => W.era?.[c.id]?.ovr ?? null); f.risk = W.players.map((c) => (c.on === false ? null : Math.round(riskRating(W, c) * 10) / 10));
     f.prices = W.players.map((c) => r1(c.P)); if (W.t === 0 || W.cfg.valueModel === 'ovrWalk' || (W.cfg.leagueUpdates && W.t % W.cfg.updateEvery === 0)) f.values = W.players.map((c) => r1(c.F)); }
   return f;
 }
@@ -1463,7 +1468,7 @@ function nextSeason(W) {
       W.era[c.id] = eraFrom(row);
       if (walk) { if (c.on === false) c.F = c.F0 = Math.max(0.05 * W.cfg.coinScale, row[0] / W.cfg.valueDivisor); } // the walk keeps going; only OVR (the odds) changes
       else c.F = Math.max(W.cfg.coinScale, row[0] / W.cfg.valueDivisor);
-      if (c.on === false) { c.on = true; c.P = W.cfg.priceOnly ? openingPrice(W, c) : c.F; c.Ph = [c.P]; c.pool = Math.max(2, Math.round(40 / Math.sqrt(Math.max(0.5, row[0] / 100)))) * W.cfg.poolMultiplier; resetMarkets(W, c); rookies.push(c); continue; }
+      if (c.on === false) { c.R0 = null; c.on = true; c.P = W.cfg.priceOnly ? openingPrice(W, c) : c.F; c.Ph = [c.P]; c.pool = Math.max(2, Math.round(40 / Math.sqrt(Math.max(0.5, row[0] / 100)))) * W.cfg.poolMultiplier; resetMarkets(W, c); rookies.push(c); continue; }
     } else {
       if (c.on === false) continue;
       if (W.cfg.priceOnly || walk) continue; // nothing to draw: price-only has no value, the OVR walk moves weekly
@@ -1557,12 +1562,17 @@ function aiSuccession(W, b) {
 }
 
 // The OVR walk: one tick a week per card in circulation or the pool. Higher OVR, better odds of going up; never certain.
-export const ovrOdds = (W, ovr) => clamp(0.5 + ((ovr || 60) - 80) / 50, W.cfg.walkMin, W.cfg.walkMax);
+// A card's risk rating (starts at OVR, then moves with its value) and the size of its weekly move
+export function riskRating(W, c) {
+  const ovr = ovrNow(W, c.id); if (c.R0 == null) { c.R0 = ovr; c.ovr0 = ovr; }
+  return clamp(c.R0 + (ovr - c.ovr0) + W.cfg.riskPerDoubling * Math.log2(Math.max(1e-9, c.F) / Math.max(1e-9, c.F0)), 40, 99);
+}
+export const walkVol = (W, r) => lerp(W.cfg.walkVolLow, W.cfg.walkVolHigh, clamp((r - W.cfg.riskLo) / (W.cfg.riskHi - W.cfg.riskLo), 0, 1));
 function ovrWalk(W) {
   for (const c of W.players) {
     if (c.on === false) continue;
-    const ovr = W.era?.[c.id]?.ovr ?? W.library.players[c.id].ovr ?? 60, step = W.cfg.walkPct * c.F0;
-    c.F = Math.max(0.01 * c.F0, c.F + (W.rand() < ovrOdds(W, ovr) ? step : -step));
+    const v = walkVol(W, riskRating(W, c));
+    c.F = Math.max(0.01 * c.F0, c.F * (W.rand() < W.cfg.walkUp ? 1 + v : 1 - v));
   }
   packCache = null; packCacheT = null;
 }
@@ -1630,7 +1640,7 @@ function bandHoldings(W) {
   for (const b of W.bots) { const g = m[b._grp ?? 2]; for (const [id, q] of b.h) { const c = W.cards[id]; g[bandOf(ovrNow(W, c.pid))] += q * c.P; } for (const it of itemsOf(W, b)) g[bandOf(ovrNow(W, it.pid))] += markItem(W, it); }
   return m.map((row) => row.map((v) => Math.round(v)));
 }
-export function upOdds(W, pid) { return ovrOdds(W, ovrNow(W, pid)); }
+export function riskOf(W, pid) { const c = W.players[pid], r = riskRating(W, c); return { rating: r, vol: walkVol(W, r) }; }
 
 /* ---------- Details for one player or one bot (the page asks for these; the world runs in a background worker) ---------- */
 export function playerDetail(W, id) {
