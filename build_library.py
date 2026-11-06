@@ -107,6 +107,11 @@ def main():
             v = vec(p)
             near = sorted((math.dist(v, vec(q)), q['name']) for q in group if q is not p)
             p['playsLike'] = [n for _, n in near[:3]]
+    # Play-style family from the site's own clustering (sandbox/families.ts writes data/families.json)
+    fam_path = os.path.join(ROOT, 'sandbox/data/families.json')
+    fams = json.load(open(fam_path)) if os.path.exists(fam_path) else {}
+    for p in players:
+        p['family'] = fams.get(p['key'], f"{p['pos']} (no family)")
     players.sort(key=lambda p: (-p['hidden']['value'], p['key']))
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     meta = {'source': 'public/data (league CSV, market.json latest snapshot, player-extras.json)', 'season': market['snapshots'][-1].get('season'),

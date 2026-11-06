@@ -4,7 +4,7 @@
   "type": "module",
   "description": "AI bots trading Retro Vault cards. The engine is shared with docs/sandbox/trading-floor.html.",
   "scripts": {
-    "library": "python3 build_library.py",
+    "library": "cd .. && npx tsx sandbox/families.ts && python3 sandbox/build_library.py",
     "page": "node build_page.mjs",
     "dry": "node run.mjs --config configs/pilot.json --dry",
     "pilot": "node run.mjs --config configs/pilot.json"

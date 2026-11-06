@@ -96,6 +96,8 @@ export function createWorld(library, overrides = {}) {
     W.cards.push({ id: i, key: p.key, name: p.name, pos: p.pos, team: teamShort(p.team), F, P: F, P0: F, S0: circ, circ: 0, pool: circ * cfg.poolMultiplier, Ph: [F], volH: [] });
   });
   for (const c of W.cards) W.byKey.set(c.key, c);
+  W.families = familyList(library);
+  library.players.forEach((p, i) => (W.cards[i].fam = familyIndex(W.families, p)));
   cfg.mix.forEach((n, a) => { for (let k = 0; k < n; k++) W.bots.push(newBot(W, a)); });
   for (const c of W.cards) for (let u = 0; u < c.S0; u++) { give(W.pick(W.bots), c, 1); c.circ++; }
   for (const b of W.bots) b.nwh = [worth(W, b)];
@@ -462,12 +464,15 @@ function playGame(W, b, game, set, answers, topic) {
   for (let k = 0; k < packs; k++) freePack(W, b);
   W.gamePacksWeek += packs;
   const r = { game: game === 'hl' ? 'higherOrLower' : 'overUnder', topic: topic || 'all', correct, of: set.length, packs };
+  const gw = W.gameWeek, tk = topic || 'all', add = (x) => { x[0]++; if (packs) x[1]++; x[2] += packs; };
+  add(gw[game]); add((gw.topic[tk] ||= [0, 0, 0])); add(gw.arch[b.a]);
   jot(W, { type: 'game', bot: b.name, ...r });
   return r;
 }
 function freePack(W, b) { const pk = packInfo(W); const cash = b.cash; b.cash = pk.price; ripPack(W, b, true); b.cash = cash; W.house.packs--; W.house.gamePacks = (W.house.gamePacks || 0) + 1; }
 function gamePhase(W) {
   const cfg = W.cfg; W.gamePacksWeek = 0;
+  W.gameWeek = { hl: [0, 0, 0], ou: [0, 0, 0], topic: {}, arch: ARCH.map(() => [0, 0, 0]) }; // [played, won a pack, packs]
   for (const g of Object.values(W.games)) { g.played.push(0); g.packs.push(0); if (g.played.length > 4) { g.played.shift(); g.packs.shift(); } }
   for (const b of W.bots) {
     b.gameResults = [];
@@ -803,9 +808,32 @@ export function frame(W, { full = false } = {}) {
     researched: [...W.week.researched].sort((a, b) => b[1] - a[1]).slice(0, 5),
     jn: [...W.journal.filter((j) => j.type === 'aiActions' || j.type === 'post' || j.type === 'message'), ...W.journal.filter((j) => !['aiActions', 'post', 'message'].includes(j.type) && (j.type !== 'game' || j.packs > 0)).slice(-30)].slice(-40),
     tickets: W.ticketPrice,
+    gw: W.gameWeek || null,
+    fam: famBubble(W),
+    hold: holdings(W),
     house: { fees: Math.round(W.house.fees), packs: W.house.packs, gamePacks: W.house.gamePacks || 0 },
     games: { need: W.games.hl.need, legs: W.games.ou.legs, packsWeek: W.gamePacksWeek || 0 },
   };
   if (full) { f.prices = W.cards.map((c) => r1(c.P)); if (W.t === 0 || (W.cfg.leagueUpdates && W.t % W.cfg.updateEvery === 0)) f.values = W.cards.map((c) => r1(c.F)); }
   return f;
 }
+
+// Price ÷ hidden value per family (by circulating supply), and the value each strategy holds in each family.
+function famBubble(W) {
+  const a = W.families.map(() => 0), b = W.families.map(() => 0);
+  for (const c of W.cards) { a[c.fam] += c.P * c.circ; b[c.fam] += c.F * c.circ; }
+  return a.map((x, i) => (b[i] ? Math.round((x / b[i]) * 1000) / 1000 : null));
+}
+function holdings(W) {
+  const m = ARCH.map(() => W.families.map(() => 0));
+  for (const b of W.bots) for (const [id, q] of b.h) { const c = W.cards[id]; m[b.a][c.fam] += q * c.P; }
+  return m.map((row) => row.map((v) => Math.round(v)));
+}
+
+// Families (the site's play-style clusters), ordered by position then size. The page uses the same list.
+export function familyList(library) {
+  const ORDER = ['QB', 'RB', 'WR', 'TE', 'OL', 'LB', 'DB', 'DL'], key = (p) => `${p.family || p.pos}|${p.pos}`;
+  const n = {}; library.players.forEach((p) => (n[key(p)] = (n[key(p)] || 0) + 1));
+  return Object.keys(n).sort((a, b) => { const [, pa] = a.split('|'), [, pb] = b.split('|'); return ORDER.indexOf(pa) - ORDER.indexOf(pb) || n[b] - n[a] || a.localeCompare(b); }).map((k) => { const [name, pos] = k.split('|'); return { name, pos, n: n[k] }; });
+}
+export const familyIndex = (fams, p) => fams.findIndex((f) => f.name === (p.family || p.pos) && f.pos === p.pos);
