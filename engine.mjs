@@ -32,7 +32,8 @@ export const DEFAULTS = {
   gossip: true, // a victim's friends flag the thief too
   outsideCollectors: true, // buyers from outside the bots bid around hidden value (the market's anchor)
   royalties: true, // each generation, holders get 3% of hidden value per card held
-  royaltyRate: 0.1, royaltyEvery: 'week', // royaltyRate: share of hidden value a card pays its holders per weeksPerGeneration (20) weeks; 'week' pays it weekly, from that week's game under the league
+  royaltyRate: 0.1, royaltyEvery: 'week', royaltyFunding: 'minted', // royaltyFunding 'minted': new coins (prices inflate); 'house': paid only out of the house's takings (fees, pack sales, living costs), a closed loop that can fall short
+  // royaltyRate: share of hidden value a card pays its holders per weeksPerGeneration (20) weeks; 'week' pays it weekly, from that week's game under the league
   evolve: true, // each generation the worst 10% by recent return adopt a mutated copy of a top 10% bot's networks (so strategies that trade well on the news can spread); off: strategies spread only through heirs
   evolveShare: 0.1,
   mortality: true, // bots live 6–14 generations; on death the estate is split between heirs that carry a mutated copy of the genome
@@ -116,7 +117,7 @@ export const DEFAULTS = {
   quotePull: 0.25, // how far unfilled orders pull the quoted price toward them each week (priceRule 'quotes' only)
   priceRule: 'comps', compsWeeks: 4, vaultIndex: 'repeatSales', // 'comps' (default): an untraded card is marked from its player's other cards' trades in the last compsWeeks weeks (comparable sales); 'lastTrade': its own last trade only. vaultIndex 'repeatSales': from pairs of trades of the same card; 'basket': every card's mark
   // 'lastTrade': a card's price is the last price it traded at; best bid and ask are shown, never move it. 'quotes': the old pull
-  outsideMode: 'value', collectors: 25, collectorError: 0.15, collectorStock: 40, // 'value' (default): two-sided dealers trading around last week's public value (see valueCollectors); 'budget': a price-taking budget; // 'budget': outsideBudget coins a week buy the lowest asks, spread by real popularity (Career Legacy), and outsideResale of what collectors hold is sold back into the best bids. 'band': the old 5% chance of a bid at 0.85–1.08× value
+  outsideMode: 'value', collectors: 25, collectorError: 0.15, collectorStart: 0.1, collectorPerCard: 4, collectorSpread: 0.05, // 'value' (default): two-sided dealers trading around last week's public value (see valueCollectors); 'budget': a price-taking budget; // 'budget': outsideBudget coins a week buy the lowest asks, spread by real popularity (Career Legacy), and outsideResale of what collectors hold is sold back into the best bids. 'band': the old 5% chance of a bid at 0.85–1.08× value
   outsideBudget: 250000, outsideResale: 0.02, outsideNews: true, // outsideNews: each player's share is his Career Legacy × his current form (the public news: a hot streak draws more, a slump or an injury less)
   forcedSale: 'book', // 'book': a margin-called or broke bot sells into the best bids, then lists the rest at auction with no minimum. 'discount': the old 88% ask and 70% item reserve
   packSale: 'auction', // 'auction': packsPerWeek are released and sold by uniform-price auction (everyone pays the lowest winning bid). 'markup': the old expected value + packEdge
@@ -1370,26 +1371,32 @@ function outsideFlow(W) {
 }
 // Value collectors (outsideMode 'value', the default): `collectors` outside dealers who know last week's value from the
 // site formula (never this week's, so a bot that reads the news can be earlier). Each has its own error (a fixed bias drawn
-// from collectorError, plus a per-card wobble half that size), a share of outsideBudget a week (savings capped at 4 weeks)
-// and room for collectorStock copies. Both ways: they buy the cheapest asks below their reference price and sell from their
-// own stock into bids above it. A bubble can still outrun them: their money and room run out.
+// from collectorError, plus a per-card wobble half that size) and a share of outsideBudget a week (savings capped at 4
+// weeks). They start out holding collectorStart of every card's copies (outside the market), so they can sell into any
+// card priced above value, and hold at most collectorPerCard copies of any one card, so a full card never stops them
+// buying others. Both ways: they buy asks at or below their reference and sell to bids within collectorSpread of it. A
+// bubble can still outrun them: their stock of a card and their money run out.
 function valueCollectors(W) {
-  const cfg = W.cfg, N = cfg.collectors ?? 25, out = (W.outside ||= new Map()), share = (cfg.outsideBudget || 0) / Math.max(1, N);
-  if (!W.coll || W.coll.length !== N) W.coll = Array.from({ length: N }, (_, i) => W.coll?.[i] || { cash: 0, stock: new Map(), n: 0, err: W.gauss() * (cfg.collectorError ?? 0.15) });
-  const wob = (i, id) => { const h = Math.sin((i + 1) * 12.9898 + (id + 1) * 78.233) * 43758.5453; return ((h - Math.floor(h)) * 2 - 1) * (cfg.collectorError ?? 0.15) * 0.5; };
+  const cfg = W.cfg, N = cfg.collectors ?? 25, share = (cfg.outsideBudget || 0) / Math.max(1, N), err = cfg.collectorError ?? 0.15;
+  if (!W.coll || W.coll.length !== N) {
+    const old = W.coll || []; W.coll = Array.from({ length: N }, (_, i) => old[i] || { cash: 0, stock: new Map(), n: 0, err: W.gauss() * err });
+    if (!W.collSeeded) { W.collSeeded = true; const out = (W.outside ||= new Map()); let k = 0; // starting stock: a share of every card's copies
+      for (const c of W.cards) { if (!(c.circ > 0) || c.on === false) continue; const q = Math.ceil((cfg.collectorStart ?? 0.1) * c.circ); for (let j = 0; j < q; j++) { const C = W.coll[k++ % N]; C.stock.set(c.id, (C.stock.get(c.id) || 0) + 1); C.n++; out.set(c.id, (out.get(c.id) || 0) + 1); } } }
+  }
+  const wob = (i, id) => { const h = Math.sin((i + 1) * 12.9898 + (id + 1) * 78.233) * 43758.5453; return ((h - Math.floor(h)) * 2 - 1) * err * 0.5; };
   const ref = (k, c) => (W.players[c.pid].Fpub ?? W.players[c.pid].F) * c.mult * Math.exp(W.coll[k].err + wob(k, c.id));
-  const cap = cfg.collectorStock ?? 40; let bought = 0, sold = 0, spent = 0;
+  const per = cfg.collectorPerCard ?? 4, spread = cfg.collectorSpread ?? 0.05; let bought = 0, sold = 0, spent = 0;
   const askBook = []; for (const c of W.cards) { if (c.on === false) continue; for (const o of asks[c.id] || []) if (!o.used && o.b !== 'store') askBook.push([c, o]); }
   for (let k = 0; k < N; k++) {
     const C = W.coll[k]; C.cash = Math.min(4 * share, C.cash + share);
-    // sell first: anything they hold that someone bids above their reference
-    for (const [id, q] of [...C.stock]) { const c = W.cards[id]; let left = q;
-      for (const o of leftBids(c)) { if (left <= 0) break; if (o.p <= ref(k, c)) break; if (xfer(W, c, o.b, 'out', o.p, o)) { o.used = true; left--; C.cash += o.p; C.n--; sold++; } }
+    // sell: any card they hold, to the best bids within `spread` of their reference
+    for (const [id, q] of [...C.stock]) { const c = W.cards[id]; let left = q; const r = ref(k, c);
+      for (const o of leftBids(c)) { if (left <= 0 || o.p < r * (1 - spread)) break; if (xfer(W, c, o.b, 'out', o.p, o)) { o.used = true; left--; C.cash += o.p; C.n--; sold++; } }
       left > 0 ? C.stock.set(id, left) : C.stock.delete(id); }
     C.cash = Math.min(4 * share, C.cash);
-    // then buy: the asks furthest below their reference, while money and room last
-    const cand = askBook.filter(([c, o]) => !o.used && o.p < ref(k, c)).sort((a, b) => a[1].p / ref(k, a[0]) - b[1].p / ref(k, b[0]));
-    for (const [c, o] of cand) { if (C.n >= cap) break; if (o.p > C.cash || o.used) continue; if (xfer(W, c, 'out', o.b, o.p, null, o)) { o.used = true; C.cash -= o.p; C.n++; C.stock.set(c.id, (C.stock.get(c.id) || 0) + 1); bought++; spent += o.p; } }
+    // buy: the asks furthest below their reference, at most `per` copies of any one card, while money lasts
+    const cand = askBook.filter(([c, o]) => !o.used && o.p <= ref(k, c) && (C.stock.get(c.id) || 0) < per).sort((a, b) => a[1].p / ref(k, a[0]) - b[1].p / ref(k, b[0]));
+    for (const [c, o] of cand) { if (o.p > C.cash || o.used || (C.stock.get(c.id) || 0) >= per) continue; if (xfer(W, c, 'out', o.b, o.p, null, o)) { o.used = true; C.cash -= o.p; C.n++; C.stock.set(c.id, (C.stock.get(c.id) || 0) + 1); bought++; spent += o.p; } }
   }
   W.outsideWeek = { spent: Math.round(spent), bought, resold: sold, held: W.coll.reduce((a, C) => a + C.n, 0) };
 }
@@ -1483,10 +1490,10 @@ function payRoyalties(W, share) {
   const k = new Map(W.players.map((p) => [p.id, gameK(p)]));
   const perCard = (c) => cfg.royaltyRate * share * c.F * (k.get(c.pid) ?? 1), perItem = (it) => cfg.royaltyRate * share * intrinsicItem(W, it) * (k.get(it.pid) ?? 1);
   let owed = 0; for (const b of W.bots) { for (const [id, q] of b.h) owed += perCard(W.cards[id]) * q; for (const uid of b.items || []) { const it = W.items.get(uid); if (it) owed += perItem(it); } }
-  const scaleR = cfg.closedEconomy ? Math.min(1, (W.treasury * 0.5) / Math.max(1, owed)) : 1; let paid = 0;
+  const house = cfg.royaltyFunding === 'house', scaleR = house ? Math.min(1, Math.max(0, W.treasury) / Math.max(1, owed)) : cfg.closedEconomy ? Math.min(1, (W.treasury * 0.5) / Math.max(1, owed)) : 1; let paid = 0;
   for (const b of W.bots) { let d = 0; for (const [id, q] of b.h) d += perCard(W.cards[id]) * q * scaleR; for (const uid of b.items || []) { const it = W.items.get(uid); if (it) d += perItem(it) * scaleR; } b.cash += d; flowIn(W, b, d); paid += d; } // royalties count in a bot's return: what it holds is its choice
   for (const L of W.cardLoans || []) { const amt = perCard(W.cards[L.id]) * scaleR; L.borrower.cash -= amt; L.lender.cash += amt; } // a short seller pays the lender what the card would have earned
-  if (cfg.closedEconomy) W.treasury -= paid; W.house.royalties += paid; W.royGen = (W.royGen || 0) + paid;
+  if (cfg.closedEconomy || house) W.treasury -= paid; W.house.royalties += paid; W.royGen = (W.royGen || 0) + paid;
   // what each card paid over the last weeksPerGeneration weeks, per copy (public: every holder saw it)
   const n = cfg.weeksPerGeneration; for (const p of W.players) { const r = (p.royWin ||= []); r.push(cfg.royaltyRate * share * p.F * (k.get(p.id) ?? 1) * scaleR); if (r.length > (share >= 1 ? 1 : n)) r.shift(); p.roySum = r.reduce((a, b) => a + b, 0); }
   for (const c of W.cards) c.lastRoy = (W.players[c.pid].roySum || 0) * c.mult; for (const it of W.items.values()) it.lastRoy = (W.players[it.pid]?.roySum || 0) * (it.mult / Math.max(1e-9, W.cards[mktId(it.pid, it.d === 4 ? 0 : it.d, it.f)]?.mult || 1));
