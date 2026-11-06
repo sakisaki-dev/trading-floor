@@ -633,3 +633,35 @@ strategies emerge or die out.
 - presets that change only the laws.
 
 **AI bots** can lend, borrow and repay through the same credit market.
+
+---
+
+## 21. Mortality, inheritance and fitness by return (prototype 2.1)
+
+**Laws added:**
+- **Mortality and inheritance.** Bots live 6–14 generations. On death the estate (cash, cards with their cost basis,
+  loans in both directions, notes) is split between 2 heirs carrying mutated copies of the genome. When heirs push
+  the population past 115% of its start, the poorest bots leave the market. Departing bots settle their loans: loans
+  they made are forgiven, loans they owe default.
+- **Fitness is return on capital.** Each generation, bots are ranked by what their own decisions earned on the
+  capital they started with; allowance, royalties and living costs are excluded. The bottom 10% adopt a mutated copy
+  of a top-10% bot's genome and keep their own wealth.
+
+**500 generations, seed 88:**
+- **Wealth no longer locks in.** The Gini peaks at 0.74 around generation 150, then falls back to 0.24–0.42 as
+  fortunes split between heirs. It used to climb to 0.99 and stay there.
+- **Lineages now run deep:** up to generation 94, against 5 before.
+- **Strategy eras succeed each other:**
+  - **Generations 1–20:** market making leads (up to 72 of ~115 bots).
+  - **Generations 20–250:** momentum and dip buying earn 15–43% per generation and spread. They profit from each
+    other and from the herd.
+  - **Generations 250+:** hoarding takes over (104 of 115 bots by generation 500). Momentum and dip buying go
+    extinct because nobody trades with them any more; prices sink to 0.08–0.5× value in an illiquid market.
+- **Leverage and theft die out:** borrowing appetite falls to about 0.04, defaults stop after generation 100, and no
+  thieves remain at generation 500.
+- **One strategy family wins:** adoption joins a bot to its mentor's family, so 90 founding lineages narrow to 3 by
+  generation 50 and 1 by generation 350.
+
+**Caveat:** hoarding wins the late game partly because of the remaining artifact. After the real history, hidden
+values still random-walk without bound, which rewards buy-and-hold. Bounded careers (retirements and new rookie
+classes) would remove that bias.

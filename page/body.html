@@ -127,7 +127,7 @@
 
   <section class="panel" aria-labelledby="hg-h">
     <div class="head"><h2 id="hg-h">What evolution selects</h2><span class="scale" id="scaleGene"></span></div>
-    <p class="note">Each row is one gene: the population's average weight on it, weighted by wealth, against where it started. Blue means it is paying and spreading.</p>
+    <p class="note">Each row is one gene: the average weight across all bots against where it started. Genes spread when bots copy the best returns and when long-lived lineages pass them to heirs. Blue = spreading.</p>
     <canvas id="hmGene" class="hm hm--short" aria-label="Heatmap of the wealth-weighted genome over time"></canvas>
     <div class="tip" id="hmGeneTip" hidden></div>
   </section>
@@ -185,7 +185,7 @@
   <div class="grid three">
     <section class="panel" aria-labelledby="lb-h">
       <div class="head"><h2 id="lb-h">Leaderboard</h2></div>
-      <div class="tablewrap"><table id="lb"><thead><tr><th>Bot</th><th class="num">Worth</th><th class="num">Cash</th><th class="num">Notes</th><th>Style</th></tr></thead><tbody></tbody></table></div>
+      <div class="tablewrap"><table id="lb"><thead><tr><th>Bot</th><th class="num">Worth</th><th class="num">Gen return</th><th class="num">Line</th><th>Style</th></tr></thead><tbody></tbody></table></div>
     </section>
     <section class="panel" aria-labelledby="sp-h">
       <div class="head"><h2 id="sp-h">Most traded</h2><span class="legend"><span><i class="line" style="background:var(--gold)"></i>Price</span><span><i class="dash"></i>Value</span></span></div>

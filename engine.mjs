@@ -29,8 +29,12 @@ export const DEFAULTS = {
   outsideCollectors: false, // buyers from outside the bots bid around hidden value (the market's anchor)
   royalties: true, // each generation, holders get 3% of hidden value per card held
   royaltyRate: 0.03,
-  evolve: true, // the poorest 10% of rule bots are replaced by mutated copies of the richest 10%
+  evolve: true, // each generation the worst 10% by return on capital adopt a mutated genome from the best 10% (keeping their wealth)
   evolveShare: 0.1,
+  mortality: true, // bots live 6–14 generations; on death the estate is split between heirs that carry a mutated copy of the genome
+  lifespan: [6, 14],
+  heirs: 2,
+  populationCap: 1.15, // heirs beyond this × the starting population push the poorest bots out of the market
   history: true, // replay the save's real seasons as news (sandbox/data/timeline.json), then real-change draws after
   seasonWeeks: 20, // weeks per season
   turnover: false, // bots join (faster after rallies, mostly speculators) and leave (after heavy losses, or retiring)
@@ -129,7 +133,7 @@ export function createWorld(library, overrides = {}) {
   startTimeline(W);
   for (let k = 0; k < cfg.population; k++) W.bots.push(newBot(W, null));
   for (const c of W.cards) for (let u = 0; u < c.S0; u++) { const b = W.pick(W.bots); give(b, c, 1); addLot(b, c, c.F, 0); c.circ++; }
-  for (const b of W.bots) b.nwh = [worth(W, b)];
+  for (const b of W.bots) { b.nwh = [worth(W, b)]; b.genStart = b.nwh[0]; b.exo = 0; }
   if (cfg.games) publishContests(W);
   record(W);
   log(W, 'start', `The market opens: ${W.bots.length} bots, ${W.cards.length} players, ${W.cards.reduce((s, c) => s + c.circ, 0).toLocaleString()} cards in circulation and ${W.cards.reduce((s, c) => s + c.pool, 0).toLocaleString()} still in the pool. Every price starts at its hidden value; no bot knows any player yet.`);
@@ -602,6 +606,7 @@ export function newBot(W, a, parent, extra = {}) {
     stats: { shared: 0, stolen: 0, caught: 0, researched: 0 }, memo: '', ...extra,
   };
   b.name = extra.name || `BOT-${String(b.id).padStart(3, '0')}`;
+  b.lineage = parent ? parent.lineage ?? parent.id : b.id;
   return b;
 }
 
@@ -731,6 +736,7 @@ function livingAndCredit(W) {
   for (const b of W.bots) {
     b.forced = 0;
     const eq = b.cash + holdingsValue(W, b) + (b.lent || 0) - b.debt, cost = cfg.livingCost + cfg.lifestyle * Math.max(0, eq);
+    const paidC = Math.min(cost, Math.max(0, b.cash)); b.exo = (b.exo || 0) - paidC;
     if (b.cash >= cost) { b.cash -= cost; W.living.spent += cost; } else { W.living.spent += Math.max(0, b.cash); b.forced += cost - Math.max(0, b.cash); b.cash = 0; W.living.broke++; }
   }
   creditMarket(W);
@@ -738,9 +744,9 @@ function livingAndCredit(W) {
   for (const b of W.bots) { const r = Number(b.pending?.repay) || 0; if (b.kind === 'ai' && r > 0) for (const L of W.loans.filter((L) => L.borrower === b)) repayLoan(W, L, Math.min(r, b.cash)); }
 }
 export function totalDebt(W) { return W.bots.reduce((s, b) => s + (b.debt || 0), 0); }
-// The population's genome, weighted by wealth: what selection is favouring
+// The population's genome, one vote per bot: what selection and inheritance are spreading
 function genomeMix(W) {
-  const rule = W.bots.filter((b) => b.kind === 'rule'), ws = rule.map((b) => Math.max(1, worth(W, b))), tot = ws.reduce((a, b) => a + b, 0) || 1;
+  const rule = W.bots.filter((b) => b.kind === 'rule'), ws = rule.map(() => 1), tot = ws.length || 1; // every bot counts once: genes spread by being copied, not by wealth
   const out = SIGNALS.map((k) => rule.reduce((s, b, i) => s + b.g.w[k] * ws[i], 0) / tot);
   out.push(rule.reduce((s, b, i) => s + Math.min(2, b.g.lev) * ws[i], 0) / tot, rule.reduce((s, b, i) => s + b.g.lendShare * ws[i], 0) / tot);
   return out.map((x) => Math.round(x * 1000) / 1000);
@@ -824,7 +830,7 @@ export function step(W) {
   W.bankRate = cfg.centralBank ? clamp(1 + cfg.bankGain * (cfg.bankTarget - lastBub), 0, 4) : 1;
   const want = cfg.allowance * W.bots.length * W.bankRate, pay = cfg.closedEconomy ? Math.min(want, W.treasury) : want;
   if (cfg.closedEconomy) W.treasury -= pay; else W.treasury = 0; // without a closed economy, the house's takings leave circulation
-  for (const b of W.bots) b.cash += pay / W.bots.length;
+  for (const b of W.bots) { b.cash += pay / W.bots.length; b.exo = (b.exo || 0) + pay / W.bots.length; }
   W.flow.paidOut = pay;
   if (cfg.wealthTax > 0 && W.t % 4 === 0) {
     const ws = W.bots.map((b) => [b, worth(W, b)]), med = ws.map((x) => x[1]).sort((a, b) => a - b)[Math.floor(ws.length / 2)] || 0;
@@ -911,22 +917,62 @@ function generationEnd(W) {
   const cfg = W.cfg, gen = W.t / cfg.weeksPerGeneration;
   if (cfg.royalties) { let owed = 0; for (const b of W.bots) for (const [id, q] of b.h) owed += cfg.royaltyRate * W.cards[id].F * q;
     const scaleR = cfg.closedEconomy ? Math.min(1, (W.treasury * 0.5) / Math.max(1, owed)) : 1; let paid = 0;
-    for (const b of W.bots) for (const [id, q] of b.h) { const d = cfg.royaltyRate * W.cards[id].F * q * scaleR; b.cash += d; paid += d; }
+    for (const b of W.bots) for (const [id, q] of b.h) { const d = cfg.royaltyRate * W.cards[id].F * q * scaleR; b.cash += d; b.exo = (b.exo || 0) + d; paid += d; }
     if (cfg.closedEconomy) W.treasury -= paid; W.house.royalties += paid; log(W, 'gen', `Generation ${gen} royalties: ${Math.round(paid).toLocaleString()} coins to card holders (${Math.round(cfg.royaltyRate * 100)}% of each card's hidden value).`); }
   for (const b of W.bots) b.seasons++;
-  if (!cfg.evolve) return;
-  const ranked = W.bots.filter((b) => b.kind === 'rule').map((b) => [b, worth(W, b)]).sort((x, y) => y[1] - x[1]);
-  const n = Math.max(1, Math.round(ranked.length * cfg.evolveShare));
-  const winners = ranked.slice(0, n).map((x) => x[0]), losers = ranked.slice(-n).map((x) => x[0]);
-  const cut = new Set(losers.map((b) => b.id));
-  for (const b of losers) for (const [id, q] of b.h) W.liq.set(id, (W.liq.get(id) || 0) + q);
-  W.bots = W.bots.filter((b) => !cut.has(b.id));
-  for (const b of W.bots) { for (const id of cut) { b.flags.delete(id); b.friends.delete(id); } }
-  for (const b of losers) jot(W, { type: 'eliminated', bot: b.name, kind: ARCH[b.a].label, social: b.social });
-  for (const w of winners) { const c = newBot(W, null, w); c.nwh = [worth(W, c)]; W.bots.push(c); jot(W, { type: 'born', bot: c.name, parent: w.name, kind: ARCH[c.a].label, social: c.social }); }
-  const kinds = (xs) => Object.entries(xs.reduce((o, b) => ((o[ARCH[b.a].label] = (o[ARCH[b.a].label] || 0) + 1), o), {})).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${v} ${k}`).join(', ');
-  const thieves = losers.filter((b) => b.social === 'thief').length, wthieves = winners.filter((b) => b.social === 'thief').length;
-  log(W, 'evolve', `Generation ${gen} ends. ${n} poorest bots eliminated (${kinds(losers)}; ${thieves} thieves). Copies of the ${n} richest take their slots (${kinds(winners)}; ${wthieves} thieves). The dead bots' cards go to a liquidator at 20% under market.`);
+  // Fitness: return on the capital the bot started the generation with, from its own decisions only (allowance,
+  // royalties and living costs are removed, since no bot chose them)
+  const rule = W.bots.filter((b) => b.kind === 'rule');
+  for (const b of rule) { const start = Math.max(50, b.genStart ?? worth(W, b)); b.roc = (worth(W, b) - (b.exo || 0)) / start - 1; b.rocHist = [...(b.rocHist || []), b.roc].slice(-10); }
+  if (cfg.evolve && rule.length > 4) {
+    const ranked = rule.slice().sort((x, y) => y.roc - x.roc), n = Math.max(1, Math.round(ranked.length * cfg.evolveShare));
+    const best = ranked.slice(0, n), worst = ranked.slice(-n);
+    for (const b of worst) { const m = W.pick(best); const before = ARCH[b.a].label; b.g = mutate(W, m.g); b.a = styleOf(b.g.w); b.gen = m.gen + 1; b.lineage = m.lineage ?? m.id; b.adopted = (b.adopted || 0) + 1; jot(W, { type: 'adopted', bot: b.name, from: m.name, before, after: ARCH[b.a].label, roc: r2(b.roc), mentorRoc: r2(m.roc) }); }
+    const kinds = (xs) => Object.entries(xs.reduce((o, b) => ((o[ARCH[b.a].label] = (o[ARCH[b.a].label] || 0) + 1), o), {})).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${v} ${k}`).join(', ');
+    log(W, 'evolve', `Generation ${gen}: best returns ${best.slice(0, 3).map((b) => `${b.name} ${b.roc >= 0 ? '+' : ''}${Math.round(b.roc * 100)}%`).join(', ')}. The ${n} worst-returning bots adopt their strategies and keep their own capital (now ${kinds(worst)}).`);
+  }
+  if (cfg.mortality) {
+    let died = 0, born = 0;
+    for (const b of rule) {
+      if (b.lifespan == null) b.lifespan = cfg.lifespan[0] + Math.floor(W.rand() * (cfg.lifespan[1] - cfg.lifespan[0] + 1));
+      if (b.seasons < b.lifespan) continue;
+      const heirs = Array.from({ length: cfg.heirs }, () => { const h = newBot(W, null, b); h.cash = 0; h.lineage = b.lineage ?? b.id; h.lifespan = cfg.lifespan[0] + Math.floor(W.rand() * (cfg.lifespan[1] - cfg.lifespan[0] + 1)); return h; });
+      settleEstate(W, b, heirs); died++; born += heirs.length;
+    }
+    // Too many heirs: the poorest leave the market (their cards are sold, their loans settled)
+    const cap = Math.round(cfg.population * cfg.populationCap);
+    const poorest = W.bots.filter((b) => b.kind === 'rule').map((b) => [b, worth(W, b)]).sort((x, y) => x[1] - y[1]);
+    let out = 0; while (W.bots.filter((b) => b.kind === 'rule').length > cap && poorest.length) { removeBot(W, poorest.shift()[0], 'priced out'); out++; }
+    if (died) log(W, 'evolve', `Generation ${gen}: ${died} bots die of old age; their estates pass to ${born} heirs carrying their strategies${out ? `, and ${out} of the poorest bots leave the market` : ''}.`);
+  }
+  for (const b of W.bots) { b.genStart = worth(W, b); b.exo = 0; }
+}
+// An estate passes to heirs in equal shares: cash, every card copy (with its cost), loans in both directions, notes
+function settleEstate(W, b, heirs) {
+  const k = heirs.length;
+  for (const h of heirs) { h.cash = b.cash / k; h.notes = new Map(b.notes); h.friends = new Set(b.friends); h.flags = new Set(b.flags); h.social = b.social; h.gen = b.gen + 1; W.bots.push(h); }
+  let i = 0;
+  for (const [id, q] of b.h) { const lots = b.lots?.get(id) || []; for (let u = 0; u < q; u++) { const h = heirs[i++ % k]; give(h, W.cards[id], 1); addLot(h, W.cards[id], lots[u]?.[0] ?? W.cards[id].F, lots[u]?.[1] ?? W.t); } }
+  for (const L of W.loans || []) {
+    if (L.lender === b) { const h = heirs[i++ % k]; L.lender = h; h.lent = (h.lent || 0) + L.amount; }
+    if (L.borrower === b) { const h = heirs[i++ % k]; L.borrower = h; h.debt = (h.debt || 0) + L.amount; }
+  }
+  for (const h of heirs) { h.nwh = [worth(W, h)]; h.genStart = h.nwh[0]; }
+  W.bots = W.bots.filter((x) => x !== b);
+  for (const x of W.bots) { if (x.flags.delete(b.id)) for (const h of heirs) x.flags.add(h.id); if (x.friends.delete(b.id)) for (const h of heirs) x.friends.add(h.id); }
+  jot(W, { type: 'died', bot: b.name, age: b.seasons, estate: r2(heirs.reduce((s, h) => s + worth(W, h), 0)), heirs: heirs.map((h) => h.name) });
+}
+// A bot leaving the market: its cards go to the liquidator; loans it made are forgiven, loans it owes default
+export function removeBot(W, b, reason) {
+  const w = worth(W, b);
+  for (const [id, q] of b.h) W.liq.set(id, (W.liq.get(id) || 0) + q);
+  for (const L of W.loans || []) {
+    if (L.lender === b && L.amount > 0) { L.borrower.debt -= L.amount; L.amount = 0; }
+    if (L.borrower === b && L.amount > 0) { L.lender.lent -= L.amount; L.amount = 0; }
+  }
+  W.bots = W.bots.filter((x) => x !== b);
+  for (const x of W.bots) { x.flags.delete(b.id); x.friends.delete(b.id); }
+  jot(W, { type: 'exited', bot: b.name, kind: ARCH[b.a].label, worth: r2(w), reason });
 }
 function detect(W) {
   const p = W.hist.p;
@@ -995,7 +1041,7 @@ export const SOCIAL = ['sharer', 'reciprocator', 'thief'];
 export function frame(W, { full = false } = {}) {
   const h = W.hist, L = (a) => a[a.length - 1];
   const r1 = (x) => Math.round(x * 10) / 10;
-  const bots = W.bots.map((b) => [b.id, b.a, b.name, Math.round(worth(W, b)), b.n, SOCIAL.indexOf(b.social), b.flaggedBy, Math.round(b.cash), b.notes.size, b.kind === 'ai' ? 1 : 0, b.gen, b.model || '', b.seasons]);
+  const bots = W.bots.map((b) => [b.id, b.a, b.name, Math.round(worth(W, b)), b.n, SOCIAL.indexOf(b.social), b.flaggedBy, Math.round(b.cash), b.notes.size, b.kind === 'ai' ? 1 : 0, b.gen, b.model || '', b.seasons, b.roc == null ? null : Math.round(b.roc * 1000) / 1000, b.lineage ?? b.id]);
   const hotNow = W.cards.slice().sort((x, y) => recentVol(y, 20) - recentVol(x, 20)).slice(0, 6).map((c) => [c.id, r1(c.P), r1(c.F), recentVol(c, 20), c.circ, c.pool]);
   const f = {
     t: W.t,
@@ -1012,6 +1058,7 @@ export function frame(W, { full = false } = {}) {
     lender: W.lender ? { ltv: r2(W.lender.ltv), rate: Math.round(W.lender.rate * 10000) / 10000 } : null,
     fashion: W.fashion ? W.fashion.map((x) => r2(x)) : null,
     genome: genomeMix(W),
+    lineages: lineageStats(W),
     people: W.turnover || null,
     mkt: marketStats(W),
     flow: W.flow ? { net: W.flow.net.map(Math.round), realized: W.flow.realized.map(Math.round), trips: W.flow.trips, tax: Math.round(W.flow.tax), paidOut: Math.round(W.flow.paidOut) } : null,
@@ -1122,9 +1169,7 @@ function peopleChange(W) {
     if (b.kind !== 'rule') continue;
     const w = worth(W, b); b.peak = Math.max(b.peak || 0, w);
     if (!(w < 0.3 * b.peak && W.t - (b.joined ?? 0) > 20 && W.rand() < 0.25) && !(W.rand() < 0.002)) continue;
-    for (const [id, q] of b.h) W.liq.set(id, (W.liq.get(id) || 0) + q);
-    W.bots = W.bots.filter((x) => x !== b); left++;
-    jot(W, { type: 'exited', bot: b.name, kind: ARCH[b.a].label, worth: r2(w), reason: w < 0.3 * b.peak ? 'gave up after heavy losses' : 'retired' });
+    removeBot(W, b, w < 0.3 * b.peak ? 'gave up after heavy losses' : 'retired'); left++;
   }
   W.turnover = { joined, left };
 }
@@ -1156,4 +1201,11 @@ function fashionStep(W) {
     else if (W.rand() < 0.002) { F[i] -= 0.5; log(W, 'fashion', `Fashion: collectors lose interest in ${W.families[i].pos} ${W.families[i].name} cards.`); }
     F[i] = clamp(F[i], -1.2, 1.5);
   }
+}
+
+// Lineages: families of bots descended from one founder. How many survive, how deep they go, how much the largest holds
+function lineageStats(W) {
+  const by = new Map(); for (const b of W.bots) { if (b.kind !== 'rule') continue; const k = b.lineage ?? b.id; const x = by.get(k) || { n: 0, w: 0, depth: 0 }; x.n++; x.w += worth(W, b); x.depth = Math.max(x.depth, b.gen); by.set(k, x); }
+  const xs = [...by.values()], tot = xs.reduce((s, x) => s + x.w, 0) || 1, top = xs.sort((a, b) => b.w - a.w)[0];
+  return { count: xs.length, depth: Math.max(0, ...xs.map((x) => x.depth)), topShare: top ? Math.round((top.w / tot) * 1000) / 1000 : 0, topSize: top?.n || 0 };
 }
