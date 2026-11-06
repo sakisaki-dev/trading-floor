@@ -3,13 +3,14 @@
    player and bot the page has selected. */
 // Everything that happened, kept for Save run (research and game entries are already summed in the frames)
 const SKIP = new Set(['research', 'game', 'aiActions']); let LOG = [];
-const keep = () => { for (const j of W.journal) if (j.t === W.t && !SKIP.has(j.type)) LOG.push(j); };
+const LOG_MAX = 120000; // Save run keeps the latest entries; a long run would otherwise fill the worker's memory
+const keep = () => { for (const j of W.journal) if (j.t === W.t && !SKIP.has(j.type)) LOG.push(j); if (LOG.length > LOG_MAX * 1.25) LOG = LOG.slice(-LOG_MAX); };
 let W = null, LIB = null, playing = true, speed = 1, timer = null, sel = { p: null, b: null };
 const det = () => ({ p: sel.p == null ? null : playerDetail(W, sel.p), b: sel.b == null ? null : botDetail(W, sel.b) });
 function one() { step(W); keep(); postMessage({ type: 'frame', frames: [frame(W, { full: true })], cfg: W.cfg, detail: det() }); }
 function schedule() {
   clearTimeout(timer); if (!playing || !W) return;
-  const tick = () => { if (!playing) return; const t0 = Date.now(); one(); const dt = Date.now() - t0; timer = setTimeout(tick, Math.max(typeof INLINE !== 'undefined' ? dt * 1.5 : 0, 333 / speed - dt)); }; // on the page itself (no worker), leave it time to draw between weeks
+  const tick = () => { if (!playing) return; const t0 = Date.now(); one(); const dt = Date.now() - t0; const duty = speed >= 16 ? 1 : speed >= 4 ? 0.75 : 0.5; timer = setTimeout(tick, Math.max(typeof INLINE !== 'undefined' ? dt * 1.5 : 0, 333 / speed - dt, dt * (1 / duty - 1))); }; // at 1× the world uses at most half a core, 3/4 at 4× // on the page itself (no worker), leave it time to draw between weeks
   timer = setTimeout(tick, 0);
 }
 onmessage = (e) => {
@@ -23,6 +24,7 @@ onmessage = (e) => {
   }
   if (!W) return;
   if (m.cmd === 'play') { playing = m.v; schedule(); }
+  else if (m.cmd === 'hidden') { if (m.v) clearTimeout(timer); else schedule(); } // the tab is out of sight: rest
   else if (m.cmd === 'speed') speed = m.v || 1;
   else if (m.cmd === 'step') one();
   else if (m.cmd === 'cfg') { W.cfg[m.k] = m.v; postMessage({ type: 'cfg', cfg: W.cfg }); }

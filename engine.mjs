@@ -562,7 +562,8 @@ const r2 = (x) => Math.round(x * 100) / 100;
 const WHO = ['bot', 'buyer', 'seller', 'a', 'b', 'thief', 'victim', 'winner', 'from', 'to'];
 export function jot(W, e) {
   const entry = { t: W.t, ...e }; W.journal.push(entry);
-  for (const k of WHO) { const n = entry[k]; if (typeof n !== 'string') continue; let l = W.botLog.get(n); if (!l) W.botLog.set(n, (l = [])); l.push(entry); if (l.length > 80) l.shift(); }
+  for (const k of WHO) { const n = entry[k]; if (typeof n !== 'string') continue; let l = W.botLog.get(n); if (!l) W.botLog.set(n, (l = [])); l.push(entry); if (l.length > 400) l.shift(); }
+  if (entry.type === 'pack' && typeof entry.bot === 'string') { let q = (W.botPacks ||= new Map()).get(entry.bot); if (!q) W.botPacks.set(entry.bot, (q = [])); q.push(entry); if (q.length > 12) q.shift(); }
   const ck = entry.card || entry.player; if (typeof ck === 'string') { let l = (W.cardLog ||= new Map()).get(ck); if (!l) W.cardLog.set(ck, (l = [])); l.push(entry); if (l.length > 60) l.shift(); }
 }
 // Cost basis: every copy a bot holds remembers what it paid (FIFO), so sales realize a profit or loss
@@ -874,7 +875,7 @@ function ruleAuctionList(W, b) {
 // borrowing, what it pays for passes and tickets, packs, sharing and stealing, and which contests to enter. The
 // weights start random. Whatever earns money survives: at each generation's end the worst-returning 10% (averaged
 // over their last 3 generations) copy the networks of the top 10% with small random changes.
-export const CARD_IN = ['bias', 'price (log)', 'rarity premium (log)', 'design', 'finish', 'change 1w', 'change 4w', 'change 12w', 'below 12w average', 'trades 4w', 'copies out', 'pool left', 'has a note', 'note vs price', 'note age', 'OVR (from research)', 'copies held', 'gain on cost', 'share of worth', 'cash share', 'debt share', 'market drawdown', 'market 4w', 'season phase', 'one of a kind', 'its premium', 'risk rating (from research)', 'royalty yield (from note)', 'my weeks of life left', 'copies I am short', 'copies lendable', 'card lending fee'];
+export const CARD_IN = ['bias', 'price (log)', 'rarity premium (log)', 'design', 'finish', 'change 1w', 'change 4w', 'change 12w', 'below 12w average', 'trades 4w', 'copies out', 'pool left', 'has a note', 'note vs price', 'note age', 'OVR (from research)', 'copies held', 'gain on cost', 'share of worth', 'cash share', 'debt share', 'market drawdown', 'market 4w', 'season phase', 'one of a kind', 'its premium', 'risk rating (from research)', 'royalty yield (from note)', 'my weeks of life left', 'copies I am short', 'copies lendable', 'card lending fee', 'royalty paid last gen ÷ price'];
 export const CARD_OUT = ['buy', 'sell', 'price offset', 'size', 'research', 'auction', 'short'];
 export const BOT_IN = ['bias', 'cash share', 'debt share', 'lent share', 'worth vs median', 'own 4w return', 'age', 'credit rate', 'weeks to my loan due', 'weeks to a loan I made is due', 'pass price', 'ticket price', 'prize pool', 'notes held', 'fresh notes', 'flags on me', 'friends', 'market drawdown', 'market 4w', 'season phase', 'pack value vs price', 'last week games', 'royalty rate', 'living cost share', 'weeks of life left', 'allowance share', 'trade fee', 'pack markup', 'card lending fee', 'short margin', 'my short exposure', 'my cards lent'];
 export const BOT_OUT = ['cash target', 'lend share', 'lend rate', 'borrow share', 'max borrow rate', 'pass bid', 'pass ask', 'ticket bid', 'ticket ask', 'research count', 'Standard packs', 'Premium packs', 'Elite packs', 'Holo packs', 'share notes', 'steal notes', 'accept swaps', ...GKEYS.map((g) => `enter ${g}`), 'lend cards share'];
@@ -898,7 +899,7 @@ const bufs = (sh) => sh.slice(1).map((m) => new Float64Array(m));
 // The card network's forward pass with its shape fixed (it runs about 350,000 times a week)
 // Inputs 0 and 19–23 are the same for every card a bot looks at in a week, so their share of the first layer is folded
 // into a bias once per bot and week (`fold`); inputs that are zero are skipped. The result is the same.
-const VARY = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 24, 25, 26, 27, 29, 30], FIXED = [0, 19, 20, 21, 22, 23, 28, 31];
+const VARY = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 24, 25, 26, 27, 29, 30, 32], FIXED = [0, 19, 20, 21, 22, 23, 28, 31];
 const FOLD = new Float64Array(16), FOLD_X = new Float64Array(16); let foldKey = null, foldT = -1;
 function foldFor(w, x, t) {
   if (foldKey === w && foldT === t) { let same = true; for (let k = 0; k < FIXED.length; k++) if (x[FIXED[k]] !== FOLD_X[k]) { same = false; break; } if (same) return; }
@@ -948,6 +949,7 @@ function cardInputs(W, b, c, nw, ctx, it) {
   x[24] = it ? 1 : 0; x[25] = it ? Math.log(it.mult / c.mult) / 2 : 0; x[26] = fr && n.risk != null ? (n.risk - 80) / 20 : 0;
   x[27] = W.cfg.royalties && !W.cfg.priceOnly ? clamp(W.cfg.royaltyRate * 10 * (fr ? (n.est * mult) / price : 1), 0, 3) : 0; // what holding it pays each generation, against its price
   x[28] = b._life ?? 1; x[29] = Math.log1p(b.owed?.get(c.id) || 0); x[30] = Math.log1p(W.lendable?.get(c.id) || 0) / 3; x[31] = W.cfg.shorting ? W.cfg.cardLendFee * 100 : 0;
+  { const roy = it ? it.lastRoy : c.lastRoy; x[32] = roy ? clamp((roy / price) * 5, 0, 3) : 0; } // what one copy paid holders at the last generation's end, against its price now
   return x;
 }
 const cardNet = (W, b, c, nw, ctx, it) => forward(CARD_SHAPE, b.g.card, cardInputs(W, b, c, nw, ctx, it), CB);
@@ -1292,6 +1294,7 @@ function generationEnd(W) {
   const cfg = W.cfg, gen = W.t / cfg.weeksPerGeneration;
   if (cfg.royalties && !cfg.priceOnly) { let owed = 0; for (const b of W.bots) { for (const [id, q] of b.h) owed += cfg.royaltyRate * W.cards[id].F * q; for (const uid of b.items || []) owed += cfg.royaltyRate * intrinsicItem(W, W.items.get(uid)); }
     const scaleR = cfg.closedEconomy ? Math.min(1, (W.treasury * 0.5) / Math.max(1, owed)) : 1; let paid = 0;
+    for (const c of W.cards) c.lastRoy = cfg.royaltyRate * c.F * scaleR; for (const it of W.items.values()) it.lastRoy = cfg.royaltyRate * intrinsicItem(W, it) * scaleR; // public: every holder saw what each card paid
     for (const b of W.bots) { let d = 0; for (const [id, q] of b.h) d += cfg.royaltyRate * W.cards[id].F * q * scaleR; for (const uid of b.items || []) d += cfg.royaltyRate * intrinsicItem(W, W.items.get(uid)) * scaleR; b.cash += d; b.exo = (b.exo || 0) + d; paid += d; }
     for (const L of W.cardLoans || []) { const amt = cfg.royaltyRate * W.cards[L.id].F * scaleR; L.borrower.cash -= amt; L.lender.cash += amt; } // a short seller pays the lender the royalty the card would have earned
     if (cfg.closedEconomy) W.treasury -= paid; W.house.royalties += paid; log(W, 'gen', `Generation ${gen} royalties: ${Math.round(paid).toLocaleString()} coins to card holders (${Math.round(cfg.royaltyRate * 100)}% of each card's hidden value).`); }
@@ -1735,7 +1738,7 @@ export function botDetail(W, id) {
   const g = b.g ? { keep: b.g.keep, lev: b.g.lev, lendShare: b.g.lendShare, passBid: b.g.passBid, ticketBid: b.g.ticketBid } : null;
   const shorts = (W.cardLoans || []).filter((L) => L.borrower === b).map((L) => [W.cards[L.id].pid, W.cards[L.id].label, r1(L.entry), r1(W.cards[L.id].P), L.due - W.t, !!L.force]);
   const lentOut = (W.cardLoans || []).filter((L) => L.lender === b).length;
-  return { id, t: W.t, shorts, lentOut, lendCards: b.g?.lendCards ?? b.pending?.lendCards ?? 0, realized: b.stats.realized || 0, debt: b.debt || 0, lent: b.lent || 0, stats: { ...b.stats }, passes: b.passes.length, tickets: b.tickets.length, games: (b._nnGames || []).length, memo: b.memo || '', g, positions, log: (W.botLog.get(b.name) || []).slice(-50).reverse() };
+  return { id, t: W.t, shorts, lentOut, lendCards: b.g?.lendCards ?? b.pending?.lendCards ?? 0, realized: b.stats.realized || 0, debt: b.debt || 0, lent: b.lent || 0, stats: { ...b.stats }, passes: b.passes.length, tickets: b.tickets.length, games: (b._nnGames || []).length, memo: b.memo || '', g, positions, log: (W.botLog.get(b.name) || []).filter((j) => j.type !== 'research').slice(-300).reverse(), research: (W.botLog.get(b.name) || []).filter((j) => j.type === 'research' && j.t > W.t - 8).length, packs: (W.botPacks?.get(b.name) || []).slice().reverse() };
 }
 
 // A thief's flags lift once it has gone W.cfg.flagWeeks without being caught again; trading with it resumes
