@@ -167,10 +167,12 @@ function drawFloor() {
     const [id, , , w, n] = b; ids.add(id);
     const jit = (((id * 2654435761) % 1000) / 1000 - 0.5) * 6, ty = b[15] == null ? Ht - pad.b - 4 + jit / 3 : Y(b[15]) + jit;
     const p = pos.get(id) || { x: X(w), y: ty };
-    p.x = X(w); p.y = ty; // no gliding: each week the dots are simply where they are p.r = C(2 + Math.sqrt(n) * 0.35, 2.5, 8) * small * (b[9] ? 1.5 : 1); p.b = b; pos.set(id, p);
+    if (Math.abs(p.x - X(w)) > 0.4 || Math.abs(p.y - ty) > 0.4) floorMoving = true; // glide to the new week, then stop redrawing
+    p.x = L(p.x, X(w), 0.18); p.y = L(p.y, ty, 0.22); p.r = C(2 + Math.sqrt(n) * 0.35, 2.5, 8) * small * (b[9] ? 1.5 : 1); p.b = b; pos.set(id, p);
   }
   for (const id of [...pos.keys()]) if (!ids.has(id)) pos.delete(id);
-  arcs.length = 0;
+  arcs = arcs.filter((a) => a.age < 30); x.lineWidth = 1;
+  for (const a of arcs) { const s = pos.get(a.s), b = pos.get(a.b); a.age++; if (!s || !b) continue; x.strokeStyle = `rgba(238,241,250,${0.24 * (1 - a.age / 30)})`; x.beginPath(); x.moveTo(s.x, s.y); x.quadraticCurveTo((s.x + b.x) / 2, Math.min(s.y, b.y) - 30, b.x, b.y); x.stroke(); }
   for (const [id, p] of pos) {
     const b = p.b, col = retColor(b[16]);
     x.beginPath(); x.arc(p.x, p.y, p.r + 1.2, 0, Math.PI * 2); x.fillStyle = COL.panel; x.fill();
@@ -456,7 +458,7 @@ const GROUP = { credit: ['loan', 'marginCall', 'default'], shorts: ['short', 'co
 
 /* ---------- Controls ---------- */
 $('preset').innerHTML = Object.entries(PRESETS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
-const SLIDERS = { livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'], walkUp: [0.01, (v) => v + '%'], walkVolLow: [0.01, (v) => '±' + v + '%'], walkVolHigh: [0.01, (v) => '±' + v + '%'], riskPerDoubling: [1, (v) => '+' + v + ' pts'], flagWeeks: [1, (v) => (v ? v + ' wk clean' : 'forever')], cardLendFee: [0.0001, (v) => (v / 100).toFixed(2) + '%/wk'], shortMargin: [0.01, (v) => v + '%'], cardLoanWeeks: [1, (v) => v + ' wk'], nnMutation: [0.01, (v) => '±' + (v / 100).toFixed(2)], nnReset: [0.001, (v) => v.toFixed(1) + '%'], evolveShare: [0.01, (v) => v + '%'] };
+const SLIDERS = { prizeShare: [0.01, (v) => v + '% of takings'], livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'], walkUp: [0.01, (v) => v + '%'], walkVolLow: [0.01, (v) => '±' + v + '%'], walkVolHigh: [0.01, (v) => '±' + v + '%'], riskPerDoubling: [1, (v) => '+' + v + ' pts'], flagWeeks: [1, (v) => (v ? v + ' wk clean' : 'forever')], cardLendFee: [0.0001, (v) => (v / 100).toFixed(2) + '%/wk'], shortMargin: [0.01, (v) => v + '%'], cardLoanWeeks: [1, (v) => v + ' wk'], nnMutation: [0.01, (v) => '±' + (v / 100).toFixed(2)], nnReset: [0.001, (v) => v.toFixed(1) + '%'], evolveShare: [0.01, (v) => v + '%'] };
 const TOGGLES = ['twoSidedQuotes', 'shorting', 'credit', 'passesTradable', 'games', 'sharing', 'stealing', 'gossip', 'outsideCollectors', 'royalties', 'evolve', 'leagueUpdates', 'centralBank', 'store', 'closedEconomy'];
 function syncControls() {
   const c = cfgNow(); if (!c) return;
@@ -477,6 +479,7 @@ function advance() {
 function anchorNow() {
   if (scrollY < 2) return null; const y = Math.min(innerHeight - 1, ($('status').getBoundingClientRect().bottom || 0) + 12);
   let el = document.elementFromPoint(innerWidth / 2, y); const chain = [];
+  const list = el?.closest?.('tbody, .watch__list, .wks, .pks, [data-k]'); if (list) el = list.parentElement; // rows in a ranked list move by design: anchor on the list itself
   while (el && el !== document.body && chain.length < 12) { chain.push([el, el.getBoundingClientRect().top]); el = el.parentElement; }
   return chain;
 }

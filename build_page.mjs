@@ -8,7 +8,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (p) => fs.readFileSync(path.join(here, p), 'utf8');
 const engine = read('engine.mjs').replace(/^export /gm, '');
 const library = JSON.stringify({ ...JSON.parse(read('data/library.json')), timeline: JSON.parse(read('data/timeline.json')), history: JSON.parse(read('data/history.json')), kits: JSON.parse(read('data/kits.json')), names: JSON.parse(read('data/names.json')) });
+const icon = 'data:image/svg+xml,' + encodeURIComponent(read('page/icon.svg').trim());
 const head = `<title>Vault Trading Floor</title>
+<link rel="icon" type="image/svg+xml" href="${icon}">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

@@ -101,9 +101,7 @@ export const DEFAULTS = {
   deployOrders: 10, // most buy orders a bot places a week to put spare cash to work
   messages: false, // AI bots may talk: one public board post and two private messages a week (280 characters each)
   messageLimits: { public: 1, direct: 2, chars: 280 },
-  gameTarget: 0.06, // average packs per ticket the payout aims for, the same for every game (nothing to farm)
   gameFloor: { need: 4, legs: 3 }, // the easiest each game may get, so guessing never pays well
-  gamesAdaptive: true, // every 4 weeks each game's bar moves so its payout returns to gameTarget
   leagueUpdates: false, // TEST ONLY: every updateEvery weeks some players' hidden values move, as a real upload would
   updateEvery: 40,
   population: 250, // non-AI bots at the start
@@ -875,10 +873,12 @@ function ruleAuctionList(W, b) {
 // borrowing, what it pays for passes and tickets, packs, sharing and stealing, and which contests to enter. The
 // weights start random. Whatever earns money survives: at each generation's end the worst-returning 10% (averaged
 // over their last 3 generations) copy the networks of the top 10% with small random changes.
-export const CARD_IN = ['bias', 'price (log)', 'rarity premium (log)', 'design', 'finish', 'change 1w', 'change 4w', 'change 12w', 'below 12w average', 'trades 4w', 'copies out', 'pool left', 'has a note', 'note vs price', 'note age', 'OVR (from research)', 'copies held', 'gain on cost', 'share of worth', 'cash share', 'debt share', 'market drawdown', 'market 4w', 'season phase', 'one of a kind', 'its premium', 'risk rating (from research)', 'royalty yield (from note)', 'my weeks of life left', 'copies I am short', 'copies lendable', 'card lending fee', 'royalty paid last gen ÷ price'];
+// Games per topic this week and next (what the contest board shows everyone), counted once a week
+function topicCount(W) { if (W._tcT === W.t) return W._tc; const n = {}; for (const cs of [W.contests, W.contestsAhead]) for (const c of Object.values(cs || {})) if (c?.topic) n[c.topic] = (n[c.topic] || 0) + 1; W._tcT = W.t; return (W._tc = n); }
+export const CARD_IN = ['bias', 'price (log)', 'rarity premium (log)', 'design', 'finish', 'change 1w', 'change 4w', 'change 12w', 'below 12w average', 'trades 4w', 'copies out', 'pool left', 'has a note', 'note vs price', 'note age', 'OVR (from research)', 'copies held', 'gain on cost', 'share of worth', 'cash share', 'debt share', 'market drawdown', 'market 4w', 'season phase', 'one of a kind', 'its premium', 'risk rating (from research)', 'royalty yield (from note)', 'my weeks of life left', 'copies I am short', 'copies lendable', 'card lending fee', 'royalty paid last gen ÷ price', 'games on its position (this + next wk)'];
 export const CARD_OUT = ['buy', 'sell', 'price offset', 'size', 'research', 'auction', 'short'];
-export const BOT_IN = ['bias', 'cash share', 'debt share', 'lent share', 'worth vs median', 'own 4w return', 'age', 'credit rate', 'weeks to my loan due', 'weeks to a loan I made is due', 'pass price', 'ticket price', 'prize pool', 'notes held', 'fresh notes', 'flags on me', 'friends', 'market drawdown', 'market 4w', 'season phase', 'pack value vs price', 'last week games', 'royalty rate', 'living cost share', 'weeks of life left', 'allowance share', 'trade fee', 'pack markup', 'card lending fee', 'short margin', 'my short exposure', 'my cards lent'];
-export const BOT_OUT = ['cash target', 'lend share', 'lend rate', 'borrow share', 'max borrow rate', 'pass bid', 'pass ask', 'ticket bid', 'ticket ask', 'research count', 'Standard packs', 'Premium packs', 'Elite packs', 'Holo packs', 'share notes', 'steal notes', 'accept swaps', ...GKEYS.map((g) => `enter ${g}`), 'lend cards share'];
+export const BOT_IN = ['bias', 'cash share', 'debt share', 'lent share', 'worth vs median', 'own 4w return', 'age', 'credit rate', 'weeks to my loan due', 'weeks to a loan I made is due', 'pass price', 'ticket price', 'prize pool', 'notes held', 'fresh notes', 'flags on me', 'friends', 'market drawdown', 'market 4w', 'season phase', 'pack value vs price', 'last week games', 'royalty rate', 'living cost share', 'weeks of life left', 'allowance share', 'trade fee', 'pack markup', 'card lending fee', 'short margin', 'my short exposure', 'my cards lent', ...TOPICS.map((t) => `games on ${t} (this + next wk)`)];
+export const BOT_OUT = ['cash target', 'lend share', 'lend rate', 'borrow share', 'max borrow rate', 'pass bid', 'pass ask', 'ticket bid', 'ticket ask', 'research count', 'Standard packs', 'Premium packs', 'Elite packs', 'Holo packs', 'share notes', 'steal notes', 'accept swaps', ...GKEYS.map((g) => `enter ${g}`), 'lend cards share', ...TOPICS.map((t) => `research aim ${t}`)];
 const CARD_SHAPE = [CARD_IN.length, 16, 8, CARD_OUT.length], BOT_SHAPE = [BOT_IN.length, 12, BOT_OUT.length];
 const NN = 8;
 const sigm = (x) => 1 / (1 + Math.exp(-x));
@@ -899,7 +899,7 @@ const bufs = (sh) => sh.slice(1).map((m) => new Float64Array(m));
 // The card network's forward pass with its shape fixed (it runs about 350,000 times a week)
 // Inputs 0 and 19–23 are the same for every card a bot looks at in a week, so their share of the first layer is folded
 // into a bias once per bot and week (`fold`); inputs that are zero are skipped. The result is the same.
-const VARY = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 24, 25, 26, 27, 29, 30, 32], FIXED = [0, 19, 20, 21, 22, 23, 28, 31];
+const VARY = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 24, 25, 26, 27, 29, 30, 32, 33], FIXED = [0, 19, 20, 21, 22, 23, 28, 31];
 const FOLD = new Float64Array(16), FOLD_X = new Float64Array(16); let foldKey = null, foldT = -1;
 function foldFor(w, x, t) {
   if (foldKey === w && foldT === t) { let same = true; for (let k = 0; k < FIXED.length; k++) if (x[FIXED[k]] !== FOLD_X[k]) { same = false; break; } if (same) return; }
@@ -949,7 +949,8 @@ function cardInputs(W, b, c, nw, ctx, it) {
   x[24] = it ? 1 : 0; x[25] = it ? Math.log(it.mult / c.mult) / 2 : 0; x[26] = fr && n.risk != null ? (n.risk - 80) / 20 : 0;
   x[27] = W.cfg.royalties && !W.cfg.priceOnly ? clamp(W.cfg.royaltyRate * 10 * (fr ? (n.est * mult) / price : 1), 0, 3) : 0; // what holding it pays each generation, against its price
   x[28] = b._life ?? 1; x[29] = Math.log1p(b.owed?.get(c.id) || 0); x[30] = Math.log1p(W.lendable?.get(c.id) || 0) / 3; x[31] = W.cfg.shorting ? W.cfg.cardLendFee * 100 : 0;
-  { const roy = it ? it.lastRoy : c.lastRoy; x[32] = roy ? clamp((roy / price) * 5, 0, 3) : 0; } // what one copy paid holders at the last generation's end, against its price now
+  { const roy = it ? it.lastRoy : c.lastRoy; x[32] = roy ? clamp((roy / price) * 5, 0, 3) : 0; }
+  x[33] = (topicCount(W)[c.pos] || 0) / 4; // games whose topic is this card's position, this week and next // what one copy paid holders at the last generation's end, against its price now
   return x;
 }
 const cardNet = (W, b, c, nw, ctx, it) => forward(CARD_SHAPE, b.g.card, cardInputs(W, b, c, nw, ctx, it), CB);
@@ -969,6 +970,7 @@ function nnThink(W, b, med) {
   x[22] = cfg.royalties && !cfg.priceOnly ? cfg.royaltyRate * 10 : 0; x[23] = clamp(((cfg.livingCost + cfg.lifestyle * nw) / nw) * 10, 0, 3); x[24] = b._life; x[25] = clamp((cfg.allowance / nw) * 10, 0, 3);
   x[26] = cfg.fee * 10; x[27] = cfg.packEdge; x[28] = cfg.shorting ? cfg.cardLendFee * 100 : 0; x[29] = cfg.shorting ? cfg.shortMargin : 0;
   x[30] = clamp(owedValue(W, b) / nw, 0, 3); x[31] = clamp(lentValue(W, b) / nw, 0, 3);
+  { const tc = W.cfg.games ? topicCount(W) : {}; TOPICS.forEach((t, i) => { x[32 + i] = (tc[t] || 0) / 4; }); }
   const o = forward(BOT_SHAPE, g.bot, x, BB);
   g.lendCards = Math.max(0, Math.tanh(o[27]));
   g.keep = 0.6 * sigm(o[0]); g.lendShare = Math.max(0, Math.tanh(o[1])) * 0.7; g.lendRate = 0.001 + 0.011 * sigm(o[2]); g.lev = Math.max(0, Math.tanh(o[3])) * 1.5; g.maxRate = 0.001 + 0.015 * sigm(o[4]);
@@ -976,13 +978,14 @@ function nnThink(W, b, med) {
   b._nnResearch = Math.round(sigm(o[9]) * W.cfg.maxResearchPerWeek);
   b._nnPacks = Object.keys(PACK_TYPES).map((t, i) => [t, o[10 + i] > 0 ? 1 + (o[10 + i] > 1.5 ? 1 : 0) : 0]);
   b.social = o[15] > Math.max(o[14], 0) ? 'thief' : o[14] > 0 ? 'sharer' : 'reciprocator'; b._nnAccept = o[16] > 0;
+  const aim0 = 17 + GKEYS.length + 1; b._nnAim = Object.fromEntries(TOPICS.map((t, i) => [t, Math.tanh(o[aim0 + i])])); // added to each card's research score by position
   b._nnGames = GKEYS.map((k, i) => [k, o[17 + i]]).filter(([, v]) => v > 0).sort((p, q) => q[1] - p[1]).map(([k]) => k);
 }
 // Research: the players whose cards most make the network want to look them up (players it has no fresh note on)
 function nnResearchWish(W, b) {
   const want = b._nnResearch || 0; if (!want) return [];
   const nw = Math.max(50 * W.cfg.coinScale, worth(W, b)), ctx = marketCtx(W), seen = new Set(), sc = [];
-  for (const c of [...[...b.h.keys()].map((id) => W.cards[id]), ...W._live]) { if (seen.has(c.pid) || c.on === false) continue; seen.add(c.pid); if (fresh(W, b.notes.get(c.pid))) continue; sc.push([W.players[c.pid], cardNet(W, b, c, nw, ctx)[4]]); }
+  for (const c of [...[...b.h.keys()].map((id) => W.cards[id]), ...W._live]) { if (seen.has(c.pid) || c.on === false) continue; seen.add(c.pid); if (fresh(W, b.notes.get(c.pid))) continue; sc.push([W.players[c.pid], cardNet(W, b, c, nw, ctx)[4] + (b._nnAim?.[c.pos] || 0)]); }
   return sc.filter((x) => x[1] > 0).sort((p, q) => q[1] - p[1]).slice(0, want).map((x) => x[0]);
 }
 function nnAct(W, b) {
