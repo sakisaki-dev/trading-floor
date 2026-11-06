@@ -224,7 +224,7 @@
   .indg h3 { font: 800 13px/1 var(--display); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0; }
   .indt { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 6px; }
   .ind small { font: 500 10.5px/1.3 var(--body); color: var(--faint); white-space: normal; }
-  .movers { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+  .movers { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
   .movers table { font-size: 12px; } .movers td:first-child { white-space: normal; }
   .cal { display: grid; gap: 0; }
   .cal div { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }

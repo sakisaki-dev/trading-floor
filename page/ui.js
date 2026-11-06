@@ -26,6 +26,7 @@ const L = (a, b, t) => a + (b - a) * t, C = (x, a, b) => Math.max(a, Math.min(b,
 const fmt = (x) => (x == null || !isFinite(x) ? '–' : Math.abs(x) >= 1000 ? Math.round(x).toLocaleString() : Math.abs(x) >= 100 ? Math.round(x).toString() : x.toFixed(1));
 const pct = (x) => (x == null || !isFinite(x) ? '–' : `${Math.round(x * 100)}%`);
 const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+const cardName = (k) => { const m = /^([A-Z]+):(.+?)\|(\w+)\|(\w+)$/.exec(k || ''); return m ? `${m[1]} ${m[2]} · ${m[4]} ${m[3]}` : k; };
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const FAMS = familyList(LIBRARY);
 
@@ -401,7 +402,7 @@ document.addEventListener('click', (e) => {
 /* ---------- Feed ---------- */
 let feedF = 'news';
 const ACT = {
-  trade: (j) => ['Trade', `<b>${esc(j.buyer)}</b> bought ${esc(j.card)} from ${esc(j.seller)} · ${j.price}`],
+  trade: (j) => ['Trade', `<b>${esc(j.buyer)}</b> bought ${esc(cardName(j.card))} from ${esc(j.seller)} · ${j.price}`],
   passTrade: (j) => ['Pass', `<b>${esc(j.buyer)}</b> bought a pass from ${esc(j.seller)} · ${j.price}`],
   ticketTrade: (j) => ['Ticket', `<b>${esc(j.buyer)}</b> bought a ticket from ${esc(j.seller)} · ${j.price}`],
   auctionList: (j) => ['Auction', `<b>${esc(j.seller)}</b> listed ${esc(j.card)} · reserve ${j.reserve}`],
@@ -418,6 +419,10 @@ const ACT = {
   message: (j) => ['DM', `<b>${esc(j.from)}</b> → ${esc(j.to)}: ${esc(j.text)}`],
   aiActions: (j) => ['AI', `<b>${esc(j.bot)}</b> ${esc(Object.entries(j.actions || {}).filter(([, v]) => (Array.isArray(v) ? v.length : v && typeof v === 'object' ? Number(v.amount) > 0 : v)).map(([k, v]) => `${k}${Array.isArray(v) ? ` ×${v.length}` : v && typeof v === 'object' ? ` ${v.amount}` : ''}`).join(', ') || 'did nothing')}`],
   flagLift: (j) => ['Flagged', `<b>${esc(j.bot)}</b>'s flags lift: ${j.by} bots trade with it again`],
+  short: (j) => ['Short', `<b>${esc(j.bot)}</b> sold ${esc(cardName(j.card))} short at ${fmt(j.price)}, borrowed from ${esc(j.lender)}`],
+  cover: (j) => ['Buy-back', `<b>${esc(j.bot)}</b> bought back ${esc(cardName(j.card))} at ${fmt(j.price)} after ${j.weeks} wk · sold at ${fmt(j.entry)} <span class="${j.entry >= j.price ? 'up' : 'down'}">${j.entry >= j.price ? '+' : ''}${fmt(j.entry - j.price)}</span>`],
+  shortCall: (j) => ['Short call', `<b>${esc(j.bot)}</b> must buy back ${esc(cardName(j.card))} (${j.why === 'due' ? 'deadline' : 'margin'}) · sold at ${fmt(j.entry)}, now ${fmt(j.price)}`],
+  forcedCover: (j) => ['Forced close', `<b>${esc(j.bot)}</b> settled ${esc(cardName(j.card))} in cash at ${fmt(j.price)} with ${esc(j.lender)} (${esc(j.why)}) · sold at ${fmt(j.entry)}`],
   loan: (j) => ['Loan', `<b>${esc(j.lender)}</b> lent ${fmt(j.amount)} to ${esc(j.borrower)} at ${(j.rate * 100).toFixed(2)}%/wk`],
   marginCall: (j) => ['Margin', `<b>${esc(j.bot)}</b> margin call · loan ${fmt(j.debt)} against ${fmt(j.cards)} of cards`],
   adopted: (j) => ['Evolution', `<b>${esc(j.bot)}</b> (${j.roc >= 0 ? '+' : ''}${Math.round(j.roc * 100)}%) adopts ${esc(j.from)}'s strategy (+${Math.round(j.mentorRoc * 100)}%): ${esc(j.before)} → ${esc(j.after)}`],
@@ -425,7 +430,7 @@ const ACT = {
   eliminated: (j) => ['Evolution', `<b>${esc(j.bot)}</b> eliminated (${esc(j.kind)}, ${esc(j.social)})`],
   born: (j) => ['Evolution', `<b>${esc(j.bot)}</b> born from ${esc(j.parent)}`],
 };
-const GROUP = { credit: ['loan', 'marginCall', 'default'], people: ['entered', 'exited', 'default'], trade: ['trade', 'passTrade', 'ticketTrade'], auction: ['auctionList', 'auctionResult'], research: ['research'], notes: ['share', 'steal', 'flagLift'], game: ['game'], pack: ['pack'], talk: ['post', 'message'], ai: ['aiActions'] };
+const GROUP = { credit: ['loan', 'marginCall', 'default'], shorts: ['short', 'cover', 'shortCall', 'forcedCover'], people: ['entered', 'exited', 'default'], trade: ['trade', 'passTrade', 'ticketTrade'], auction: ['auctionList', 'auctionResult'], research: ['research'], notes: ['share', 'steal', 'flagLift'], game: ['game'], pack: ['pack'], talk: ['post', 'message'], ai: ['aiActions'] };
 function drawFeed() {
   const n = nNow(), rows = [];
   if (feedF === 'news') {
@@ -441,8 +446,8 @@ document.querySelectorAll('#actFilter [data-f]').forEach((b) => b.addEventListen
 $('preset').innerHTML = Object.entries(PRESETS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
 $('libPick').innerHTML = LIBRARY.players.map((p, i) => `<option value="${i}">${p.pos} ${esc(p.name)}</option>`).join('');
 $('libPick').addEventListener('change', (e) => { libId = +e.target.value; drawLibrary(); });
-const SLIDERS = { livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'], walkUp: [0.01, (v) => v + '%'], walkVolLow: [0.01, (v) => '±' + v + '%'], walkVolHigh: [0.01, (v) => '±' + v + '%'], riskPerDoubling: [1, (v) => '+' + v + ' pts'], flagWeeks: [1, (v) => (v ? v + ' wk clean' : 'forever')] };
-const TOGGLES = ['twoSidedQuotes', 'credit', 'passesTradable', 'games', 'sharing', 'stealing', 'gossip', 'outsideCollectors', 'royalties', 'evolve', 'leagueUpdates', 'centralBank', 'store', 'closedEconomy'];
+const SLIDERS = { livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'], walkUp: [0.01, (v) => v + '%'], walkVolLow: [0.01, (v) => '±' + v + '%'], walkVolHigh: [0.01, (v) => '±' + v + '%'], riskPerDoubling: [1, (v) => '+' + v + ' pts'], flagWeeks: [1, (v) => (v ? v + ' wk clean' : 'forever')], cardLendFee: [0.0001, (v) => (v / 100).toFixed(2) + '%/wk'], shortMargin: [0.01, (v) => v + '%'], cardLoanWeeks: [1, (v) => v + ' wk'] };
+const TOGGLES = ['twoSidedQuotes', 'shorting', 'credit', 'passesTradable', 'games', 'sharing', 'stealing', 'gossip', 'outsideCollectors', 'royalties', 'evolve', 'leagueUpdates', 'centralBank', 'store', 'closedEconomy'];
 function syncControls() {
   const c = cfgNow(); if (!c) return;
   for (const [k, [s, f]] of Object.entries(SLIDERS)) { $(k).value = Math.round((c[k] / s) * 100) / 100; $(k + 'V').textContent = f(+$(k).value); }
@@ -651,6 +656,15 @@ const IND_GROUPS = [
     { key: 'auc', label: 'Auction sell-through', desc: 'share of auctions that sold', get: (f) => (f.ord?.aucListed ? f.ord.aucSold / f.ord.aucListed : null), show: (v) => pct(v) },
     { key: 'aucc', label: 'Auction coins / wk', desc: 'what auction winners paid', get: O('aucCoins'), show: fmt },
   ]],
+  ['Short selling', [
+    { key: 'sopen', label: 'Short interest', desc: 'borrowed copies sold short and not yet bought back', get: O('shortCopies'), show: (v) => fmt(v) },
+    { key: 'sval', label: 'Short value', desc: 'what those copies are worth now', get: O('shortValue'), show: fmt },
+    { key: 'sratio', label: 'Short ratio', desc: 'short value as a share of the market', get: (f) => (f.ord && f.mkt?.mcap ? f.ord.shortValue / f.mkt.mcap : null), show: (v) => (v * 100).toFixed(2) + '%' },
+    { key: 'snew', label: 'New shorts / wk', desc: 'copies borrowed and sold this week', get: O('shorts'), show: (v) => String(v) },
+    { key: 'scov', label: 'Buy-backs / wk', desc: 'shorts closed by buying a copy back', get: O('covers'), show: (v) => String(v) },
+    { key: 'sforce', label: 'Forced closes / wk', desc: 'shorts settled in cash after a margin call or the deadline', get: O('forced'), show: (v) => String(v) },
+    { key: 'slend', label: 'Copies to borrow', desc: 'cards their holders offered to lend this week', get: O('lendable'), show: fmt },
+  ]],
   ['Money', [
     { key: 'cash', label: 'Coins held', desc: 'all cash in bots’ hands', get: (f) => f.mkt?.cash, show: fmt },
     { key: 'allow', label: 'Allowance / wk', desc: 'new coins paid to every bot', get: O('allowance'), show: fmt },
@@ -725,6 +739,7 @@ function drawMovers() {
   const br = breadth(at) || { hi: [], lo: [] }, byId = new Map(rows.map((r) => [r.id, r]));
   $('mvHi').tBodies[0].innerHTML = moverRows(br.hi.map((id) => byId.get(id)).filter(Boolean).sort((a, b) => b.r - a.r).slice(0, 10), chg);
   $('mvLo').tBodies[0].innerHTML = moverRows(br.lo.map((id) => byId.get(id)).filter(Boolean).sort((a, b) => a.r - b.r).slice(0, 10), chg);
+  if ($('mvShort')) { const si = f.si || []; $('mvShort').tBodies[0].innerHTML = moverRows(rows.filter((r) => si[r.id] > 0).sort((a, b) => si[b.id] - si[a.id] || b.P - a.P).slice(0, 10), (r) => `${si[r.id]} short`); }
   $('mvHiN').textContent = br.hi.length ? `${br.hi.length} players` : ''; $('mvLoN').textContent = br.lo.length ? `${br.lo.length} players` : '';
 }
 // Sectors: the eight positions, each weighted by the cards it has out
@@ -870,7 +885,7 @@ function drawDetail() {
       tape = D.tape.length ? `<table class="book"><thead><tr><th>Wk</th><th>Card</th><th>Buyer</th><th class="num">Price</th></tr></thead><tbody>${D.tape.map((j) => `<tr><td class="k">${j.t}</td><td class="k">${esc(String(j.card).split('|').slice(1).join(' ') || String(j.card).split(' · ').slice(1).join(' · '))}</td><td>${esc(j.buyer || '–')}</td><td class="num">${fmt(j.price)}</td></tr>`).join('')}</tbody></table>` : '<p class="note">No trades yet.</p>';
       holders = `<div style="grid-column:1/-1"><h3>Top holders</h3><table class="book"><tbody>${D.holders.map(([bid, bname, grp, q, v]) => `<tr data-bot="${bid}"><td><span class="sw" style="background:${GROUPS[grp].color}"></span>${esc(bname)}</td><td class="num">${q} cards</td><td class="num k">${fmt(v)}</td></tr>`).join('') || '<tr><td class="k">Nobody</td></tr>'}</tbody></table></div>`;
     } else if (mode === 'live') { items = '<p class="note" style="grid-column:1/-1">Loading his cards…</p>'; }
-    $('detail').innerHTML = `<div class="stats">${tile('Price (Prizm Base)', fmt(now.P))}${tile('Hidden value', fmt(now.F))}${tile('Price ÷ value', now.F ? (now.P / now.F).toFixed(2) + '×' : '–')}${tile('4-wk change', chgSpan(now.chg))}${tile('OVR', ovrOf(id))}${risk != null ? tile('Risk rating', Math.round(risk)) + tile('Weekly swing', `±${(swing * 100).toFixed(1)}% · up ${pct(cw.walkUp)} of weeks`) : ''}${now.circ != null ? tile('Cards out', now.circ) + tile('Left in pool', now.pool) : ''}${tile('4-wk trades', now.vol4)}</div>${grid}${items}<div style="grid-column:1/-1"><h3>Time &amp; sales</h3>${tape}</div>${holders}`;
+    $('detail').innerHTML = `<div class="stats">${tile('Price (Prizm Base)', fmt(now.P))}${tile('Hidden value', fmt(now.F))}${tile('Price ÷ value', now.F ? (now.P / now.F).toFixed(2) + '×' : '–')}${tile('4-wk change', chgSpan(now.chg))}${tile('OVR', ovrOf(id))}${risk != null ? tile('Risk rating', Math.round(risk)) + tile('Weekly swing', `±${(swing * 100).toFixed(1)}% · up ${pct(cw.walkUp)} of weeks`) : ''}${now.circ != null ? tile('Cards out', now.circ) + tile('Left in pool', now.pool) : ''}${FRAMES[ix()]?.si ? tile('Short interest', `${FRAMES[ix()].si[id]} copies`) : ''}${tile('4-wk trades', now.vol4)}</div>${grid}${items}<div style="grid-column:1/-1"><h3>Time &amp; sales</h3>${tape}</div>${holders}`;
     return;
   }
   $('detail').innerHTML = '<p class="note">The account panel shows this bot\'s positions and activity.</p>';
@@ -890,15 +905,16 @@ function drawAcct() {
     const bot = LIVE.b;
     realized = bot.realized; debt = bot.debt;
     positions = bot.positions.map(([pid, label, q, ac, P]) => ({ pid, label, q, ac, P, pnl: ac == null ? null : (P - ac) * q }));
+    for (const [pid, label, entry, P, left, forced] of bot.shorts || []) positions.push({ pid, label: `SHORT · ${label}${forced ? ' · forced to buy back' : ` · ${left} wk left`}`, q: -1, ac: entry, P, pnl: entry - P });
     const g = bot.g, bar = (label, v, max, col) => `<span title="${label}"><i style="width:${Math.round(C(v / max, 0, 1) * 100)}%;background:${col}"></i>${label}</span>`;
-    extra = (g ? `<div class="genome">${bar(`cash target ${pct(g.keep)}`, g.keep, 0.6, '#3987e5')}${bar(`borrow ${g.lev.toFixed(2)}×`, g.lev, 1.5, '#e66767')}${bar(`lend ${pct(g.lendShare)}`, g.lendShare, 0.7, '#4fd18b')}${bar(`pass bid ${fmt(g.passBid)}`, g.passBid, 30 * (cfgNow().coinScale || 1), '#c98500')}${bar(`ticket bid ${fmt(g.ticketBid)}`, g.ticketBid, 10 * (cfgNow().coinScale || 1), '#9085e9')}</div>` : '') + `<div class="note">Lent ${fmt(bot.lent)} · Swaps ${bot.stats.shared} · thefts ${bot.stats.stolen} (caught ${bot.stats.caught}) · researched ${bot.stats.researched} · ${bot.passes} passes · ${bot.tickets} tickets${bot.games ? ` · enters ${bot.games} games` : ''}${bot.memo ? `<br>Memo: ${esc(bot.memo).slice(0, 200)}` : ''}</div>`;
+    extra = (g ? `<div class="genome">${bar(`cash target ${pct(g.keep)}`, g.keep, 0.6, '#3987e5')}${bar(`borrow ${g.lev.toFixed(2)}×`, g.lev, 1.5, '#e66767')}${bar(`lend ${pct(g.lendShare)}`, g.lendShare, 0.7, '#4fd18b')}${bar(`pass bid ${fmt(g.passBid)}`, g.passBid, 30 * (cfgNow().coinScale || 1), '#c98500')}${bar(`ticket bid ${fmt(g.ticketBid)}`, g.ticketBid, 10 * (cfgNow().coinScale || 1), '#9085e9')}</div>` : '') + `<div class="note">Lends ${pct(bot.lendCards || 0)} of its cards · ${bot.lentOut || 0} lent out now · coins lent ${fmt(bot.lent)} · Swaps ${bot.stats.shared} · thefts ${bot.stats.stolen} (caught ${bot.stats.caught}) · researched ${bot.stats.researched} · ${bot.passes} passes · ${bot.tickets} tickets${bot.games ? ` · enters ${bot.games} games` : ''}${bot.memo ? `<br>Memo: ${esc(bot.memo).slice(0, 200)}` : ''}</div>`;
   } else if (isAi && f.aiDetail?.[name]) {
     const d = f.aiDetail[name]; realized = d.realized; debt = d.debt ?? null;
     positions = d.positions.map(([cid, q, ac]) => { const P = (f.prices?.[cid >> 4] ?? 0) * mktMult(cid); return { cid, pid: cid >> 4, label: mktLabel(cid), q, ac, P, pnl: (P - ac) * q }; });
     const m = RUN.memos?.[name] && Object.entries(RUN.memos[name]).filter(([t]) => +t <= f.t).pop()?.[1];
     extra = m ? `<div class="note">Memo: ${esc(m).slice(0, 240)}</div>` : '';
   }
-  positions.sort((x, y) => y.q * y.P - x.q * x.P);
+  positions.sort((x, y) => Math.abs(y.q) * y.P - Math.abs(x.q) * x.P);
   const unreal = positions.reduce((s, p) => s + (p.pnl || 0), 0);
   const log = botLogFor(name).map((j) => { const r = ACT[j.type]?.(j); return r ? `<div><time>W${j.t}</time><span class="k">${r[0]}</span> ${r[1]}</div>` : ''; }).join('');
   $('acct').innerHTML = `<div><div class="who"><b><span class="sw" style="background:${grpColor(b)}"></span>${esc(name)}</b><span class="note">${kindOf(b)}${model ? ` · ${esc(model)}` : ''} · ${GROUPS[b[17] ?? 2].label} · ${SOC[soc]} · gen ${gen} · rank ${rank}/${f.bots.length}</span></div>

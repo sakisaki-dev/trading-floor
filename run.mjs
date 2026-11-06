@@ -78,6 +78,8 @@ const SCHEMA = obj({
   packs: arr(obj({ type: { type: 'string', enum: Object.keys(E.PACK_TYPES) }, count: int })),
   auction: arr(obj({ player: str, reserve: num })),
   auctionBids: arr(obj({ auctionId: str, bid: num })),
+  short: arr(obj({ player: str, price: num })),
+  lendCards: num,
   passOrders: arr(obj({ side: { type: 'string', enum: ['buy', 'sell'] }, price: num, qty: int })),
   ticketOrders: arr(obj({ side: { type: 'string', enum: ['buy', 'sell'] }, price: num, qty: int })),
   games: arr(obj({ game: { type: 'string', enum: Object.keys(E.GAMES) }, answers: arr(str) })),
@@ -151,7 +153,7 @@ function mockPolicy(o) {
   const games = o.games ? Object.entries(o.games.answerThisWeek || {}).slice(0, 3).map(([game, c]) => ({ game, answers: c.questions.map(() => (game === 'valuation' ? '20' : game === 'prediction' ? '0.5' : 'A')) })) : [];
   const auctionBids = (o.auctions?.open || []).filter((a) => rows.find((r) => r.card === a.card && r.yourNote && r.yourNote.estimateForThisCard > a.reserve * 1.1)).map((a) => ({ auctionId: a.auctionId, bid: a.reserve * 1.05 }));
   const friend = (o.otherBots || []).find((b) => !b.flaggedYou);
-  return { lend: { amount: 0, rate: 0 }, borrow: { amount: 0, maxRate: 0 }, repay: 0, research, notes, orders: orders.slice(0, 12), packs: o.you.cash > o.packs.types.standard.price * 4 ? [{ type: 'standard', count: 1 }] : [], auction: [], auctionBids, passOrders: [], ticketOrders: [], games, share: friend ? [friend.name] : [], acceptShares: ['all'], steal: '', post: '', messages: [], memo: `Week ${o.week}: tracking ${notes.length} new notes.` };
+  return { lend: { amount: 0, rate: 0 }, borrow: { amount: 0, maxRate: 0 }, repay: 0, research, notes, orders: orders.slice(0, 12), packs: o.you.cash > o.packs.types.standard.price * 4 ? [{ type: 'standard', count: 1 }] : [], auction: [], auctionBids, short: [], lendCards: 0, passOrders: [], ticketOrders: [], games, share: friend ? [friend.name] : [], acceptShares: ['all'], steal: '', post: '', messages: [], memo: `Week ${o.week}: tracking ${notes.length} new notes.` };
 }
 
 /* ---------- Main loop ---------- */

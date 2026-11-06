@@ -36,6 +36,9 @@
     <div class="slider"><label for="walkVolHigh">Safe-card swing / wk <b id="walkVolHighV"></b></label><input id="walkVolHigh" type="range" min="0" max="5" step="0.25" value="1"></div>
     <div class="slider"><label for="riskPerDoubling">Rating per value doubling <b id="riskPerDoublingV"></b></label><input id="riskPerDoubling" type="range" min="0" max="25" step="1" value="10"></div>
     <div class="slider"><label for="flagWeeks">Thief flags last <b id="flagWeeksV"></b></label><input id="flagWeeks" type="range" min="0" max="104" step="2" value="26"></div>
+    <div class="slider"><label for="cardLendFee">Card lending fee <b id="cardLendFeeV"></b></label><input id="cardLendFee" type="range" min="0" max="200" step="5" value="50"></div>
+    <div class="slider"><label for="shortMargin">Short collateral <b id="shortMarginV"></b></label><input id="shortMargin" type="range" min="10" max="150" step="5" value="50"></div>
+    <div class="slider"><label for="cardLoanWeeks">Return borrowed cards within <b id="cardLoanWeeksV"></b></label><input id="cardLoanWeeks" type="range" min="2" max="52" step="1" value="12"></div>
     <div class="slider"><label for="packEdge">Pack edge <b id="packEdgeV"></b></label><input id="packEdge" type="range" min="0" max="60" step="5" value="25"></div>
     <div class="slider"><label for="passesPerWeek">Passes / wk <b id="passesPerWeekV"></b></label><input id="passesPerWeek" type="range" min="0" max="6" step="1" value="3"></div>
     <div class="slider"><label for="knowledgeWeeks">Notes last <b id="knowledgeWeeksV"></b></label><input id="knowledgeWeeks" type="range" min="2" max="40" step="1" value="12"></div>
@@ -47,6 +50,7 @@
     <div class="slider"><label for="storePremium">Store markup <b id="storePremiumV"></b></label><input id="storePremium" type="range" min="10" max="200" step="10" value="60"></div>
     <div class="toggles">
       <label class="toggle" title="Between trades, a price is marked to the bid–ask spread only when there are buyers and sellers; off = any unfilled order pulls it (the old rule)"><input type="checkbox" id="twoSidedQuotes" checked> Two-sided quotes</label>
+      <label class="toggle" title="Holders may lend cards; others may borrow and sell them short"><input type="checkbox" id="shorting" checked> Short selling</label>
       <label class="toggle"><input type="checkbox" id="credit" checked> Credit</label>
       <label class="toggle"><input type="checkbox" id="centralBank"> Central bank</label>
       <label class="toggle"><input type="checkbox" id="store"> Vault store</label>
@@ -130,6 +134,7 @@
     <section class="panel"><div class="head"><h2>Top losers</h2><span class="note">4 weeks</span></div><table id="mvDown"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
     <section class="panel"><div class="head"><h2>Most active</h2><span class="note">trades, 4 weeks</span></div><table id="mvAct"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">Volume</th></tr></thead><tbody></tbody></table></section>
     <section class="panel"><div class="head"><h2>New highs</h2><span class="note" id="mvHiN"></span></div><table id="mvHi"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>Most shorted</h2><span class="note">copies out on loan</span></div><table id="mvShort"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">Short</th></tr></thead><tbody></tbody></table></section>
     <section class="panel"><div class="head"><h2>New lows</h2><span class="note" id="mvLoN"></span></div><table id="mvLo"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
   </div>
 
@@ -254,6 +259,7 @@
         <button type="button" data-f="pack" aria-pressed="false">Packs</button>
         <button type="button" data-f="talk" aria-pressed="false">Talk</button>
         <button type="button" data-f="credit" aria-pressed="false">Credit</button>
+        <button type="button" data-f="shorts" aria-pressed="false">Shorts</button>
         <button type="button" data-f="people" aria-pressed="false">People</button>
         <button type="button" data-f="ai" aria-pressed="false">AI</button>
       </div>
