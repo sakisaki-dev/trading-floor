@@ -24,13 +24,26 @@
   </div>
 
   <div class="rules" id="rules" hidden>
+    <div class="slider"><label for="livingCost">Living cost / wk <b id="livingCostV"></b></label><input id="livingCost" type="range" min="0" max="20" step="1" value="4"></div>
+    <div class="slider"><label for="lifestyle">Spend of worth / wk <b id="lifestyleV"></b></label><input id="lifestyle" type="range" min="0" max="100" step="5" value="15"></div>
+    <div class="slider"><label for="maxLTV">Borrow up to <b id="maxLTVV"></b></label><input id="maxLTV" type="range" min="0" max="90" step="5" value="60"></div>
+    <div class="slider"><label for="interest">Interest / wk <b id="interestV"></b></label><input id="interest" type="range" min="0" max="100" step="5" value="20"></div>
     <div class="slider"><label for="fee">Trade fee <b id="feeV"></b></label><input id="fee" type="range" min="0" max="10" step="0.5" value="4"></div>
     <div class="slider"><label for="allowance">Allowance / wk <b id="allowanceV"></b></label><input id="allowance" type="range" min="0" max="100" step="5" value="10"></div>
     <div class="slider"><label for="packEdge">Pack edge <b id="packEdgeV"></b></label><input id="packEdge" type="range" min="0" max="60" step="5" value="25"></div>
     <div class="slider"><label for="passesPerWeek">Passes / wk <b id="passesPerWeekV"></b></label><input id="passesPerWeek" type="range" min="0" max="6" step="1" value="3"></div>
     <div class="slider"><label for="knowledgeWeeks">Notes last <b id="knowledgeWeeksV"></b></label><input id="knowledgeWeeks" type="range" min="2" max="40" step="1" value="12"></div>
     <div class="slider"><label for="detectChance">Theft caught <b id="detectChanceV"></b></label><input id="detectChance" type="range" min="0" max="100" step="5" value="35"></div>
+    <p class="kicker" style="grid-column:1/-1;margin:4px 0 0">Policy experiments (off in a free market)</p>
+    <div class="slider"><label for="priceLimit">Price limit / wk <b id="priceLimitV"></b></label><input id="priceLimit" type="range" min="0" max="50" step="5" value="0"></div>
+    <div class="slider"><label for="wealthTax">Wealth tax / wk <b id="wealthTaxV"></b></label><input id="wealthTax" type="range" min="0" max="1" step="0.05" value="0"></div>
+    <div class="slider"><label for="positionLimit">Position limit <b id="positionLimitV"></b></label><input id="positionLimit" type="range" min="0" max="100" step="5" value="0"></div>
+    <div class="slider"><label for="storePremium">Store markup <b id="storePremiumV"></b></label><input id="storePremium" type="range" min="10" max="200" step="10" value="60"></div>
     <div class="toggles">
+      <label class="toggle"><input type="checkbox" id="credit" checked> Credit</label>
+      <label class="toggle"><input type="checkbox" id="centralBank"> Central bank</label>
+      <label class="toggle"><input type="checkbox" id="store"> Vault store</label>
+      <label class="toggle"><input type="checkbox" id="closedEconomy"> Closed economy</label>
       <label class="toggle"><input type="checkbox" id="passesTradable" checked> Pass market</label>
       <label class="toggle"><input type="checkbox" id="games" checked> Games</label>
       <label class="toggle"><input type="checkbox" id="sharing" checked> Sharing</label>
@@ -45,38 +58,69 @@
 
   <p class="hyp" id="hyp"></p>
 
+  <div class="tape" id="tape" aria-label="Biggest movers over four weeks"><div class="tape__track" id="tapeTrack"></div></div>
+
   <div class="kpis">
     <div class="kpi"><span>Week</span><b id="kWeek">–</b><small id="kWeekS"></small></div>
-    <div class="kpi"><span>Price ÷ value</span><b id="kBub">–</b><small id="kBubS"></small></div>
+    <div class="kpi"><span>Market ÷ value</span><b id="kBub">–</b><small id="kBubS"></small></div>
     <div class="kpi"><span>Gini</span><b id="kGini">–</b><small id="kGiniS"></small></div>
     <div class="kpi"><span>Trades / wk</span><b id="kTrades">–</b><small id="kTradesS"></small></div>
     <div class="kpi"><span>Pass price</span><b id="kPass">–</b><small id="kPassS"></small></div>
     <div class="kpi"><span>Ticket price</span><b id="kTicket">–</b><small id="kTicketS"></small></div>
     <div class="kpi"><span>Game win rate</span><b id="kWin">–</b><small id="kWinS"></small></div>
-    <div class="kpi"><span>Richest</span><b id="kTop">–</b><small id="kTopS"></small></div>
+    <div class="kpi"><span>Leverage</span><b id="kBank">–</b><small id="kBankS"></small></div>
+  </div>
+
+  <div class="desk">
+    <section class="panel watch" aria-labelledby="w-h">
+      <div class="head"><h2 id="w-h">Watchlist</h2><select id="wsort" aria-label="Sort the watchlist"><option value="vol">Most traded</option><option value="up">Top gainers</option><option value="down">Top losers</option><option value="cap">Market value</option><option value="rich">Most overpriced</option><option value="cheap">Most underpriced</option></select></div>
+      <input id="wfilter" type="search" placeholder="Search players" aria-label="Search players">
+      <div class="watch__list" id="watch" role="listbox" aria-label="Cards"></div>
+    </section>
+
+    <section class="panel chartp" aria-labelledby="ch-name">
+      <div class="chhead">
+        <div class="chhead__id"><button type="button" id="toMarket" class="chip-btn" hidden>← Market</button><h2 id="ch-name">Market</h2><span class="note" id="chSub"></span></div>
+        <div class="chhead__num"><b id="chLast">–</b><span id="chChg"></span></div>
+      </div>
+      <div class="chtools">
+        <div class="seg" role="group" aria-label="Timeframe" id="tf"><button type="button" data-tf="20" aria-pressed="false">20W</button><button type="button" data-tf="52" aria-pressed="true">52W</button><button type="button" data-tf="0" aria-pressed="false">All</button></div>
+        <div class="seg" role="group" aria-label="Chart type" id="cmode"><button type="button" data-m="line" aria-pressed="true">Line</button><button type="button" data-m="candle" aria-pressed="false">Candles</button></div>
+        <span class="legend" id="chLegend"></span>
+      </div>
+      <canvas id="chart" aria-label="Price chart for the selected market, card or bot"></canvas>
+      <canvas id="volc" aria-label="Volume"></canvas>
+      <div class="tip" id="chartTip" hidden></div>
+      <div id="detail" class="detail"></div>
+    </section>
+
+    <section class="panel acct" aria-labelledby="a-h">
+      <div class="head"><h2 id="a-h">Account</h2><span class="note">click any bot</span></div>
+      <div id="acct"></div>
+    </section>
   </div>
 
   <div class="grid main">
     <section class="panel" aria-labelledby="floor-h">
-      <div class="head"><h2 id="floor-h">Floor</h2><span class="note">x = worth (log) · size = cards · dashed ring = thief · red ring = flagged by 5+</span></div>
+      <div class="head"><h2 id="floor-h">Floor</h2><span class="note">click a bot · x = worth (log) · size = cards · dashed = thief · red ring = flagged 5+</span></div>
       <canvas id="floor" aria-label="Every bot by worth, one lane per strategy"></canvas>
       <div class="tip" id="floorTip" hidden></div>
     </section>
     <div class="stack">
-      <section class="panel" aria-labelledby="mk-h">
-        <div class="head"><h2 id="mk-h">Price vs value</h2><span class="legend"><span><i class="line" style="background:var(--gold)"></i>Price</span><span><i class="dash"></i>Hidden value</span></span></div>
-        <canvas id="market" class="ch" aria-label="Price index and hidden value index"></canvas>
-        <div class="tip" id="marketTip" hidden></div>
+      <section class="panel" aria-labelledby="cons-h">
+        <div class="head"><h2 id="cons-h">Where the money goes</h2><span class="note">last 20 weeks · bills and interest leave the economy</span></div>
+        <div class="tablewrap"><table id="pnl"><thead><tr><th>Strategy</th><th class="num">Realized P&amp;L</th><th class="bar"><span class="sr-only">P&amp;L bar</span></th><th class="num">Net cash</th><th class="num">Quick flips</th></tr></thead><tbody></tbody></table></div>
+        <p class="note" id="consNote"></p>
+      </section>
+      <section class="panel" aria-labelledby="ct-h">
+        <div class="head"><h2 id="ct-h">Cash held by the richest 10%</h2></div>
+        <canvas id="cashTop" class="ch" aria-label="Share of all cash held by the richest 10% of bots"></canvas>
+        <div class="tip" id="cashTopTip" hidden></div>
       </section>
       <section class="panel" aria-labelledby="ac-h">
         <div class="head"><h2 id="ac-h">Cost of access</h2><span class="legend"><span><i class="line" style="background:var(--gold)"></i>Research pass</span><span><i class="line" style="background:#9cc7ff"></i>Game ticket</span></span></div>
         <canvas id="access" class="ch" aria-label="Research pass and game ticket prices in coins"></canvas>
         <div class="tip" id="accessTip" hidden></div>
-      </section>
-      <section class="panel" aria-labelledby="gw-h">
-        <div class="head"><h2 id="gw-h">Game win rate</h2><span class="legend"><span><i class="line" style="background:#3987e5"></i>Higher or Lower</span><span><i class="line" style="background:#e66767"></i>Over / Under</span></span></div>
-        <canvas id="wins" class="ch" aria-label="Share of game tickets that won a pack, 4-week average"></canvas>
-        <div class="tip" id="winsTip" hidden></div>
       </section>
     </div>
   </div>
@@ -107,6 +151,9 @@
   <div class="grid three">
     <section class="panel" aria-labelledby="gt-h">
       <div class="head"><h2 id="gt-h">Games · last 4 weeks</h2><span class="note" id="gBars"></span></div>
+      <div class="legend"><span><i class="line" style="background:#3987e5"></i>Higher or Lower win rate</span><span><i class="line" style="background:#e66767"></i>Over / Under</span></div>
+      <canvas id="wins" class="ch ch--short" aria-label="Share of game tickets that won a pack, 4-week average"></canvas>
+      <div class="tip" id="winsTip" hidden></div>
       <div class="tablewrap"><table id="gTopic"><thead><tr><th>Topic</th><th class="num">Played</th><th class="num">Win %</th><th class="bar"><span class="sr-only">Win rate bar</span></th><th class="num">Packs/tkt</th></tr></thead><tbody></tbody></table></div>
       <div class="tablewrap"><table id="gArch"><thead><tr><th>Strategy</th><th class="num">Played</th><th class="num">Win %</th><th class="bar"><span class="sr-only">Win rate bar</span></th><th class="num">Packs/tkt</th></tr></thead><tbody></tbody></table></div>
     </section>

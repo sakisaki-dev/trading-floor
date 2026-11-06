@@ -58,6 +58,7 @@ const SCHEMA = obj({
   steal: str,
   post: str,
   messages: arr(obj({ to: str, text: str })),
+  borrow: num,
   memo: str,
 });
 
@@ -119,7 +120,7 @@ function mockPolicy(o) {
   const games = o.games ? o.games.higherOrLower.sets.slice(0, o.games.tickets).map((set) => ({ game: 'higherOrLower', answers: set.map(() => (mr() < 0.5 ? 'A' : 'B')) })) : [];
   const auctionBids = (o.auctions?.open || []).filter((a) => rows.find((r) => r.player === a.player && r.yourNote && r.yourNote.estimate > a.reserve * 1.1)).map((a) => ({ auctionId: a.auctionId, bid: a.reserve * 1.05 }));
   const friend = (o.otherBots || []).find((b) => !b.flaggedYou);
-  return { research, notes, orders: orders.slice(0, 12), packs: o.you.cash > o.packs.price * 4 ? 1 : 0, auction: [], auctionBids, passOrders: [], ticketOrders: [], games, nextGameTopic: 'all', share: friend ? [friend.name] : [], acceptShares: ['all'], steal: '', post: '', messages: [], memo: `Week ${o.week}: tracking ${notes.length} new notes.` };
+  return { borrow: 0, research, notes, orders: orders.slice(0, 12), packs: o.you.cash > o.packs.price * 4 ? 1 : 0, auction: [], auctionBids, passOrders: [], ticketOrders: [], games, nextGameTopic: 'all', share: friend ? [friend.name] : [], acceptShares: ['all'], steal: '', post: '', messages: [], memo: `Week ${o.week}: tracking ${notes.length} new notes.` };
 }
 
 /* ---------- Main loop ---------- */

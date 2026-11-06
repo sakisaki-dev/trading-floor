@@ -489,3 +489,39 @@ The scripted stand-ins mostly finish in the bottom half, which is the floor a re
     promoted to bigger models when they win? [exempt]
 12. **AI memory:** each call is fresh, with a 600-character memo as the only memory (cheap, and forces
     summarising). Or give a longer history? [memo only]
+
+---
+
+## 17. Free-market realism: why bubbles pop (prototype 1.2)
+
+An earlier build looked like a permanent bubble. Two reasons:
+- **The chart was misleading.** It plotted total market value, which rises as new cards enter circulation. The main
+  chart is now the **Vault index**, a fixed basket like a stock index.
+- **The engine lacked the forces that end real bubbles.** Bots could never be forced to sell, and money only grew.
+
+**Added as real-world forces (on by default), not rules imposed from outside:**
+- **Living costs:** 4 coins a week plus 0.15% of worth. Richer bots spend more, and a bot that can't pay is sold
+  out of cards at a discount.
+- **Credit:** bots borrow against their cards. Momentum and retail bots borrow most, the rest little or nothing.
+  The limit is 60% of their cards' value, with 0.2% weekly interest. A loan past 75% triggers a margin call:
+  forced sales at a discount. Loans create coins and repayments remove them, which is what makes booms and busts
+  reinforce themselves.
+
+**Artificial safeguards** (Vault store ceiling, price limits, central bank, wealth tax, position caps) remain as
+**policy experiments**, off by default.
+
+**What it does (seed 88, 400 weeks):**
+- **Balanced market:** a steady 0.8× of hidden value (an illiquidity and fee discount).
+- **Speculators on credit** (trend chasers and herd, no outside collectors, 25-coin allowance): a slide to 0.29×,
+  then a credit boom to 0.90× and a crash to about 0.4×, with 95 margin calls.
+- **Without new money or outside buyers:** deflation to 0.13×, and the Gini rises from 0.20 to 0.40.
+- **Who loses:** the retail herd. Over 20 weeks its realized P&L was −4,800 to −5,900 coins, mostly to pack
+  arbitrage, contrarians and value bots. That is the "cards round-trip through the herd and cash consolidates"
+  effect, shown in the Where the money goes table.
+
+**Stock-market interface:**
+- A ticker tape, a watchlist and the big chart (line or candles, 20W / 52W / All, with volume).
+- For a card: its order book, time & sales and top holders.
+- For any bot you click: its account (worth, cash, loan, realized and unrealized P&L, positions with average cost,
+  and a live activity log).
+- AI bots can also `borrow` or repay, and see their debt, borrowing limit and next week's living cost.
