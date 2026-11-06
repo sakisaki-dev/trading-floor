@@ -85,11 +85,6 @@
   </div>
   <div class="mvc" id="mvc" aria-live="polite"></div>
 
-  <section class="panel" aria-labelledby="map-h">
-    <div class="head"><h2 id="map-h">Market map</h2><div class="maptools"><span class="note">each box is a player, sized by the market value of his cards out, coloured by price change · grouped by position · click to open</span><div class="seg" role="group" aria-label="Colour by" id="mapTf"><button type="button" data-k="1" aria-pressed="false">1W</button><button type="button" data-k="4" aria-pressed="true">4W</button><button type="button" data-k="12" aria-pressed="false">12W</button></div><span class="scale" id="scaleMap"></span></div></div>
-    <canvas id="map" aria-label="Market map: every player sized by market value and coloured by price change"></canvas>
-    <div class="tip" id="mapTip" hidden></div>
-  </section>
 
   <div class="desk">
     <section class="panel watch" aria-labelledby="w-h">
@@ -271,5 +266,11 @@
   <section class="panel acct" id="acctPanel" aria-labelledby="a-h">
     <div class="head"><h2 id="a-h">Account</h2><span class="note">click any bot on the floor, the leaderboard or a holders list</span></div>
     <div id="acct"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="map-h">
+    <div class="head"><h2 id="map-h">Market map</h2><div class="maptools"><span class="note">each box is a player, sized by the market value of his cards out, coloured by price change · grouped by position · click to open</span><div class="seg" role="group" aria-label="Colour by" id="mapTf"><button type="button" data-k="1" aria-pressed="false">1W</button><button type="button" data-k="4" aria-pressed="true">4W</button><button type="button" data-k="12" aria-pressed="false">12W</button></div><span class="scale" id="scaleMap"></span></div></div>
+    <canvas id="map" aria-label="Market map: every player sized by market value and coloured by price change"></canvas>
+    <div class="tip" id="mapTip" hidden></div>
   </section>
 </div>

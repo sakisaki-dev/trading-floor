@@ -43,7 +43,7 @@
   .sub { color: var(--muted); max-width: 62ch; }
 
   /* Controls */
-  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+  div.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
   button, select, input[type=number] { font: 600 13px/1 var(--body); color: var(--chalk); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; cursor: pointer; }
   input[type=number] { width: 74px; cursor: text; font-family: var(--mono); padding: 6px 8px; }
   button:hover, select:hover, .file:hover { border-color: var(--muted); }
@@ -223,7 +223,20 @@
   .indg { display: grid; gap: 6px; }
   .indg h3 { font: 800 13px/1 var(--display); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0; }
   .indt { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 6px; }
-  .ind small { font: 500 10.5px/1.3 var(--body); color: var(--faint); white-space: normal; }
+  .qt { all: unset; cursor: pointer; display: grid; gap: 4px; padding: 10px 11px 9px; border-radius: 8px; background: #0d1222; box-shadow: inset 0 0 0 1px var(--line); min-width: 0; }
+  .qt:hover { box-shadow: inset 0 0 0 1px var(--muted); }
+  .qt[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--gold); }
+  .qt:focus-visible { box-shadow: inset 0 0 0 2px var(--gold); }
+  .qt__top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+  .qt__name { font: 700 11px/1.2 var(--body); color: var(--chalk); letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qt__tf { font: 600 9px/1 var(--mono); color: var(--faint); letter-spacing: 0.08em; }
+  .qt__row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .qt__row b { font: 700 18px/1.1 var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qt__chg { font: 700 11px/1 var(--mono); padding: 3px 6px; border-radius: 4px; white-space: nowrap; color: var(--muted); background: rgb(150 162 196 / 0.12); }
+  .qt__chg.qt--up { color: #26c281; background: rgb(38 194 129 / 0.12); }
+  .qt__chg.qt--dn { color: #ff5c5c; background: rgb(255 92 92 / 0.12); }
+  .qt canvas { width: 100%; height: 62px; display: block; margin-top: 2px; }
+  .qt small { font: 500 10.5px/1.3 var(--body); color: var(--faint); white-space: normal; }
   .movers { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
   .movers table { font-size: 12px; } .movers td:first-child { white-space: normal; }
   .cal { display: grid; gap: 0; }

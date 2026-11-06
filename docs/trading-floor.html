@@ -48,7 +48,7 @@
   .sub { color: var(--muted); max-width: 62ch; }
 
   /* Controls */
-  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+  div.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
   button, select, input[type=number] { font: 600 13px/1 var(--body); color: var(--chalk); background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 11px; cursor: pointer; }
   input[type=number] { width: 74px; cursor: text; font-family: var(--mono); padding: 6px 8px; }
   button:hover, select:hover, .file:hover { border-color: var(--muted); }
@@ -228,7 +228,20 @@
   .indg { display: grid; gap: 6px; }
   .indg h3 { font: 800 13px/1 var(--display); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0; }
   .indt { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 6px; }
-  .ind small { font: 500 10.5px/1.3 var(--body); color: var(--faint); white-space: normal; }
+  .qt { all: unset; cursor: pointer; display: grid; gap: 4px; padding: 10px 11px 9px; border-radius: 8px; background: #0d1222; box-shadow: inset 0 0 0 1px var(--line); min-width: 0; }
+  .qt:hover { box-shadow: inset 0 0 0 1px var(--muted); }
+  .qt[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--gold); }
+  .qt:focus-visible { box-shadow: inset 0 0 0 2px var(--gold); }
+  .qt__top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+  .qt__name { font: 700 11px/1.2 var(--body); color: var(--chalk); letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qt__tf { font: 600 9px/1 var(--mono); color: var(--faint); letter-spacing: 0.08em; }
+  .qt__row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .qt__row b { font: 700 18px/1.1 var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .qt__chg { font: 700 11px/1 var(--mono); padding: 3px 6px; border-radius: 4px; white-space: nowrap; color: var(--muted); background: rgb(150 162 196 / 0.12); }
+  .qt__chg.qt--up { color: #26c281; background: rgb(38 194 129 / 0.12); }
+  .qt__chg.qt--dn { color: #ff5c5c; background: rgb(255 92 92 / 0.12); }
+  .qt canvas { width: 100%; height: 62px; display: block; margin-top: 2px; }
+  .qt small { font: 500 10.5px/1.3 var(--body); color: var(--faint); white-space: normal; }
   .movers { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
   .movers table { font-size: 12px; } .movers td:first-child { white-space: normal; }
   .cal { display: grid; gap: 0; }
@@ -341,11 +354,6 @@
   </div>
   <div class="mvc" id="mvc" aria-live="polite"></div>
 
-  <section class="panel" aria-labelledby="map-h">
-    <div class="head"><h2 id="map-h">Market map</h2><div class="maptools"><span class="note">each box is a player, sized by the market value of his cards out, coloured by price change · grouped by position · click to open</span><div class="seg" role="group" aria-label="Colour by" id="mapTf"><button type="button" data-k="1" aria-pressed="false">1W</button><button type="button" data-k="4" aria-pressed="true">4W</button><button type="button" data-k="12" aria-pressed="false">12W</button></div><span class="scale" id="scaleMap"></span></div></div>
-    <canvas id="map" aria-label="Market map: every player sized by market value and coloured by price change"></canvas>
-    <div class="tip" id="mapTip" hidden></div>
-  </section>
 
   <div class="desk">
     <section class="panel watch" aria-labelledby="w-h">
@@ -527,6 +535,12 @@
   <section class="panel acct" id="acctPanel" aria-labelledby="a-h">
     <div class="head"><h2 id="a-h">Account</h2><span class="note">click any bot on the floor, the leaderboard or a holders list</span></div>
     <div id="acct"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="map-h">
+    <div class="head"><h2 id="map-h">Market map</h2><div class="maptools"><span class="note">each box is a player, sized by the market value of his cards out, coloured by price change · grouped by position · click to open</span><div class="seg" role="group" aria-label="Colour by" id="mapTf"><button type="button" data-k="1" aria-pressed="false">1W</button><button type="button" data-k="4" aria-pressed="true">4W</button><button type="button" data-k="12" aria-pressed="false">12W</button></div><span class="scale" id="scaleMap"></span></div></div>
+    <canvas id="map" aria-label="Market map: every player sized by market value and coloured by price change"></canvas>
+    <div class="tip" id="mapTip" hidden></div>
   </section>
 </div>
 
@@ -2544,15 +2558,17 @@ floor.addEventListener('pointerleave', () => { hover = null; floorTip.hidden = t
 /* ---------- Line charts ---------- */
 const charts = {};
 function axes(x, Wd, Ht, pad, lo, hi, fy, n) {
-  x.font = `500 10px ${css('--mono')}`; x.textBaseline = 'middle'; x.textAlign = 'right';
-  for (let i = 0; i <= 3; i++) { const v = lo + ((hi - lo) * i) / 3, y = pad.t + (Ht - pad.t - pad.b) * (1 - i / 3); x.fillStyle = 'rgba(255,255,255,0.06)'; x.fillRect(pad.l, Math.round(y), Wd - pad.l - pad.r, 1); x.fillStyle = COL.faint; x.fillText(fy(v), pad.l - 5, y); }
-  x.textAlign = 'left'; x.textBaseline = 'alphabetic';
-  for (let t = gpw(); t < n; t += gpw()) { const px = pad.l + ((Wd - pad.l - pad.r) * t) / Math.max(1, n - 1); x.fillStyle = 'rgba(255,255,255,0.05)'; x.fillRect(px, pad.t, 1, Ht - pad.t - pad.b); }
+  x.font = `500 10px ${css('--mono')}`; x.textBaseline = 'middle'; x.textAlign = 'left';
+  x.setLineDash([2, 4]); x.lineWidth = 1;
+  for (let i = 0; i <= 3; i++) { const v = lo + ((hi - lo) * i) / 3, y = Math.round(pad.t + (Ht - pad.t - pad.b) * (1 - i / 3)) + 0.5; x.strokeStyle = 'rgba(255,255,255,0.08)'; x.beginPath(); x.moveTo(pad.l, y); x.lineTo(Wd - pad.r, y); x.stroke(); x.fillStyle = COL.faint; x.fillText(fy(v), Wd - pad.r + 6, y); }
+  x.setLineDash([]); x.textBaseline = 'alphabetic';
+  for (let t = gpw(); t < n; t += gpw()) { const px = Math.round(pad.l + ((Wd - pad.l - pad.r) * t) / Math.max(1, n - 1)); x.fillStyle = 'rgba(255,255,255,0.04)'; x.fillRect(px, pad.t, 1, Ht - pad.t - pad.b); }
+  x.fillStyle = 'rgba(255,255,255,0.14)'; x.fillRect(pad.l, Ht - pad.b, Wd - pad.l - pad.r, 1);
   if (n > 1) { x.fillStyle = COL.faint; x.fillText('W0', pad.l, Ht - 2); x.textAlign = 'right'; x.fillText(`W${FRAMES[n - 1].t}`, Wd - pad.r, Ht - 2); x.textAlign = 'left'; }
 }
 function line(id, series, o) {
   const cv = $(id), [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
-  const n = nNow(), pad = { l: 38, r: 8, t: 6, b: 14 }, data = series.map((s) => s.data.slice(0, n));
+  const n = nNow(), pad = { l: 6, r: 52, t: 8, b: 16 }, data = series.map((s) => s.data.slice(0, n));
   let lo = Infinity, hi = -Infinity; data.forEach((d) => d.forEach((v) => { if (v == null) return; lo = Math.min(lo, v); hi = Math.max(hi, v); }));
   if (!isFinite(lo)) { lo = 0; hi = 1; }
   if (o.ref !== undefined) { lo = Math.min(lo, o.ref); hi = Math.max(hi, o.ref); }
@@ -2563,16 +2579,16 @@ function line(id, series, o) {
   series.forEach((s, k) => {
     const d = data[k];
     const path = () => { x.beginPath(); let on = false; d.forEach((v, i) => { if (v == null) { on = false; return; } on ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)); on = true; }); };
-    if (s.fill) { const first = d.findIndex((v) => v != null); if (first >= 0) { path(); x.lineTo(X(n - 1), Ht - pad.b); x.lineTo(X(first), Ht - pad.b); x.closePath(); const g = x.createLinearGradient(0, pad.t, 0, Ht - pad.b); g.addColorStop(0, rgba(s.color, 0.2)); g.addColorStop(1, rgba(s.color, 0)); x.fillStyle = g; x.fill(); } }
-    path(); x.setLineDash(s.dash ? [5, 4] : []); x.strokeStyle = s.color; x.lineWidth = 2; x.lineJoin = 'round'; x.stroke(); x.setLineDash([]);
-    const lv = d[n - 1]; if (lv != null) { x.beginPath(); x.arc(X(n - 1), Y(lv), 3.2, 0, Math.PI * 2); x.fillStyle = s.color; x.fill(); }
+    if (s.fill || series.length === 1) { const first = d.findIndex((v) => v != null); if (first >= 0) { path(); x.lineTo(X(n - 1), Ht - pad.b); x.lineTo(X(first), Ht - pad.b); x.closePath(); const g = x.createLinearGradient(0, pad.t, 0, Ht - pad.b); g.addColorStop(0, rgba(s.color, 0.24)); g.addColorStop(1, rgba(s.color, 0)); x.fillStyle = g; x.fill(); } }
+    path(); x.setLineDash(s.dash ? [5, 4] : []); x.strokeStyle = s.color; x.lineWidth = 1.6; x.lineJoin = 'round'; x.stroke(); x.setLineDash([]);
+    const lv = d[n - 1]; if (lv != null) { const ly = Y(lv); x.beginPath(); x.arc(X(n - 1), ly, 2.6, 0, Math.PI * 2); x.fillStyle = s.color; x.fill(); x.fillStyle = COL.panel; x.fillRect(Wd - pad.r + 1, ly - 10, pad.r, 20); x.fillStyle = s.color; x.fillRect(Wd - pad.r + 2, ly - 7, pad.r - 3, 14); x.fillStyle = '#0b1020'; x.font = `700 9.5px ${css('--mono')}`; x.textBaseline = 'middle'; x.fillText(o.fy(lv), Wd - pad.r + 5, ly); x.textBaseline = 'alphabetic'; }
   });
   const c = (charts[id] ||= {}); Object.assign(c, { X, n, pad, Wd });
   if (c.hi !== undefined && c.hi < n) { x.fillStyle = 'rgba(238,241,250,0.35)'; x.fillRect(Math.round(X(c.hi)), pad.t, 1, Ht - pad.t - pad.b); series.forEach((s, k) => { const v = data[k][c.hi]; if (v == null) return; x.beginPath(); x.arc(X(c.hi), Y(v), 4, 0, Math.PI * 2); x.fillStyle = s.color; x.fill(); x.strokeStyle = COL.panel; x.lineWidth = 2; x.stroke(); }); }
 }
 function stack(id, layers) {
   const cv = $(id), [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
-  const n = nNow(), Ls = layers.slice(0, n), pad = { l: 38, r: 8, t: 6, b: 14 };
+  const n = nNow(), Ls = layers.slice(0, n), pad = { l: 6, r: 52, t: 8, b: 16 };
   const X = (i) => pad.l + ((Wd - pad.l - pad.r) * i) / Math.max(1, n - 1), Y = (v) => pad.t + (Ht - pad.t - pad.b) * (1 - v);
   axes(x, Wd, Ht, pad, 0, 1, (v) => pct(v), n);
   const base = new Array(n).fill(0);
@@ -3056,26 +3072,43 @@ const metricSeries = (m, upto = ix()) => {
   for (let i = 0; i <= upto; i++) { const v = m.get(FRAMES[i], i); out.push(v == null || !isFinite(v) ? null : v); }
   return out;
 };
-function spark(cv, d, color, zero) {
+// A market-site mini chart: the last 52 weeks, green when it ended above where it started and red when below, a dotted
+// baseline at the start, a fading fill, high and low marks, and a dot on the latest value
+const UP = '#26c281', DN = '#ff5c5c';
+function spark(cv, d, show, zero, selected) {
   const [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
-  const vals = d.filter((v) => v != null); if (vals.length < 2) return;
-  let lo = Math.min(...vals), hi = Math.max(...vals); if (zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); } const sp = hi - lo || Math.abs(hi) || 1;
-  const X = (i) => 1 + (i / Math.max(1, d.length - 1)) * (Wd - 2), Y = (v) => Ht - 2 - ((v - lo) / sp) * (Ht - 4);
-  if (zero && lo < 0 && hi > 0) { x.fillStyle = 'rgba(255,255,255,0.15)'; x.fillRect(0, Math.round(Y(0)), Wd, 1); }
-  x.beginPath(); let on = false; d.forEach((v, i) => { if (v == null) { on = false; return; } on ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)); on = true; }); x.strokeStyle = color; x.lineWidth = 1.5; x.stroke();
+  const idx = d.map((v, i) => (v == null ? -1 : i)).filter((i) => i >= 0); if (idx.length < 2) return null;
+  const first = d[idx[0]], last = d[idx[idx.length - 1]], up = last >= first, col = selected ? COL.gold : up ? UP : DN;
+  let lo = Infinity, hi = -Infinity, iLo = 0, iHi = 0; for (const i of idx) { if (d[i] < lo) { lo = d[i]; iLo = i; } if (d[i] > hi) { hi = d[i]; iHi = i; } }
+  if (zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+  const sp = hi - lo || Math.abs(hi) || 1, pt = 9, pb = 9, L0 = 1, R0 = 4;
+  const X = (i) => L0 + (i / Math.max(1, d.length - 1)) * (Wd - L0 - R0), Y = (v) => pt + (1 - (v - lo) / sp) * (Ht - pt - pb);
+  // baseline at the start of the window
+  x.strokeStyle = 'rgba(238,241,250,0.28)'; x.lineWidth = 1; x.setLineDash([2, 3]); x.beginPath(); x.moveTo(L0, Math.round(Y(first)) + 0.5); x.lineTo(Wd - R0, Math.round(Y(first)) + 0.5); x.stroke(); x.setLineDash([]);
+  const path = () => { x.beginPath(); let on = false; d.forEach((v, i) => { if (v == null) { on = false; return; } on ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)); on = true; }); };
+  path(); x.lineTo(X(idx[idx.length - 1]), Ht); x.lineTo(X(idx[0]), Ht); x.closePath();
+  const g = x.createLinearGradient(0, pt, 0, Ht); g.addColorStop(0, rgba(col, 0.28)); g.addColorStop(1, rgba(col, 0)); x.fillStyle = g; x.fill();
+  path(); x.strokeStyle = col; x.lineWidth = 1.6; x.lineJoin = 'round'; x.stroke();
+  const lx = X(idx[idx.length - 1]), ly = Y(last); x.beginPath(); x.arc(lx, ly, 4.5, 0, Math.PI * 2); x.fillStyle = rgba(col, 0.25); x.fill(); x.beginPath(); x.arc(lx, ly, 2.2, 0, Math.PI * 2); x.fillStyle = col; x.fill();
+  if (show && Wd > 120) { x.font = `500 9px ${css('--mono')}`; x.fillStyle = COL.faint; x.textBaseline = 'top'; x.textAlign = X(iHi) > Wd / 2 ? 'right' : 'left'; x.fillText('H ' + show(hi), C(X(iHi), 2, Wd - 2), 0); x.textBaseline = 'bottom'; x.textAlign = X(iLo) > Wd / 2 ? 'right' : 'left'; x.fillText('L ' + show(lo), C(X(iLo), 2, Wd - 2), Ht); x.textAlign = 'left'; x.textBaseline = 'alphabetic'; }
+  return { first, last, up };
 }
 // The indicators board: built once, then only values and sparklines change each week
 function drawIndicators() {
   const f = cur(); if (!f) return; const host = $('ind'), at = ix();
   if (!host.dataset.built) {
-    host.innerHTML = IND_GROUPS.map(([g, ms]) => `<div class="indg"><h3>${g}</h3><div class="indt">${ms.map((m) => `<button type="button" class="stat--btn ind" data-metric="${m.key}" title="${esc(m.desc)} · click to chart it"><span>${m.label}</span><b data-v></b><small>${esc(m.desc)}</small><canvas aria-hidden="true"></canvas></button>`).join('')}</div></div>`).join('');
+    host.innerHTML = IND_GROUPS.map(([g, ms]) => `<div class="indg"><h3>${g}</h3><div class="indt">${ms.map((m) => `<button type="button" class="qt" data-metric="${m.key}" title="${esc(m.desc)} · click to chart it"><span class="qt__top"><span class="qt__name">${m.label}</span><span class="qt__tf">52W</span></span><span class="qt__row"><b data-v></b><span class="qt__chg" data-c></span></span><canvas aria-hidden="true"></canvas><small>${esc(m.desc)}</small></button>`).join('')}</div></div>`).join('');
     host.dataset.built = '1';
   }
-  host.querySelectorAll('[data-metric]').forEach((el) => {
+  for (const el of host.querySelectorAll('[data-metric]')) {
     const m = METRICS.find((x) => x.key === el.dataset.metric), d = metricSeries(m, at), v = d[d.length - 1], on = SEL.type === 'metric' && SEL.key === m.key;
     el.setAttribute('aria-pressed', String(on)); el.querySelector('[data-v]').textContent = v == null ? '–' : m.show(v);
-    spark(el.querySelector('canvas'), d, on ? COL.gold : '#9cc7ff', m.zero);
-  });
+    const w = d.slice(-52), r = spark(el.querySelector('canvas'), w, m.show, m.zero, on), c = el.querySelector('[data-c]');
+    if (!r) { c.textContent = ''; continue; }
+    const rel = r.first > 0 && !m.zero && !m.noPct, ch = rel ? r.last / r.first - 1 : r.last - r.first, flat = Math.abs(ch) < 1e-9;
+    c.className = 'qt__chg ' + (flat ? '' : ch > 0 ? 'qt--up' : 'qt--dn');
+    c.textContent = flat ? '0' : `${ch > 0 ? '▲' : '▼'} ${rel ? Math.abs(ch * 100).toFixed(1) + '%' : m.show(Math.abs(ch))}`;
+  }
 }
 // Movers: gainers and losers over 4 weeks, most active, new 12-week highs and lows
 function moverRows(rows, extra) { return rows.length ? rows.map((r) => { const p = LIBRARY.players[r.id]; return `<tr data-card="${r.id}"><td>${p.pos} ${esc(p.name)}</td><td class="num">${fmt(r.P)}</td><td class="num">${extra(r)}</td></tr>`; }).join('') : '<tr><td class="k" colspan="3">None this week.</td></tr>'; }
