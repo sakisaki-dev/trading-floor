@@ -112,7 +112,8 @@ export const DEFAULTS = {
   liquidation: 'auction', liqListings: 30, liqStart: 0.95, liqStep: 0.05, // 'auction': seized copies go to the sealed auction with no minimum price, liqListings a week; 'cutWhenUnsold' / 'chase': the old asks (liqStart, liqStep)
   twoSidedQuotes: true, // between trades, a price is marked to the spread only when the book has both an unfilled bid and an unfilled offer; off: any unfilled bid above or offer below pulls it (the old rule, which dragged every price down while random bots posted far more offers than bids)
   quotePull: 0.25, // how far unfilled orders pull the quoted price toward them each week (priceRule 'quotes' only)
-  priceRule: 'lastTrade', // 'lastTrade': a card's price is the last price it traded at; best bid and ask are shown, never move it. 'quotes': the old pull
+  priceRule: 'comps', compsWeeks: 4, vaultIndex: 'repeatSales', // 'comps' (default): an untraded card is marked from its player's other cards' trades in the last compsWeeks weeks (comparable sales); 'lastTrade': its own last trade only. vaultIndex 'repeatSales': from pairs of trades of the same card; 'basket': every card's mark
+  // 'lastTrade': a card's price is the last price it traded at; best bid and ask are shown, never move it. 'quotes': the old pull
   outsideMode: 'budget', // 'budget': outsideBudget coins a week buy the lowest asks, spread by real popularity (Career Legacy), and outsideResale of what collectors hold is sold back into the best bids. 'band': the old 5% chance of a bid at 0.85–1.08× value
   outsideBudget: 52000, outsideResale: 0.02, outsideNews: true, // outsideNews: each player's share is his Career Legacy × his current form (the public news: a hot streak draws more, a slump or an injury less)
   forcedSale: 'book', // 'book': a margin-called or broke bot sells into the best bids, then lists the rest at auction with no minimum. 'discount': the old 88% ask and 70% item reserve
@@ -1296,6 +1297,25 @@ export function step(W) {
   record(W);
 }
 // One copy changes hands at a price outside the weekly cross (outside collectors, forced sellers hitting bids)
+// A card traded at this price: remember it (for comparable-sales marks), and pair it with the card's previous trade (for
+// the repeat-sales Vault index). A card's opening price counts as its first trade.
+// Comparable sales: a player's 16 card markets differ only by their rarity multiplier, so a trade in any of them is news
+// about all of them. A market that didn't trade this week is marked at the median of the player's trades in the last
+// compsWeeks weeks (each brought back to a base card by its multiplier), times its own multiplier. A market that traded
+// keeps its own price; a player none of whose cards traded keeps his old marks.
+function compsMark(W) {
+  const k = W.cfg.compsWeeks ?? 4;
+  for (const p of W.players) {
+    const base = []; for (let j = 0; j < 16; j++) { const m = W.cards[p.id * 16 + j]; if (m.lastTradeT != null && m.lastTradeT > 0 && W.t - m.lastTradeT < k) base.push(m.lastTradeP / m.mult); }
+    if (!base.length) continue; base.sort((a, b) => a - b); const med = base.length % 2 ? base[base.length >> 1] : (base[base.length / 2 - 1] + base[base.length / 2]) / 2;
+    for (let j = 0; j < 16; j++) { const m = W.cards[p.id * 16 + j]; if (m.lastTradeT === W.t) continue; m.P = med * m.mult; if (m.Ph.length) m.Ph[m.Ph.length - 1] = m.P; }
+  }
+}
+function noteTrade(W, c, price) {
+  const t0 = c.lastTradeT ?? 0, p0 = c.lastTradeP ?? c.P0;
+  if (t0 < W.t && W.t - t0 <= 52 && p0 > 0 && price > 0) (W.rsPairs ||= []).push([t0, Math.log(price / p0)]);
+  if (c.lastTradeT !== W.t) { c.lastTradeT = W.t; c.lastTradeP = price; } else c.lastTradeP = price;
+}
 function xfer(W, c, buyer, seller, price) {
   const cfg = W.cfg;
   if (buyer && buyer !== 'out' && buyer.cash < price) return false;
@@ -1305,7 +1325,7 @@ function xfer(W, c, buyer, seller, price) {
   else { if ((seller.h.get(c.id) || 0) < 1) return false; give(seller, c, -1); seller.cash += price * (1 - cfg.fee); W.house.fees += price * cfg.fee; W.treasury += price * cfg.fee; flowIn(W, seller, price * (1 - cfg.fee)); sellLot(W, seller, c, price * (1 - cfg.fee)); }
   if (buyer === 'out') { W.outside.set(c.id, (W.outside.get(c.id) || 0) + 1); c.circ--; W.house.outside += price; }
   else { buyer.cash -= price; give(buyer, c, 1); flowOut(W, buyer, price); addLot(buyer, c, price, W.t); }
-  c.P = price; if (c.Ph.length) c.Ph[c.Ph.length - 1] = price; if (c.volH.length) c.volH[c.volH.length - 1]++; W.lastTrades = (W.lastTrades || 0) + 1; if (W.ord) W.ord.coins += price;
+  c.P = price; noteTrade(W, c, price); if (c.Ph.length) c.Ph[c.Ph.length - 1] = price; if (c.volH.length) c.volH[c.volH.length - 1]++; W.lastTrades = (W.lastTrades || 0) + 1; if (W.ord) W.ord.coins += price;
   jot(W, { type: 'trade', card: c.key, price: r2(price), buyer: buyer === 'out' ? 'outside collector' : buyer.name, seller: seller === 'out' ? 'outside collector' : seller === 'liq' ? 'liquidator' : seller === 'store' ? 'Vault store' : seller.name });
   return true;
 }
@@ -1381,7 +1401,7 @@ function clear(W) {
           done++;
           if (W.arcsWeek.length < 60 && buyer && seller !== 'liq' && seller !== 'store' && W.rand() < 0.5) W.arcsWeek.push([seller.id, buyer.id]);
         }
-        if (done) c.P = price;
+        if (done) { c.P = price; noteTrade(W, c, price); }
       }
     }
     // Quote pressure: unfilled bids above the price (or asks below it) move the quote even without a trade.
@@ -1402,6 +1422,7 @@ function clear(W) {
     trades += done;
   }
   W.lastTrades = trades;
+  if (cfg.priceRule === 'comps') compsMark(W);
   impliedPrices(W);
 }
 function leagueUpdate(W) {
@@ -1495,6 +1516,16 @@ function detect(W) {
 }
 
 /* ---------- Metrics ---------- */
+// The Vault index, repeat-sales (as house-price indices are built): every card that traded is paired with its own previous
+// trade, and each pair says where the index is today (the index then, moved by that card's change since). The index is the
+// median of those; a week with fewer than 3 pairs keeps last week's level. Cards that didn't trade drop out instead of
+// holding it flat.
+function repeatSales(W) {
+  const L = (W.rsLog ||= [0]), pairs = W.rsPairs || []; W.rsPairs = [];
+  const est = pairs.filter(([t0]) => L[t0] != null).map(([t0, d]) => L[t0] + d).sort((a, b) => a - b);
+  const prev = L[W.t - 1] ?? L[L.length - 1] ?? 0, now = est.length >= 3 ? est[est.length >> 1] : prev;
+  L[W.t] = now; return 100 * Math.exp(now);
+}
 export function idx(W, which) { let a = 0, b = 0; for (const c of W.cards) { a += (which === 'P' ? c.P : c.F) * c.S0; b += c.P0 * c.S0; } return (100 * a) / b; }
 export function bubble(W) { let a = 0, b = 0; for (const c of W.cards) { a += c.P * c.circ; b += c.F * c.circ; } return b ? a / b : 1; }
 export function gini(xs) { const s = xs.slice().sort((a, b) => a - b), n = s.length, tot = s.reduce((a, b) => a + b, 0); if (!tot) return 0; let g = 0; s.forEach((x, i) => (g += (2 * (i + 1) - n - 1) * x)); return g / (n * tot); }
@@ -1502,7 +1533,7 @@ function record(W) {
   const nws = W.bots.map((b) => worth(W, b)), tot = nws.reduce((a, b) => a + b, 0) || 1;
   assignGroups(W); const share = GROUPS.map(() => 0); W.bots.forEach((b, i) => (share[b._grp] += nws[i] / tot));
   const h = W.hist;
-  h.p.push(idx(W, 'P')); h.f.push(idx(W, 'F')); h.bub.push(bubble(W)); h.gini.push(gini(nws)); h.share.push(share); h.trades.push(W.lastTrades);
+  h.p.push(W.cfg.vaultIndex === 'basket' ? idx(W, 'P') : repeatSales(W)); h.f.push(idx(W, 'F')); h.bub.push(bubble(W)); h.gini.push(gini(nws)); h.share.push(share); h.trades.push(W.lastTrades);
   h.money.push(W.bots.reduce((s, b) => s + b.cash, 0)); h.pass.push(W.passPrice); h.shares.push(W.week.shares); h.thefts.push(W.week.thefts); h.gamePacks.push(W.gamePacksWeek || 0);
   let known = 0; for (const b of W.bots) for (const n of b.notes.values()) if (fresh(W, n)) known++;
   h.informed.push(known / Math.max(1, W.bots.length)); h.flags.push(W.bots.reduce((s, b) => s + b.flags.size, 0));
