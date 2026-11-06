@@ -14,7 +14,7 @@ export const DEFAULTS = {
   coinScale: 20, // every coin amount in the rules (cash, allowance, stakes, costs, pass and ticket prices) is in units of this
   startCash: 20000,
   allowance: 1800, // coins per bot per week (new money: this is the inflation lever)
-  fee: 0.04, // share of every card sale kept by the house
+  fee: 0.01, // share of every card sale kept by the house
   packSize: 5,
   packEdge: 0.25, // packs cost their expected hidden value × (1 + edge)
   poolMultiplier: 10, // unminted copies in the pool = copies in circulation at the start × this
@@ -30,7 +30,7 @@ export const DEFAULTS = {
   gossip: true, // a victim's friends flag the thief too
   outsideCollectors: true, // buyers from outside the bots bid around hidden value (the market's anchor)
   royalties: true, // each generation, holders get 3% of hidden value per card held
-  royaltyRate: 0.03,
+  royaltyRate: 0.1, royaltyEvery: 'week', // royaltyRate: share of hidden value a card pays its holders per weeksPerGeneration (20) weeks; 'week' pays it weekly, from that week's game under the league
   evolve: true, // each generation the worst 10% by recent return adopt a mutated copy of a top 10% bot's networks (so strategies that trade well on the news can spread); off: strategies spread only through heirs
   evolveShare: 0.1,
   mortality: true, // bots live 6–14 generations; on death the estate is split between heirs that carry a mutated copy of the genome
@@ -115,7 +115,7 @@ export const DEFAULTS = {
   priceRule: 'comps', compsWeeks: 4, vaultIndex: 'repeatSales', // 'comps' (default): an untraded card is marked from its player's other cards' trades in the last compsWeeks weeks (comparable sales); 'lastTrade': its own last trade only. vaultIndex 'repeatSales': from pairs of trades of the same card; 'basket': every card's mark
   // 'lastTrade': a card's price is the last price it traded at; best bid and ask are shown, never move it. 'quotes': the old pull
   outsideMode: 'budget', // 'budget': outsideBudget coins a week buy the lowest asks, spread by real popularity (Career Legacy), and outsideResale of what collectors hold is sold back into the best bids. 'band': the old 5% chance of a bid at 0.85–1.08× value
-  outsideBudget: 52000, outsideResale: 0.02, outsideNews: true, // outsideNews: each player's share is his Career Legacy × his current form (the public news: a hot streak draws more, a slump or an injury less)
+  outsideBudget: 250000, outsideResale: 0.02, outsideNews: true, // outsideNews: each player's share is his Career Legacy × his current form (the public news: a hot streak draws more, a slump or an injury less)
   forcedSale: 'book', // 'book': a margin-called or broke bot sells into the best bids, then lists the rest at auction with no minimum. 'discount': the old 88% ask and 70% item reserve
   packSale: 'auction', // 'auction': packsPerWeek are released and sold by uniform-price auction (everyone pays the lowest winning bid). 'markup': the old expected value + packEdge
   packsPerWeek: 33, packMix: { standard: 0.75, premium: 0.21, elite: 0.025, holo: 0.015 }, // the mix bots bought under the old price
@@ -136,7 +136,7 @@ export const DEFAULTS = {
   nnMutation: 0.15, // weight noise when a bot copies a better bot's networks (standard deviation per weight)
   nnReset: 0.01, // chance each copied weight is redrawn from scratch instead (bigger jumps)
   nnResearchError: 0.2, // how far a neural bot's research note can be off the hidden value (log-normal)
-  nnFitnessGens: 3,
+  nnFitnessGens: 6, // fitness = the mean return over this many generations (a longer window rewards consistency over luck)
   nnStartBias: 0, // newborn networks lean toward doing nothing: this is subtracted from the buy, sell, pack and borrow outputs' starting bias
   practiceGens: 0, // before the market opens, the bots play this many generations in a private practice market with the same rules and open with what they learned // neural bots are ranked by their average return over this many generations
   social: { sharer: 0.45, reciprocator: 0.35, thief: 0.2 }, // social style shares among rule bots
@@ -1240,6 +1240,7 @@ export function step(W) {
     if (!W.L && W.timeline && W.seasonIx >= W.timeline.seasons.length - 1) leagueStart(W);
     if (W.L) { if (W.t % cfg.seasonWeeks === 0 && W.seasonIx >= W.timeline.seasons.length) leagueSeasonEnd(W); leagueWeek(W); leagueValues(W); }
   } else if (cfg.valueModel === 'ovrWalk') ovrWalk(W); else if (cfg.valueModel === 'factors') factorValues(W);
+  if (cfg.royalties && !cfg.priceOnly && cfg.royaltyEvery !== 'generation') payRoyalties(W, 1 / cfg.weeksPerGeneration);
   W.flow = { net: GROUPS.map(() => 0), realized: GROUPS.map(() => 0), trips: GROUPS.map(() => 0), tax: 0, paidOut: 0 };
   assignGroups(W);
   W.week = { shares: 0, thefts: 0, caught: 0, researched: new Map() };
@@ -1432,14 +1433,27 @@ function leagueUpdate(W) {
   const up = moved[0], dn = moved[moved.length - 1];
   log(W, 'update', `League update (test): ${moved.length} players' values moved${up ? `, led by ${up[0].pos} ${up[0].name} up ${Math.round((up[1] - 1) * 100)}%` : ''}${dn ? ` and ${dn[0].pos} ${dn[0].name} down ${Math.round((1 - dn[1]) * 100)}%` : ''}. Every note on them is now out of date.`);
 }
+// Royalties: a card pays its holders royaltyRate of its hidden value per weeksPerGeneration weeks. 'week' (default) pays
+// each week a 1/weeksPerGeneration share, scaled under the league by that week's game: his production ÷ his career pace
+// (a big game pays more, an injured, idle or retired player pays nothing). 'generation': the old lump at each generation's end.
+function payRoyalties(W, share) {
+  const cfg = W.cfg, league = cfg.valueModel === 'league' && W.L;
+  const gameK = (p) => { if (!league || !p.lg) return 1; if (!p.lg.active || !p._game || p._gameT !== W.t) return 0; const g = p.lg.tot.g || 0, cpg = g ? lgProduction(p.pos, p.lg.tot) / g : 0; return cpg > 0 ? Math.max(0, lgProduction(p.pos, p._game) / cpg) : 1; };
+  const k = new Map(W.players.map((p) => [p.id, gameK(p)]));
+  const perCard = (c) => cfg.royaltyRate * share * c.F * (k.get(c.pid) ?? 1), perItem = (it) => cfg.royaltyRate * share * intrinsicItem(W, it) * (k.get(it.pid) ?? 1);
+  let owed = 0; for (const b of W.bots) { for (const [id, q] of b.h) owed += perCard(W.cards[id]) * q; for (const uid of b.items || []) { const it = W.items.get(uid); if (it) owed += perItem(it); } }
+  const scaleR = cfg.closedEconomy ? Math.min(1, (W.treasury * 0.5) / Math.max(1, owed)) : 1; let paid = 0;
+  for (const b of W.bots) { let d = 0; for (const [id, q] of b.h) d += perCard(W.cards[id]) * q * scaleR; for (const uid of b.items || []) { const it = W.items.get(uid); if (it) d += perItem(it) * scaleR; } b.cash += d; flowIn(W, b, d); paid += d; } // royalties count in a bot's return: what it holds is its choice
+  for (const L of W.cardLoans || []) { const amt = perCard(W.cards[L.id]) * scaleR; L.borrower.cash -= amt; L.lender.cash += amt; } // a short seller pays the lender what the card would have earned
+  if (cfg.closedEconomy) W.treasury -= paid; W.house.royalties += paid; W.royGen = (W.royGen || 0) + paid;
+  // what each card paid over the last weeksPerGeneration weeks, per copy (public: every holder saw it)
+  const n = cfg.weeksPerGeneration; for (const p of W.players) { const r = (p.royWin ||= []); r.push(cfg.royaltyRate * share * p.F * (k.get(p.id) ?? 1) * scaleR); if (r.length > (share >= 1 ? 1 : n)) r.shift(); p.roySum = r.reduce((a, b) => a + b, 0); }
+  for (const c of W.cards) c.lastRoy = (W.players[c.pid].roySum || 0) * c.mult; for (const it of W.items.values()) it.lastRoy = (W.players[it.pid]?.roySum || 0) * (it.mult / Math.max(1e-9, W.cards[mktId(it.pid, it.d === 4 ? 0 : it.d, it.f)]?.mult || 1));
+}
 function generationEnd(W) {
   const cfg = W.cfg, gen = W.t / cfg.weeksPerGeneration;
-  if (cfg.royalties && !cfg.priceOnly) { let owed = 0; for (const b of W.bots) { for (const [id, q] of b.h) owed += cfg.royaltyRate * W.cards[id].F * q; for (const uid of b.items || []) owed += cfg.royaltyRate * intrinsicItem(W, W.items.get(uid)); }
-    const scaleR = cfg.closedEconomy ? Math.min(1, (W.treasury * 0.5) / Math.max(1, owed)) : 1; let paid = 0;
-    for (const c of W.cards) c.lastRoy = cfg.royaltyRate * c.F * scaleR; for (const it of W.items.values()) it.lastRoy = cfg.royaltyRate * intrinsicItem(W, it) * scaleR; // public: every holder saw what each card paid
-    for (const b of W.bots) { let d = 0; for (const [id, q] of b.h) d += cfg.royaltyRate * W.cards[id].F * q * scaleR; for (const uid of b.items || []) d += cfg.royaltyRate * intrinsicItem(W, W.items.get(uid)) * scaleR; b.cash += d; b.exo = (b.exo || 0) + d; paid += d; }
-    for (const L of W.cardLoans || []) { const amt = cfg.royaltyRate * W.cards[L.id].F * scaleR; L.borrower.cash -= amt; L.lender.cash += amt; } // a short seller pays the lender the royalty the card would have earned
-    if (cfg.closedEconomy) W.treasury -= paid; W.house.royalties += paid; log(W, 'gen', `Generation ${gen} royalties: ${Math.round(paid).toLocaleString()} coins to card holders (${Math.round(cfg.royaltyRate * 100)}% of each card's hidden value).`); }
+  if (cfg.royalties && !cfg.priceOnly && cfg.royaltyEvery === 'generation') payRoyalties(W, 1);
+  if (cfg.royalties && !cfg.priceOnly) { log(W, 'gen', `Generation ${gen} royalties: ${Math.round(W.royGen || 0).toLocaleString()} coins to card holders.`); W.royGen = 0; }
   for (const b of W.bots) b.seasons++;
   // Fitness: return on the capital the bot started the generation with, from its own decisions only (allowance,
   // royalties and living costs are removed, since no bot chose them)
@@ -1502,7 +1516,7 @@ export function removeBot(W, b, reason) {
 function detect(W) {
   const p = W.hist.p;
   if (p.length > 5) {
-    const now = idx(W, 'P'), past = p[p.length - 4];
+    const now = p[p.length - 1], past = p[p.length - 5]; // the Vault index against its own value 4 weeks earlier (like with like)
     if (now < past * 0.88 && !(W.cool.crash > W.t)) { log(W, 'crash', `Crash: the price index fell ${Math.round((1 - now / past) * 100)}% in four weeks.`); W.cool.crash = W.t + 12; }
     if (now > past * 1.15 && !(W.cool.boom > W.t)) { log(W, 'bubble', `Rally: the price index rose ${Math.round((now / past - 1) * 100)}% in four weeks.`); W.cool.boom = W.t + 12; }
   }
@@ -1517,14 +1531,26 @@ function detect(W) {
 
 /* ---------- Metrics ---------- */
 // The Vault index, repeat-sales (as house-price indices are built): every card that traded is paired with its own previous
-// trade, and each pair says where the index is today (the index then, moved by that card's change since). The index is the
-// median of those; a week with fewer than 3 pairs keeps last week's level. Cards that didn't trade drop out instead of
-// holding it flat.
+// trade. Each week the last 104 weeks of the index are estimated together from all their pairs by least squares (each pair:
+// log index then − log index at the earlier trade = that card's log change), with the weeks before fixed. A very small
+// smoothness term bridges weeks without trades; the pairs decide everything else. Cards that didn't trade drop out instead of
+// holding it flat. Earlier weeks are revised as new pairs arrive; the chart shows each week's value as it was published.
 function repeatSales(W) {
-  const L = (W.rsLog ||= [0]), pairs = W.rsPairs || []; W.rsPairs = [];
-  const est = pairs.filter(([t0]) => L[t0] != null).map(([t0, d]) => L[t0] + d).sort((a, b) => a - b);
-  const prev = L[W.t - 1] ?? L[L.length - 1] ?? 0, now = est.length >= 3 ? est[est.length >> 1] : prev;
-  L[W.t] = now; return 100 * Math.exp(now);
+  const L = (W.rsLog ||= [0]), WIN = 104, all = (W.rsAll ||= []);
+  for (const [t0, d] of W.rsPairs || []) all.push([t0, W.t, Math.max(-2, Math.min(2, d))]); W.rsPairs = [];
+  W.rsAll = all.filter((x) => x[1] > W.t - WIN);
+  const start = Math.max(1, W.t - WIN + 1), n = W.t - start + 1; if (n <= 0) return 100 * Math.exp(L[W.t] ?? 0);
+  const A = Array.from({ length: n }, () => new Float64Array(n)), rhs = new Float64Array(n), known = (t) => L[t] ?? L[L.length - 1] ?? 0;
+  for (const [t0, t1, d] of W.rsAll) { const i1 = t1 - start; if (i1 < 0) continue;
+    if (t0 >= start) { const i0 = t0 - start; A[i1][i1] += 1; A[i0][i0] += 1; A[i1][i0] -= 1; A[i0][i1] -= 1; rhs[i1] += d; rhs[i0] -= d; }
+    else { A[i1][i1] += 1; rhs[i1] += d + known(t0); } }
+  const lam = 1e-3; // smoothness between neighbouring weeks
+  for (let i = 0; i < n; i++) { if (i === 0) { A[0][0] += lam; rhs[0] += lam * known(start - 1); } else { A[i][i] += lam; A[i - 1][i - 1] += lam; A[i][i - 1] -= lam; A[i - 1][i] -= lam; } }
+  for (let c = 0; c < n; c++) { let piv = c; for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[piv][c])) piv = r; [A[c], A[piv]] = [A[piv], A[c]]; [rhs[c], rhs[piv]] = [rhs[piv], rhs[c]];
+    const d = A[c][c] || 1e-12; for (let r = c + 1; r < n; r++) { const f = A[r][c] / d; if (!f) continue; for (let k = c; k < n; k++) A[r][k] -= f * A[c][k]; rhs[r] -= f * rhs[c]; } }
+  const x = new Float64Array(n); for (let r = n - 1; r >= 0; r--) { let v = rhs[r]; for (let k = r + 1; k < n; k++) v -= A[r][k] * x[k]; x[r] = v / (A[r][r] || 1e-12); }
+  for (let i = 0; i < n; i++) L[start + i] = x[i];
+  return 100 * Math.exp(L[W.t]);
 }
 export function idx(W, which) { let a = 0, b = 0; for (const c of W.cards) { a += (which === 'P' ? c.P : c.F) * c.S0; b += c.P0 * c.S0; } return (100 * a) / b; }
 export function bubble(W) { let a = 0, b = 0; for (const c of W.cards) { a += c.P * c.circ; b += c.F * c.circ; } return b ? a / b : 1; }
@@ -1732,7 +1758,7 @@ function leagueWeek(W) {
     for (const k of LSTATS[p.pos]) { const r = s.rates[k] || 0; game[k] = LYARDS.has(k) ? Math.max(0, Math.round(r * Math.exp(noise * W.gauss() - (noise * noise) / 2))) : poisson1(W, r); }
     for (const [k, v] of Object.entries(game)) { s.season[k] = (s.season[k] || 0) + v; s.tot[k] = (s.tot[k] || 0) + v; }
     const G = W.library.leagueRates.legacyGrowth[p.pos]; if (G) s.legacy += G.perScore * lgProduction(p.pos, game) + G.perGame;
-    p._game = game; s.win.push(lgProduction(p.pos, game)); s.win.shift();
+    p._game = game; p._gameT = W.t; s.win.push(lgProduction(p.pos, game)); s.win.shift();
   }
 }
 // The season ends: awards, the Super Bowl, retirements and rookies, then each player's form changes
