@@ -458,14 +458,15 @@ const GROUP = { credit: ['loan', 'marginCall', 'default'], shorts: ['short', 'co
 
 /* ---------- Controls ---------- */
 $('preset').innerHTML = Object.entries(PRESETS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
-const SLIDERS = { scarcity: [0.01, (v) => (v / 100).toFixed(2)], packsPerWeek: [1, (v) => String(v)], liqListings: [1, (v) => String(v)], outsideBudget: [1, (v) => v.toLocaleString()], outsideResale: [0.01, (v) => v + '%'], prizeShare: [0.01, (v) => v + '% of takings'], livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'], walkUp: [0.01, (v) => v + '%'], walkVolLow: [0.01, (v) => '±' + v + '%'], walkVolHigh: [0.01, (v) => '±' + v + '%'], riskPerDoubling: [1, (v) => '+' + v + ' pts'], flagWeeks: [1, (v) => (v ? v + ' wk clean' : 'forever')], cardLendFee: [0.0001, (v) => (v / 100).toFixed(2) + '%/wk'], shortMargin: [0.01, (v) => v + '%'], cardLoanWeeks: [1, (v) => v + ' wk'], nnMutation: [0.01, (v) => '±' + (v / 100).toFixed(2)], nnReset: [0.01, (v) => v.toFixed(1) + '%'], evolveShare: [0.01, (v) => v + '%'] };
+const SLIDERS = { entryRate: [0.01, (v) => (v / 100).toFixed(2)], heirs: [1, (v) => String(v)], scarcity: [0.01, (v) => (v / 100).toFixed(2)], packsPerWeek: [1, (v) => String(v)], liqListings: [1, (v) => String(v)], outsideBudget: [1, (v) => v.toLocaleString()], outsideResale: [0.01, (v) => v + '%'], prizeShare: [0.01, (v) => v + '% of takings'], livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'], walkUp: [0.01, (v) => v + '%'], walkVolLow: [0.01, (v) => '±' + v + '%'], walkVolHigh: [0.01, (v) => '±' + v + '%'], riskPerDoubling: [1, (v) => '+' + v + ' pts'], flagWeeks: [1, (v) => (v ? v + ' wk clean' : 'forever')], cardLendFee: [0.0001, (v) => (v / 100).toFixed(2) + '%/wk'], shortMargin: [0.01, (v) => v + '%'], cardLoanWeeks: [1, (v) => v + ' wk'], nnMutation: [0.01, (v) => '±' + (v / 100).toFixed(2)], nnReset: [0.01, (v) => v.toFixed(1) + '%'], evolveShare: [0.01, (v) => v + '%'] };
 const SELECTS = ['pastSave', 'valueModel', 'priceRule', 'outsideMode', 'liquidation', 'forcedSale', 'packSale'];
-const TOGGLES = ['twoSidedQuotes', 'shorting', 'credit', 'passesTradable', 'games', 'sharing', 'stealing', 'gossip', 'outsideCollectors', 'royalties', 'evolve', 'leagueUpdates', 'centralBank', 'store', 'closedEconomy'];
+const TOGGLES = ['capPoorest', 'turnover', 'twoSidedQuotes', 'shorting', 'credit', 'passesTradable', 'games', 'sharing', 'stealing', 'gossip', 'outsideCollectors', 'royalties', 'evolve', 'leagueUpdates', 'centralBank', 'store', 'closedEconomy'];
 function syncControls() {
   const c = cfgNow(); if (!c) return;
   for (const [k, [s, f]] of Object.entries(SLIDERS)) { $(k).value = Math.round((c[k] / s) * 100) / 100; $(k + 'V').textContent = f(+$(k).value); }
   for (const k of TOGGLES) $(k).checked = !!c[k];
   for (const k of SELECTS) if (c[k] != null) $(k).value = c[k];
+  if (typeof rulesUi === 'function') rulesUi();
 }
 for (const [k, [s, f]] of Object.entries(SLIDERS)) $(k).addEventListener('input', () => { const v = +$(k).value; $(k + 'V').textContent = f(v); opts[k] = v * s; if (mode === 'live') { tell({ cmd: 'cfg', k, v: v * s }); logChange(k, v * s); } });
 for (const k of SELECTS) $(k).addEventListener('change', (e) => { opts[k] = e.target.value; if (mode === 'live') { tell({ cmd: 'cfg', k, v: e.target.value }); logChange(k, e.target.value); } });
@@ -977,7 +978,7 @@ function drawCalendar() {
   const nextS = Math.ceil((t + 1) / sw) * sw, nextG = Math.ceil((t + 1) / gw) * gw, yr = seasonNum(f);
   const ev = [];
   ev.push([nextS, `Season ${yr != null ? 'Y' + (yr + 1) : 'change'} arrives`, 'new OVRs and real results; risk ratings shift with OVR; rookies enter the pool']);
-  ev.push([nextG, 'Generation ends', `royalties (${pct(c.royaltyRate ?? 0.03)} of hidden value) paid to holders · the worst ${pct(c.evolveShare ?? 0.1)} copy the best networks · bots at the end of their lives pass their estates to heirs`]);
+  ev.push([nextG, 'Generation ends', `royalties (${pct(c.royaltyRate ?? 0.03)} of hidden value) paid to holders ${c.evolve ? ` · the worst ${pct(c.evolveShare ?? 0.1)} copy the best networks` : ''} · bots at the end of their lives pass their estates and networks to ${c.heirs ?? 1} heir${(c.heirs ?? 1) > 1 ? 's' : ''}`]);
   if (o.due4) ev.push([t + 4, `${o.due4} loans fall due`, `${fmt(o.due4Coins)} coins within 4 weeks; borrowers who can't repay must sell`]);
   ev.push([t + 1, 'Every week', `allowance ${fmt(c.allowance)} a bot · living cost ${fmt(c.livingCost)} plus ${((c.lifestyle ?? 0) * 100).toFixed(2)}% of worth · ${c.passesPerWeek ?? 3} research passes and ${c.gameTickets ?? 3} tickets each`]);
   if (f.topics) ev.push([t + 1, 'This week’s contests', Object.entries(f.topics).map(([g, tp]) => `${GAMES[g]?.label || g}${tp ? ` (${tp})` : ''}`).join(' · ')]);
@@ -1212,3 +1213,24 @@ function drawLayoutPanel() {
 }
 $('layoutBtn').addEventListener('click', () => { const open = $('layoutP').hidden; $('layoutP').hidden = !open; $('layoutBtn').setAttribute('aria-expanded', String(open)); $('layoutBtn').textContent = open ? 'Layout ▴' : 'Layout ▾'; drawLayoutPanel(); });
 applyLayout();
+
+/* ---------- Rules panel: show a control only when its rule is on; mark what differs from the defaults ---------- */
+const ctlVal = (k) => { const el = $(k); return el.type === 'checkbox' ? el.checked : el.tagName === 'SELECT' ? el.value : +el.value * SLIDERS[k][0]; };
+function rulesUi() {
+  for (const el of document.querySelectorAll('#rules [data-when]')) el.hidden = !el.dataset.when.split('&').every((c) => { const [k, v] = c.split('='), x = $(k); return v == null ? x.checked : x.value === v; });
+  for (const k of [...Object.keys(SLIDERS), ...TOGGLES, ...SELECTS]) {
+    const el = $(k), d = DEFAULTS[k]; if (!el || d === undefined) continue; const v = ctlVal(k);
+    const diff = typeof d === 'number' ? Math.abs(v - d) > ((+el.step || 1) * SLIDERS[k][0]) / 2 : v !== d;
+    el.closest('.slider, .mech, .toggle')?.classList.toggle('chg', diff);
+  }
+}
+$('rules').addEventListener('input', rulesUi); $('rules').addEventListener('change', rulesUi);
+$('rulesReset').addEventListener('click', () => {
+  for (const k of [...Object.keys(SLIDERS), ...TOGGLES, ...SELECTS]) {
+    const el = $(k), d = DEFAULTS[k]; if (!el || d === undefined || ctlVal(k) === d) continue;
+    if (el.type === 'checkbox') el.checked = !!d; else if (el.tagName === 'SELECT') el.value = d; else { el.value = Math.round((d / SLIDERS[k][0]) * 100) / 100; $(k + 'V').textContent = SLIDERS[k][1](+el.value); }
+    opts[k] = d; if (mode === 'live') { tell({ cmd: 'cfg', k, v: d }); logChange(k, d); }
+  }
+  rulesUi();
+});
+rulesUi();

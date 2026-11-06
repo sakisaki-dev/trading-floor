@@ -13,7 +13,7 @@ export const DEFAULTS = {
   valueDivisor: 1, // the site's card values are divided by this to get coins (1 = the site's exact prices)
   coinScale: 20, // every coin amount in the rules (cash, allowance, stakes, costs, pass and ticket prices) is in units of this
   startCash: 20000,
-  allowance: 200, // coins per bot per week (new money: this is the inflation lever)
+  allowance: 1800, // coins per bot per week (new money: this is the inflation lever)
   fee: 0.04, // share of every card sale kept by the house
   packSize: 5,
   packEdge: 0.25, // packs cost their expected hidden value × (1 + edge)
@@ -28,15 +28,15 @@ export const DEFAULTS = {
   stealing: true, // thieves may copy another bot's notes
   detectChance: 0.35, // chance a theft is noticed; the victim then flags the thief and stops sharing with it
   gossip: true, // a victim's friends flag the thief too
-  outsideCollectors: false, // buyers from outside the bots bid around hidden value (the market's anchor)
+  outsideCollectors: true, // buyers from outside the bots bid around hidden value (the market's anchor)
   royalties: true, // each generation, holders get 3% of hidden value per card held
   royaltyRate: 0.03,
-  evolve: true, // each generation the worst 10% by return on capital adopt a mutated genome from the best 10% (keeping their wealth)
+  evolve: false, // OLD RULE (off): each generation the worst 10% by recent return adopt a mutated copy of a top 10% bot's networks. Off: strategies spread only through heirs
   evolveShare: 0.1,
   mortality: true, // bots live 6–14 generations; on death the estate is split between heirs that carry a mutated copy of the genome
   lifespan: [6, 14],
-  heirs: 2,
-  populationCap: 1.15, // heirs beyond this × the starting population push the poorest bots out of the market
+  heirs: 1, // an estate passes to this many heirs, each with a mutated copy of the networks (1 keeps the population steady: it changes only through newcomers and bots that give up or retire)
+  capPoorest: false, populationCap: 1.15, // OLD RULE (off): heirs beyond populationCap × the starting population push the poorest bots out of the market
   // Intrinsic value: 'ovrWalk' (default) starts every card at the site's price for it (its value × its rarity). Each week
   // it rises by a percentage with probability walkUp, else falls by the same percentage. The size of that move comes
   // from the card's risk rating: ±walkVolLow at riskLo or below, ±walkVolHigh at riskHi or above, in between in a line.
@@ -52,7 +52,7 @@ export const DEFAULTS = {
   // (copies out now + print run) ÷ (copies out at the start + print run), raised to −scarcity: packs opened add copies and
   // lower it, collectors taking cards out raise it. Nothing here says which way a value goes.
   valueModel: 'factors', scarcity: 0.5, pastSave: 'hold',
-  walkUp: 0.55, walkVolLow: 0.10, walkVolHigh: 0.01, riskLo: 60, riskHi: 95, riskPerDoubling: 10,
+  walkUp: 0.55, walkVolLow: 0.15, walkVolHigh: 0.03, riskLo: 60, riskHi: 95, riskPerDoubling: 10,
   startSeason: 'latest', // 'latest' opens the market at the present (site prices and price history imported); 'first' replays from Y79
   priceOnly: false, // a card is worth only what someone pays: no hidden value anywhere in the world (no royalties, packs priced
                     // from market prices, no valuation contest, research shows what a card has traded for). Real seasons still
@@ -60,12 +60,13 @@ export const DEFAULTS = {
                     // anchor them (holding earns nothing, cards have no use), prices ratchet down to about zero.
   history: true, // replay the save's real seasons as news (sandbox/data/timeline.json), then real-change draws after
   seasonWeeks: 20, // weeks per season
-  turnover: false, // bots join (faster after rallies, mostly speculators) and leave (after heavy losses, or retiring)
-  entryRate: 0.25, // newcomers per week in a flat market
+  turnover: true, // newcomers with fresh random networks arrive (entryRate a week, the only source of new strategies); bots that lose 70% of their peak may give up, and a few retire
+  entryRate: 0.25, // newcomers per week
+  retireRate: 0, // share of bots that leave at random each week (the old rule was 0.002)
   lenderCycle: false, // (retired: credit is now between bots, so rates and limits come from their own decisions)
   fashion: false, // collectors' taste for each player family drifts, jumps on hype and feeds on price gains
   gameStake: 40, // coins each entrant stakes into a game's pot (plus a ticket); the best scores share the pot
-  prizeShare: 0.5, // share of the house's weekly takings (trade fees, pack sales, living costs) paid back out as contest prizes
+  prizeShare: 0, // share of the house's weekly takings (trade fees, pack sales, living costs) added to contest prizes (0: games pay only from the stakes, so only skill wins)
   aiLifespanWeeks: [40, 80], // an AI bot's life; when it ends its estate and memo pass to one heir, who carries on
   games: true, // weekly Arcade contests (see GAMES)
   gameTickets: 3, // game tickets granted to every bot each week; a ticket is spent when a game starts (no restarts)
@@ -1416,8 +1417,8 @@ function generationEnd(W) {
       const heirs = Array.from({ length: cfg.heirs }, () => { const h = newBot(W, null, b); h.cash = 0; h.lineage = b.lineage ?? b.id; h.lifespan = cfg.lifespan[0] + Math.floor(W.rand() * (cfg.lifespan[1] - cfg.lifespan[0] + 1)); return h; });
       settleEstate(W, b, heirs); died++; born += heirs.length;
     }
-    // Too many heirs: the poorest leave the market (their cards are sold, their loans settled)
-    const cap = Math.round(cfg.population * cfg.populationCap);
+    // OLD RULE capPoorest: too many heirs and the poorest leave the market (their cards are sold, their loans settled)
+    const cap = cfg.capPoorest ? Math.round(cfg.population * cfg.populationCap) : Infinity;
     const poorest = W.bots.filter((b) => b.kind === 'rule').map((b) => [b, worth(W, b)]).sort((x, y) => x[1] - y[1]);
     let out = 0; while (W.bots.filter((b) => b.kind === 'rule').length > cap && poorest.length) { removeBot(W, poorest.shift()[0], 'priced out'); out++; }
     if (died) log(W, 'evolve', `Generation ${gen}: ${died} bots die of old age; their estates pass to ${born} heirs carrying their strategies${out ? `, and ${out} of the poorest bots leave the market` : ''}.`);
@@ -1675,7 +1676,7 @@ function peopleChange(W) {
   for (const b of W.bots.slice()) {
     if (b.kind !== 'rule') continue;
     const w = worth(W, b); b.peak = Math.max(b.peak || 0, w);
-    if (!(w < 0.3 * b.peak && W.t - (b.joined ?? 0) > 20 && W.rand() < 0.25) && !(W.rand() < 0.002)) continue;
+    if (!(w < 0.3 * b.peak && W.t - (b.joined ?? 0) > 20 && W.rand() < 0.25) && !(W.rand() < (cfg.retireRate ?? 0))) continue; // giving up after heavy losses is the market's doing; retiring at random is a rate we set (0 by default)
     removeBot(W, b, w < 0.3 * b.peak ? 'gave up after heavy losses' : 'retired'); left++;
   }
   W.turnover = { joined, left };

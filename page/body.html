@@ -4,7 +4,7 @@
       <span class="kicker gold">Retro Vault · Sandbox</span>
       <h1>The <em>Trading</em> Floor</h1>
     </div>
-    <p class="sub">250 neural bots trade real players' cards (every design, finish, kit, Prizm parallel and autograph) at the site's real prices, replaying the save's real seasons. Each bot is two small networks with random weights; what earns money gets copied.</p>
+    <p class="sub">250 neural bots trade real players' cards (every design, finish, kit, Prizm parallel and autograph) at the site's real prices, replaying the save's real seasons. Each bot is two small networks with random weights. Nobody copies anybody: a bot's networks pass to its heir when it dies, and newcomers arrive with fresh ones.</p>
   </header>
 
   <div class="bar" role="group" aria-label="Simulation controls">
@@ -26,63 +26,73 @@
   </div>
 
   <div class="rules" id="rules" hidden>
-    <div class="slider"><label for="livingCost">Living cost / wk <b id="livingCostV"></b></label><input id="livingCost" type="range" min="0" max="400" step="20" value="80"></div>
-    <div class="slider"><label for="lifestyle">Spend of worth / wk <b id="lifestyleV"></b></label><input id="lifestyle" type="range" min="0" max="100" step="5" value="15"></div>
-    <div class="slider"><label for="maxLTV">Borrow up to <b id="maxLTVV"></b></label><input id="maxLTV" type="range" min="0" max="90" step="5" value="60"></div>
-    <div class="slider"><label for="interest">Interest / wk <b id="interestV"></b></label><input id="interest" type="range" min="0" max="100" step="5" value="20"></div>
-    <div class="slider"><label for="fee">Trade fee <b id="feeV"></b></label><input id="fee" type="range" min="0" max="10" step="0.5" value="4"></div>
-    <div class="slider"><label for="allowance">Allowance / wk <b id="allowanceV"></b></label><input id="allowance" type="range" min="0" max="2000" step="100" value="200"></div>
-    <div class="slider"><label for="walkUp">Old walk: values rise, % of weeks <b id="walkUpV"></b></label><input id="walkUp" type="range" min="40" max="70" step="1" value="55"></div>
-    <div class="slider"><label for="walkVolLow">Old walk: risky-card swing / wk <b id="walkVolLowV"></b></label><input id="walkVolLow" type="range" min="1" max="25" step="0.5" value="10"></div>
-    <div class="slider"><label for="walkVolHigh">Old walk: safe-card swing / wk <b id="walkVolHighV"></b></label><input id="walkVolHigh" type="range" min="0" max="5" step="0.25" value="1"></div>
-    <div class="slider"><label for="riskPerDoubling">Old walk: rating per value doubling <b id="riskPerDoublingV"></b></label><input id="riskPerDoubling" type="range" min="0" max="25" step="1" value="10"></div>
-    <div class="slider"><label for="flagWeeks">Thief flags last <b id="flagWeeksV"></b></label><input id="flagWeeks" type="range" min="0" max="104" step="2" value="26"></div>
-    <div class="slider"><label for="cardLendFee">Card lending fee <b id="cardLendFeeV"></b></label><input id="cardLendFee" type="range" min="0" max="200" step="5" value="50"></div>
-    <div class="slider"><label for="shortMargin">Short collateral <b id="shortMarginV"></b></label><input id="shortMargin" type="range" min="10" max="150" step="5" value="50"></div>
-    <div class="slider"><label for="cardLoanWeeks">Return borrowed cards within <b id="cardLoanWeeksV"></b></label><input id="cardLoanWeeks" type="range" min="2" max="52" step="1" value="12"></div>
-    <div class="slider"><label for="nnMutation">Mutation per weight <b id="nnMutationV"></b></label><input id="nnMutation" type="range" min="0" max="50" step="1" value="15"></div>
-    <div class="slider"><label for="nnReset">Weights redrawn <b id="nnResetV"></b></label><input id="nnReset" type="range" min="0" max="10" step="0.5" value="1"></div>
-    <div class="slider"><label for="evolveShare">Worst copy the best <b id="evolveShareV"></b></label><input id="evolveShare" type="range" min="0" max="40" step="1" value="10"></div>
-    <div class="slider"><label for="packEdge">Old packs: pack edge <b id="packEdgeV"></b></label><input id="packEdge" type="range" min="0" max="60" step="5" value="25"></div>
-    <div class="slider" title="Share of the house's weekly takings (trade fees, pack sales, living costs) paid back out as contest prizes"><label for="prizeShare">Prize pool <b id="prizeShareV"></b></label><input id="prizeShare" type="range" min="0" max="100" step="5" value="50"></div>
-    <div class="slider"><label for="passesPerWeek">Passes / wk <b id="passesPerWeekV"></b></label><input id="passesPerWeek" type="range" min="0" max="6" step="1" value="3"></div>
-    <div class="slider"><label for="knowledgeWeeks">Notes last <b id="knowledgeWeeksV"></b></label><input id="knowledgeWeeks" type="range" min="2" max="40" step="1" value="12"></div>
-    <div class="slider"><label for="detectChance">Theft caught <b id="detectChanceV"></b></label><input id="detectChance" type="range" min="0" max="100" step="5" value="35"></div>
-    <p class="kicker" style="grid-column:1/-1;margin:4px 0 0">Market mechanisms (we set quantities; traders set prices)</p>
-    <label class="mech" title="Player data × supply: the site value from his real data, times how scarce his copies are. The old walk rose 55% of weeks."><span>Hidden value</span><select id="valueModel"><option value="factors">Player data × supply</option><option value="ovrWalk">Old: scripted walk</option><option value="formula">Old: formula with pull</option></select></label>
-    <label class="mech" title="After the last real season there is no player data. Hold: the player factor stays put and only supply moves values. Draw: each season replays a random real season-to-season change from his position (it compounds about ×1.21 a season)."><span>Past the save</span><select id="pastSave"><option value="hold">Hold player values</option><option value="draw">Draw real season changes</option></select></label>
-    <label class="mech" title="Last trade: a card keeps the price it last traded at; the best bid and ask are shown and seen by the bots but never move it."><span>Card price</span><select id="priceRule"><option value="lastTrade">Last trade</option><option value="quotes">Old: unfilled orders pull it</option></select></label>
-    <label class="mech" title="Budget: a weekly sum, spread by Career Legacy, buys the lowest asks; a share of what they hold is sold back into the best bids. Turn Outside buyers on below."><span>Outside buyers</span><select id="outsideMode"><option value="budget">Budget at the lowest asks</option><option value="band">Old: 0.85–1.08× value</option></select></label>
-    <label class="mech" title="Auction: seized copies go to the sealed auction with no minimum price, a set number a week."><span>Liquidator</span><select id="liquidation"><option value="auction">Auction, no minimum</option><option value="cutWhenUnsold">Old: cut 5% when unsold</option><option value="chase">Old: 80% of price</option></select></label>
-    <label class="mech" title="A margin-called or broke bot sells into the best bids until its debt is covered; the rest goes to auction with no minimum."><span>Forced sellers</span><select id="forcedSale"><option value="book">Into the best bids, then auction</option><option value="discount">Old: 88% asks, 70% item reserve</option></select></label>
-    <label class="mech" title="Auction: a set number released a week, sold in a uniform-price auction per type (everyone pays the lowest winning bid)."><span>Packs</span><select id="packSale"><option value="auction">Released weekly, sold by auction</option><option value="markup">Old: value + pack edge</option></select></label>
-    <div class="slider" title="How strongly the number of copies out moves value: value × (copies now ÷ copies at the start)^−weight, each counted with the print run"><label for="scarcity">Scarcity weight <b id="scarcityV"></b></label><input id="scarcity" type="range" min="0" max="150" step="5" value="50"></div>
-    <div class="slider" title="Packs the house releases each week (75% Standard, 21% Premium, 2.5% Elite, 1.5% Holo: the mix bots bought under the old price)"><label for="packsPerWeek">Packs released / wk <b id="packsPerWeekV"></b></label><input id="packsPerWeek" type="range" min="0" max="120" step="1" value="33"></div>
-    <div class="slider" title="Seized copies and one-of-a-kind cards the liquidator puts up for auction each week"><label for="liqListings">Liquidator listings / wk <b id="liqListingsV"></b></label><input id="liqListings" type="range" min="0" max="120" step="5" value="30"></div>
-    <div class="slider" title="Coins outside collectors bring each week (52,000 is what the old rule spent)"><label for="outsideBudget">Outside budget / wk <b id="outsideBudgetV"></b></label><input id="outsideBudget" type="range" min="0" max="200000" step="4000" value="52000"></div>
-    <div class="slider" title="Share of their holdings outside collectors sell back into the best bids each week"><label for="outsideResale">Outside resale / wk <b id="outsideResaleV"></b></label><input id="outsideResale" type="range" min="0" max="10" step="0.5" value="2"></div>
-    <p class="kicker" style="grid-column:1/-1;margin:4px 0 0">Policy experiments (off in a free market)</p>
-    <div class="slider"><label for="priceLimit">Price limit / wk <b id="priceLimitV"></b></label><input id="priceLimit" type="range" min="0" max="50" step="5" value="0"></div>
-    <div class="slider"><label for="wealthTax">Wealth tax / wk <b id="wealthTaxV"></b></label><input id="wealthTax" type="range" min="0" max="1" step="0.05" value="0"></div>
-    <div class="slider"><label for="positionLimit">Position limit <b id="positionLimitV"></b></label><input id="positionLimit" type="range" min="0" max="100" step="5" value="0"></div>
-    <div class="slider"><label for="storePremium">Store markup <b id="storePremiumV"></b></label><input id="storePremium" type="range" min="10" max="200" step="10" value="60"></div>
-    <div class="toggles">
-      <label class="toggle" title="Between trades, a price is marked to the bid–ask spread only when there are buyers and sellers; off = any unfilled order pulls it (the old rule)"><input type="checkbox" id="twoSidedQuotes" checked> Old quote pull: two-sided</label>
-      <label class="toggle" title="Holders may lend cards; others may borrow and sell them short"><input type="checkbox" id="shorting" checked> Short selling</label>
-      <label class="toggle"><input type="checkbox" id="credit" checked> Credit</label>
-      <label class="toggle"><input type="checkbox" id="centralBank"> Central bank</label>
-      <label class="toggle"><input type="checkbox" id="store"> Vault store</label>
-      <label class="toggle"><input type="checkbox" id="closedEconomy"> Closed economy</label>
-      <label class="toggle"><input type="checkbox" id="passesTradable" checked> Pass market</label>
-      <label class="toggle"><input type="checkbox" id="games" checked> Games</label>
-      <label class="toggle"><input type="checkbox" id="sharing" checked> Sharing</label>
-      <label class="toggle"><input type="checkbox" id="stealing" checked> Stealing</label>
-      <label class="toggle"><input type="checkbox" id="gossip" checked> Gossip</label>
+    <div class="rules__bar"><b>Rules</b><span class="note">changes apply to the running world at once · a gold dot marks a rule changed from its default</span><button type="button" id="rulesReset">Reset all to defaults</button></div>
+    <section class="rgrp" aria-label="Money"><h3>Money<span>what comes in and what leaves every week</span></h3><div class="rgrp__c">
+      <div class="slider"><label for="allowance">Allowance / wk <b id="allowanceV"></b></label><input id="allowance" type="range" min="0" max="2000" step="100" value="200"></div>
+      <div class="slider"><label for="livingCost">Living cost / wk <b id="livingCostV"></b></label><input id="livingCost" type="range" min="0" max="400" step="20" value="80"></div>
+      <div class="slider"><label for="lifestyle">Spend of worth / wk <b id="lifestyleV"></b></label><input id="lifestyle" type="range" min="0" max="100" step="5" value="15"></div>
+      <div class="slider"><label for="fee">Trade fee <b id="feeV"></b></label><input id="fee" type="range" min="0" max="10" step="0.5" value="4"></div>
+      <div class="slider" title="Share of the house's weekly takings (trade fees, pack sales, living costs) paid back out as contest prizes"><label for="prizeShare">Prize pool <b id="prizeShareV"></b></label><input id="prizeShare" type="range" min="0" max="100" step="5" value="0"></div>
+      <div class="rgrp__t"><label class="toggle"><input type="checkbox" id="closedEconomy"> Closed economy</label><label class="toggle"><input type="checkbox" id="centralBank"> Central bank</label></div>
+    </div></section>
+    <section class="rgrp" aria-label="Values and prices"><h3>Values and prices<span>what a card is worth and what it trades at</span></h3><div class="rgrp__c">
+      <label class="mech" title="Player data × supply: the site value from his real data, times how scarce his copies are. The old walk rose 55% of weeks."><span>Hidden value</span><select id="valueModel"><option value="factors">Player data × supply</option><option value="ovrWalk">Old: scripted walk</option><option value="formula">Old: formula with pull</option></select></label>
+      <label class="mech" data-when="valueModel=factors" title="After the last real season there is no player data. Hold: the player factor stays put and only supply moves values. Draw: each season replays a random real season-to-season change from his position (it compounds about ×1.21 a season)."><span>Past the save</span><select id="pastSave"><option value="hold">Hold player values</option><option value="draw">Draw real season changes</option></select></label>
+      <div class="slider" data-when="valueModel=factors" title="How strongly the number of copies out moves value: value × (copies now ÷ copies at the start)^−weight, each counted with the print run"><label for="scarcity">Scarcity weight <b id="scarcityV"></b></label><input id="scarcity" type="range" min="0" max="150" step="5" value="50"></div>
+      <div class="slider" data-when="valueModel=ovrWalk"><label for="walkVolLow">Low-OVR swing / wk <b id="walkVolLowV"></b></label><input id="walkVolLow" type="range" min="1" max="25" step="0.5" value="10"></div>
+      <div class="slider" data-when="valueModel=ovrWalk"><label for="walkVolHigh">High-OVR swing / wk <b id="walkVolHighV"></b></label><input id="walkVolHigh" type="range" min="0" max="5" step="0.25" value="1"></div>
+      <div class="slider" data-when="valueModel=ovrWalk"><label for="walkUp">Values rise, % of weeks <b id="walkUpV"></b></label><input id="walkUp" type="range" min="40" max="70" step="1" value="55"></div>
+      <div class="slider" data-when="valueModel=ovrWalk"><label for="riskPerDoubling">Rating per value doubling <b id="riskPerDoublingV"></b></label><input id="riskPerDoubling" type="range" min="0" max="25" step="1" value="10"></div>
+      <label class="mech" title="Last trade: a card keeps the price it last traded at; the best bid and ask are shown and seen by the bots but never move it."><span>Card price</span><select id="priceRule"><option value="lastTrade">Last trade</option><option value="quotes">Old: unfilled orders pull it</option></select></label>
+      <label class="toggle" data-when="priceRule=quotes" title="Between trades, a price is marked to the bid–ask spread only when there are buyers and sellers; off = any unfilled order pulls it (the old rule)"><input type="checkbox" id="twoSidedQuotes" checked> Pull only when two-sided</label>
+      <div class="rgrp__t"><label class="toggle"><input type="checkbox" id="royalties" checked> Royalties</label><label class="toggle"><input type="checkbox" id="leagueUpdates"> League updates</label></div>
+    </div></section>
+    <section class="rgrp" aria-label="Packs and selling"><h3>Packs and selling<span>where new cards come from and how sales clear</span></h3><div class="rgrp__c">
+      <label class="mech" title="Auction: a set number released a week, sold in a uniform-price auction per type (everyone pays the lowest winning bid)."><span>Packs</span><select id="packSale"><option value="auction">Released weekly, sold by auction</option><option value="markup">Old: value + pack edge</option></select></label>
+      <div class="slider" data-when="packSale=auction" title="Packs the house releases each week (75% Standard, 21% Premium, 2.5% Elite, 1.5% Holo: the mix bots bought under the old price)"><label for="packsPerWeek">Packs released / wk <b id="packsPerWeekV"></b></label><input id="packsPerWeek" type="range" min="0" max="120" step="1" value="33"></div>
+      <div class="slider" data-when="packSale=markup"><label for="packEdge">Markup over value <b id="packEdgeV"></b></label><input id="packEdge" type="range" min="0" max="60" step="5" value="25"></div>
       <label class="toggle"><input type="checkbox" id="outsideCollectors"> Outside buyers</label>
-      <label class="toggle"><input type="checkbox" id="royalties" checked> Royalties</label>
-      <label class="toggle"><input type="checkbox" id="evolve" checked> Evolution</label>
-      <label class="toggle"><input type="checkbox" id="leagueUpdates"> League updates</label>
-    </div>
+      <label class="mech" data-when="outsideCollectors" title="Budget: a weekly sum, spread by Career Legacy, buys the lowest asks; a share of what they hold is sold back into the best bids. Turn Outside buyers on below."><span>Outside buyers</span><select id="outsideMode"><option value="budget">Budget at the lowest asks</option><option value="band">Old: 0.85–1.08× value</option></select></label>
+      <div class="slider" data-when="outsideCollectors&outsideMode=budget" title="Coins outside collectors bring each week (52,000 is what the old rule spent)"><label for="outsideBudget">Outside budget / wk <b id="outsideBudgetV"></b></label><input id="outsideBudget" type="range" min="0" max="200000" step="4000" value="52000"></div>
+      <div class="slider" data-when="outsideCollectors&outsideMode=budget" title="Share of their holdings outside collectors sell back into the best bids each week"><label for="outsideResale">Outside resale / wk <b id="outsideResaleV"></b></label><input id="outsideResale" type="range" min="0" max="10" step="0.5" value="2"></div>
+      <label class="mech" title="Auction: seized copies go to the sealed auction with no minimum price, a set number a week."><span>Liquidator</span><select id="liquidation"><option value="auction">Auction, no minimum</option><option value="cutWhenUnsold">Old: cut 5% when unsold</option><option value="chase">Old: 80% of price</option></select></label>
+      <div class="slider" data-when="liquidation=auction" title="Seized copies and one-of-a-kind cards the liquidator puts up for auction each week"><label for="liqListings">Liquidator listings / wk <b id="liqListingsV"></b></label><input id="liqListings" type="range" min="0" max="120" step="5" value="30"></div>
+      <label class="mech" title="A margin-called or broke bot sells into the best bids until its debt is covered; the rest goes to auction with no minimum."><span>Forced sellers</span><select id="forcedSale"><option value="book">Into the best bids, then auction</option><option value="discount">Old: 88% asks, 70% item reserve</option></select></label>
+      <div class="rgrp__t"><label class="toggle"><input type="checkbox" id="store"> Vault store</label></div>
+    </div></section>
+    <section class="rgrp" aria-label="Credit and shorts"><h3>Credit and shorts<span>borrowing coins and borrowing cards</span></h3><div class="rgrp__c">
+      <label class="toggle"><input type="checkbox" id="credit" checked> Credit</label>
+      <div class="slider" data-when="credit"><label for="maxLTV">Borrow up to <b id="maxLTVV"></b></label><input id="maxLTV" type="range" min="0" max="90" step="5" value="60"></div>
+      <div class="slider" data-when="credit"><label for="interest">Interest / wk <b id="interestV"></b></label><input id="interest" type="range" min="0" max="100" step="5" value="20"></div>
+      <label class="toggle" title="Holders may lend cards; others may borrow and sell them short"><input type="checkbox" id="shorting" checked> Short selling</label>
+      <div class="slider" data-when="shorting"><label for="cardLendFee">Card lending fee <b id="cardLendFeeV"></b></label><input id="cardLendFee" type="range" min="0" max="200" step="5" value="50"></div>
+      <div class="slider" data-when="shorting"><label for="shortMargin">Short collateral <b id="shortMarginV"></b></label><input id="shortMargin" type="range" min="10" max="150" step="5" value="50"></div>
+      <div class="slider" data-when="shorting"><label for="cardLoanWeeks">Return borrowed cards within <b id="cardLoanWeeksV"></b></label><input id="cardLoanWeeks" type="range" min="2" max="52" step="1" value="12"></div>
+    </div></section>
+    <section class="rgrp" aria-label="Knowledge and games"><h3>Knowledge and games<span>research, notes, theft and contests</span></h3><div class="rgrp__c">
+      <label class="toggle"><input type="checkbox" id="games" checked> Games</label>
+      <div class="slider"><label for="passesPerWeek">Passes / wk <b id="passesPerWeekV"></b></label><input id="passesPerWeek" type="range" min="0" max="6" step="1" value="3"></div>
+      <div class="slider"><label for="knowledgeWeeks">Notes last <b id="knowledgeWeeksV"></b></label><input id="knowledgeWeeks" type="range" min="2" max="40" step="1" value="12"></div>
+      <div class="slider" data-when="stealing"><label for="detectChance">Theft caught <b id="detectChanceV"></b></label><input id="detectChance" type="range" min="0" max="100" step="5" value="35"></div>
+      <div class="slider" data-when="stealing"><label for="flagWeeks">Thief flags last <b id="flagWeeksV"></b></label><input id="flagWeeks" type="range" min="0" max="104" step="2" value="26"></div>
+      <div class="rgrp__t"><label class="toggle"><input type="checkbox" id="passesTradable" checked> Pass market</label><label class="toggle"><input type="checkbox" id="sharing" checked> Sharing</label><label class="toggle"><input type="checkbox" id="stealing" checked> Stealing</label><label class="toggle"><input type="checkbox" id="gossip" checked> Gossip</label></div>
+    </div></section>
+    <section class="rgrp" aria-label="Population and learning"><h3>Population and learning<span>who arrives, who inherits, how networks change</span></h3><div class="rgrp__c">
+      <label class="toggle" title="New bots with fresh random networks arrive; bots that lose most of their peak may give up"><input type="checkbox" id="turnover" checked> Newcomers</label>
+      <div class="slider" data-when="turnover" title="New bots arriving each week, each with fresh random networks"><label for="entryRate">Newcomers / wk <b id="entryRateV"></b></label><input id="entryRate" type="range" min="0" max="200" step="5" value="25"></div>
+      <div class="slider" title="How many heirs an estate passes to when a bot dies (each carries a mutated copy of its networks)"><label for="heirs">Heirs per death <b id="heirsV"></b></label><input id="heirs" type="range" min="1" max="3" step="1" value="1"></div>
+      <div class="slider"><label for="nnMutation">Mutation per weight <b id="nnMutationV"></b></label><input id="nnMutation" type="range" min="0" max="50" step="1" value="15"></div>
+      <div class="slider"><label for="nnReset">Weights redrawn <b id="nnResetV"></b></label><input id="nnReset" type="range" min="0" max="10" step="0.5" value="1"></div>
+      <label class="toggle" title="Old rule: each generation the worst 10% copy a top bot's networks"><input type="checkbox" id="evolve"> Old: worst copy the best</label>
+      <div class="slider" data-when="evolve"><label for="evolveShare">Share who copy <b id="evolveShareV"></b></label><input id="evolveShare" type="range" min="0" max="40" step="1" value="10"></div>
+      <label class="toggle" title="Old rule: heirs beyond 1.15× the starting population push the poorest bots out"><input type="checkbox" id="capPoorest"> Old: poorest pushed out</label>
+    </div></section>
+    <section class="rgrp" aria-label="Policy experiments"><h3>Policy experiments<span>off in a free market</span></h3><div class="rgrp__c">
+      <div class="slider"><label for="priceLimit">Price limit / wk <b id="priceLimitV"></b></label><input id="priceLimit" type="range" min="0" max="50" step="5" value="0"></div>
+      <div class="slider"><label for="wealthTax">Wealth tax / wk <b id="wealthTaxV"></b></label><input id="wealthTax" type="range" min="0" max="1" step="0.05" value="0"></div>
+      <div class="slider"><label for="positionLimit">Position limit <b id="positionLimitV"></b></label><input id="positionLimit" type="range" min="0" max="100" step="5" value="0"></div>
+      <div class="slider" data-when="store"><label for="storePremium">Store markup <b id="storePremiumV"></b></label><input id="storePremium" type="range" min="10" max="200" step="10" value="60"></div>
+    </div></section>
   </div>
 
   <div class="layoutp" id="layoutP" hidden></div>
