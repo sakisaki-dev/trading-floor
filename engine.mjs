@@ -86,6 +86,7 @@ export const DEFAULTS = {
   wealthTax: 0, // weekly tax on worth above 2× the median bot, paid into the house treasury (0 = off)
   positionLimit: 0, // no bot may hold more than this share of a card's circulation (at least 3 copies allowed; 0 = off)
   quotePull: 0.25, // how far unfilled orders pull the quoted price toward them each week
+  flagWeeks: 26, // a caught thief can't trade with the bots that flagged it; the flags lift after this many weeks without being caught again (0 = never)
   deployOrders: 10, // most buy orders a bot places a week to put spare cash to work
   messages: false, // AI bots may talk: one public board post and two private messages a week (280 characters each)
   messageLimits: { public: 1, direct: 2, chars: 280 },
@@ -187,6 +188,8 @@ export function addAiBot(W, extra = {}) {
   return b;
 }
 
+// Two bots can't deal with each other while either has flagged the other as a thief
+const blocked = (a, b) => !!a && !!b && typeof a === 'object' && typeof b === 'object' && (a.flags?.has(b.id) || b.flags?.has(a.id));
 function give(b, c, q) { const v = (b.h.get(c.id) || 0) + q; v > 0 ? b.h.set(c.id, v) : b.h.delete(c.id); b.n += q; }
 export function worth(W, b) {
   let v = b.cash - (b.debt || 0) + (b.lent || 0);
@@ -398,11 +401,11 @@ export function steal(W, thief, victim) {
   for (const [id, n] of notes) thief.notes.set(id, { est: n.est, week: n.week, from: `taken from ${victim.name}`, ...(n.facts ? { facts: n.facts } : {}) });
   trimNotes(W, thief); thief.stats.stolen++; W.week.thefts++;
   if (W.rand() < W.cfg.detectChance) {
-    W.week.caught++; thief.stats.caught++;
+    W.week.caught++; thief.stats.caught++; thief.lastCaught = W.t;
     const flaggers = [victim, ...(W.cfg.gossip ? W.bots.filter((f) => victim.friends.has(f.id)) : [])];
     for (const f of flaggers) if (!f.flags.has(thief.id)) { f.flags.add(thief.id); f.friends.delete(thief.id); thief.flaggedBy++; }
     jot(W, { type: 'steal', thief: thief.name, victim: victim.name, ok: true, notes: notes.length, caught: true, flaggedBy: flaggers.length });
-    if (thief.flaggedBy >= 5 && !thief.announced) { thief.announced = true; log(W, 'flag', `${thief.name} (${ARCH[thief.a].label}) is caught stealing notes again. ${thief.flaggedBy} bots now refuse to share with it.`); }
+    if (thief.flaggedBy >= 5 && !thief.announced) { thief.announced = true; log(W, 'flag', `${thief.name} (${ARCH[thief.a].label}) is caught stealing notes again. ${thief.flaggedBy} bots now refuse to share or trade with it.`); }
     return { ok: true, caught: true, notes: notes.length };
   }
   jot(W, { type: 'steal', thief: thief.name, victim: victim.name, ok: true, notes: notes.length, caught: false });
@@ -434,7 +437,7 @@ function tokenMarket(W, kind) {
   }
   B.sort((x, y) => y.p - x.p); A.sort((x, y) => x.p - y.p);
   const m = []; let i = 0, j = 0;
-  while (i < B.length && j < A.length && B[i].p >= A[j].p) { if (B[i].b === A[j].b) { j++; continue; } m.push([B[i], A[j]]); i++; j++; }
+  while (i < B.length && j < A.length && B[i].p >= A[j].p) { if (B[i].b === A[j].b || blocked(B[i].b, A[j].b)) { j++; continue; } m.push([B[i], A[j]]); i++; j++; }
   let traded = 0, price = null;
   if (m.length) {
     const last = m[m.length - 1]; price = (last[0].p + last[1].p) / 2;
@@ -492,7 +495,7 @@ function auctionPhase(W) {
   for (const a of open) {
     const c = W.cards[a.cardId], it = a.uid ? W.items.get(a.uid) : null, sellerName = a.seller === 'liq' ? 'liquidator' : a.seller.name, label = it ? it.label : c.key;
     for (const b of W.bots) {
-      if (b === a.seller) continue;
+      if (b === a.seller || (a.seller !== 'liq' && blocked(b, a.seller))) continue;
       let bidv = null;
       if (b.kind === 'ai') bidv = Number((b.pending?.auctionBids || []).find((x) => x.auctionId === a.id)?.bid) || null;
       else { const base = b.g.nn ? nnAuctionBid(W, b, c, it) : ruleAuctionBid(W, b, c); bidv = base && it ? (base * it.mult) / c.mult : base; }
@@ -1022,6 +1025,7 @@ function creditMarket(W) {
   const fills = []; let i = 0, j = 0;
   while (i < asks2.length && j < offers.length && asks2[i].rate >= offers[j].rate) {
     if (asks2[i].b === offers[j].b) { j++; continue; }
+    if (blocked(asks2[i].b, offers[j].b)) { let k = j + 1; while (k < offers.length && offers[k].rate <= asks2[i].rate && (blocked(asks2[i].b, offers[k].b) || asks2[i].b === offers[k].b)) k++; if (k < offers.length && offers[k].rate <= asks2[i].rate) [offers[j], offers[k]] = [offers[k], offers[j]]; else { i++; continue; } }
     const x = Math.min(asks2[i].amt, offers[j].amt); if (x > 0.5) fills.push([asks2[i], offers[j], x]);
     asks2[i].amt -= x; offers[j].amt -= x; if (asks2[i].amt <= 0.5) i++; if (offers[j].amt <= 0.5) j++;
   }
@@ -1147,6 +1151,7 @@ export function step(W) {
   for (const b of W.bots) if (b.kind === 'rule') b.a = styleOf(b.g.w); // a style is just the dominant weight, which mutation can change
   { const nn = W.bots.filter((b) => b.g?.nn); if (nn.length) { const ws = nn.map((b) => worth(W, b)).sort((x, y) => x - y), med = ws[Math.floor(ws.length / 2)]; for (const b of nn) nnThink(W, b, med); } }
   livingAndCredit(W); peopleChange(W); fashionStep(W);
+  liftFlags(W);
   socialPhase(W); aiSocial(W);
   passPhase(W);
   if (cfg.games) { tokenMarket(W, 'ticket'); gamePhase(W); }
@@ -1183,7 +1188,11 @@ function clear(W) {
     c.book = { bids: B.slice(0, 6).map((o) => [r2(o.p), o.b ? (o.b === 'liq' ? 'liquidator' : o.b.name) : 'outside']), asks: A.slice(0, 6).map((o) => [r2(o.p), o.b === 'store' ? 'Vault store' : o.b === 'liq' ? 'liquidator' : o.b.name]) };
     if (B.length && A.length) {
       const m = []; let i = 0, j = 0;
-      while (i < B.length && j < A.length && B[i].p >= A[j].p) { if (B[i].b && B[i].b === A[j].b) { j++; continue; } m.push([B[i], A[j]]); i++; j++; }
+      while (i < B.length && j < A.length && B[i].p >= A[j].p) {
+        if (B[i].b && B[i].b === A[j].b) { j++; continue; }
+        if (blocked(B[i].b, A[j].b)) { let k = j + 1; while (k < A.length && A[k].p <= B[i].p && (blocked(B[i].b, A[k].b) || B[i].b === A[k].b)) k++; if (k < A.length && A[k].p <= B[i].p) [A[j], A[k]] = [A[k], A[j]]; else { i++; continue; } } // a flagged pair can't trade: the next ask, or the next bid
+        m.push([B[i], A[j]]); i++; j++;
+      }
       if (m.length) {
         const last = m[m.length - 1], price = clamp((last[0].p + last[1].p) / 2, lim[0], lim[1]);
         for (const [bd, ak] of m) {
@@ -1270,7 +1279,7 @@ function settleEstate(W, b, heirs) {
   }
   for (const h of heirs) { h.nwh = [worth(W, h)]; h.genStart = h.nwh[0]; }
   W.bots = W.bots.filter((x) => x !== b);
-  for (const x of W.bots) { if (x.flags.delete(b.id)) for (const h of heirs) x.flags.add(h.id); if (x.friends.delete(b.id)) for (const h of heirs) x.friends.add(h.id); }
+  for (const x of W.bots) { if (x.flags.delete(b.id)) for (const h of heirs) { x.flags.add(h.id); h.flaggedBy = (h.flaggedBy || 0) + 1; h.lastCaught = b.lastCaught ?? W.t; } if (x.friends.delete(b.id)) for (const h of heirs) x.friends.add(h.id); }
   jot(W, { type: 'died', bot: b.name, age: b.seasons, estate: r2(heirs.reduce((s, h) => s + worth(W, h), 0)), heirs: heirs.map((h) => h.name) });
 }
 // A bot leaving the market: its cards go to the liquidator; loans it made are forgiven, loans it owes default
@@ -1660,4 +1669,16 @@ export function botDetail(W, id) {
   for (const it of itemsOf(W, b)) positions.push([it.pid, it.label, 1, r1(it.cost), r1(markItem(W, it))]);
   const g = b.g ? { keep: b.g.keep, lev: b.g.lev, lendShare: b.g.lendShare, passBid: b.g.passBid, ticketBid: b.g.ticketBid } : null;
   return { id, t: W.t, realized: b.stats.realized || 0, debt: b.debt || 0, lent: b.lent || 0, stats: { ...b.stats }, passes: b.passes.length, tickets: b.tickets.length, games: (b._nnGames || []).length, memo: b.memo || '', g, positions, log: (W.botLog.get(b.name) || []).slice(-50).reverse() };
+}
+
+// A thief's flags lift once it has gone W.cfg.flagWeeks without being caught again; trading with it resumes
+function liftFlags(W) {
+  const n = W.cfg.flagWeeks; if (!(n > 0)) return;
+  for (const t of W.bots) {
+    if (!t.flaggedBy || W.t - (t.lastCaught ?? 0) < n) continue;
+    let k = 0; for (const x of W.bots) if (x.flags.delete(t.id)) k++;
+    t.flaggedBy = 0; t.announced = false;
+    if (k >= 5) log(W, 'flag', `${t.name}'s flags lift after ${n} weeks without being caught: ${k} bots will trade with it again.`);
+    jot(W, { type: 'flagLift', bot: t.name, by: k });
+  }
 }
