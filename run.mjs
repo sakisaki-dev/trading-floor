@@ -75,7 +75,7 @@ const SCHEMA = obj({
   research: arr(str),
   notes: arr(obj({ player: str, estimate: num, facts: str })),
   orders: arr(obj({ player: str, side: { type: 'string', enum: ['buy', 'sell'] }, price: num, qty: int })),
-  packs: int,
+  packs: arr(obj({ type: { type: 'string', enum: Object.keys(E.PACK_TYPES) }, count: int })),
   auction: arr(obj({ player: str, reserve: num })),
   auctionBids: arr(obj({ auctionId: str, bid: num })),
   passOrders: arr(obj({ side: { type: 'string', enum: ['buy', 'sell'] }, price: num, qty: int })),
@@ -139,24 +139,25 @@ async function decide(bot, seat, obs) {
 let mockSeed = 1;
 const mr = () => ((mockSeed = (mockSeed * 16807) % 2147483647) / 2147483647);
 function mockPolicy(o) {
-  const rows = o.market || [];
+  const rows = (o.market?.rows || []).map((r) => ({ card: r[0], price: r[2], youHold: r[6], yourNote: r[8] == null ? null : { estimateForThisCard: r[8] } }));
   const unknown = rows.filter((r) => !r.yourNote).slice(0, 10);
-  const research = unknown.sort(() => mr() - 0.5).slice(0, o.you.researchPasses).map((r) => r.player);
-  const notes = (o.lastWeek.researchResults || []).map((p) => ({ player: p.key, estimate: Math.max(1, (p.careerLegacy || 500) / 40 + (p.ovr || 60) - 60), facts: `${p.pos} OVR ${p.ovr}, grade ${p.grade}` }));
+  const research = unknown.sort(() => mr() - 0.5).slice(0, o.you.researchPasses).map((r) => r.card);
+  const notes = (o.lastWeek.researchResults || []).map((p) => ({ player: p.key, estimate: 20 * Math.max(1, (p.careerLegacy || 500) / 40 + (p.ovr || 60) - 60), facts: `${p.pos} OVR ${p.ovr}, grade ${p.grade}` }));
   const orders = [];
   for (const r of rows) {
-    if (r.yourNote && r.price < r.yourNote.estimate * 0.85 && o.you.cash > r.price * 2) orders.push({ player: r.player, side: 'buy', price: +(r.price * 1.03).toFixed(2), qty: 1 });
-    if (r.yourNote && r.youHold && r.price > r.yourNote.estimate * 1.2) orders.push({ player: r.player, side: 'sell', price: +(r.price * 0.98).toFixed(2), qty: 1 });
+    if (r.yourNote && r.price < r.yourNote.estimateForThisCard * 0.85 && o.you.cash > r.price * 2) orders.push({ player: r.card, side: 'buy', price: +(r.price * 1.03).toFixed(2), qty: 1 });
+    if (r.yourNote && r.youHold && r.price > r.yourNote.estimateForThisCard * 1.2) orders.push({ player: r.card, side: 'sell', price: +(r.price * 0.98).toFixed(2), qty: 1 });
   }
   const games = o.games ? Object.entries(o.games.answerThisWeek || {}).slice(0, 3).map(([game, c]) => ({ game, answers: c.questions.map(() => (game === 'valuation' ? '20' : game === 'prediction' ? '0.5' : 'A')) })) : [];
-  const auctionBids = (o.auctions?.open || []).filter((a) => rows.find((r) => r.player === a.player && r.yourNote && r.yourNote.estimate > a.reserve * 1.1)).map((a) => ({ auctionId: a.auctionId, bid: a.reserve * 1.05 }));
+  const auctionBids = (o.auctions?.open || []).filter((a) => rows.find((r) => r.card === a.card && r.yourNote && r.yourNote.estimateForThisCard > a.reserve * 1.1)).map((a) => ({ auctionId: a.auctionId, bid: a.reserve * 1.05 }));
   const friend = (o.otherBots || []).find((b) => !b.flaggedYou);
-  return { lend: { amount: 0, rate: 0 }, borrow: { amount: 0, maxRate: 0 }, repay: 0, research, notes, orders: orders.slice(0, 12), packs: o.you.cash > o.packs.price * 4 ? 1 : 0, auction: [], auctionBids, passOrders: [], ticketOrders: [], games, share: friend ? [friend.name] : [], acceptShares: ['all'], steal: '', post: '', messages: [], memo: `Week ${o.week}: tracking ${notes.length} new notes.` };
+  return { lend: { amount: 0, rate: 0 }, borrow: { amount: 0, maxRate: 0 }, repay: 0, research, notes, orders: orders.slice(0, 12), packs: o.you.cash > o.packs.types.standard.price * 4 ? [{ type: 'standard', count: 1 }] : [], auction: [], auctionBids, passOrders: [], ticketOrders: [], games, share: friend ? [friend.name] : [], acceptShares: ['all'], steal: '', post: '', messages: [], memo: `Week ${o.week}: tracking ${notes.length} new notes.` };
 }
 
 /* ---------- Main loop ---------- */
 const lib = JSON.parse(fs.readFileSync(path.join(here, 'data/library.json'), 'utf8'));
 lib.timeline = JSON.parse(fs.readFileSync(path.join(here, 'data/timeline.json'), 'utf8'));
+for (const k of ['history', 'kits', 'names']) { const f = path.join(here, `data/${k}.json`); if (fs.existsSync(f)) lib[k] = JSON.parse(fs.readFileSync(f, 'utf8')); }
 const W = E.createWorld(lib, worldCfg);
 const seats = new Map();
 // Seats are keyed by name: when a bot's life ends, its heir sits in the same seat (same model) and carries on

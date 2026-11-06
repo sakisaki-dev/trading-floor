@@ -4,7 +4,7 @@
       <span class="kicker gold">Retro Vault · Sandbox</span>
       <h1>The <em>Trading</em> Floor</h1>
     </div>
-    <p class="sub">Bots trade real players' cards against hidden values, replaying the save's real seasons. Every bot starts with a random strategy genome; what works spreads.</p>
+    <p class="sub">250 neural bots trade real players' cards (every design, finish, kit, Prizm parallel and autograph) at the site's real prices, replaying the save's real seasons. Each bot is two small networks with random weights; what earns money gets copied.</p>
   </header>
 
   <div class="bar" role="group" aria-label="Simulation controls">
@@ -24,12 +24,12 @@
   </div>
 
   <div class="rules" id="rules" hidden>
-    <div class="slider"><label for="livingCost">Living cost / wk <b id="livingCostV"></b></label><input id="livingCost" type="range" min="0" max="20" step="1" value="4"></div>
+    <div class="slider"><label for="livingCost">Living cost / wk <b id="livingCostV"></b></label><input id="livingCost" type="range" min="0" max="400" step="20" value="80"></div>
     <div class="slider"><label for="lifestyle">Spend of worth / wk <b id="lifestyleV"></b></label><input id="lifestyle" type="range" min="0" max="100" step="5" value="15"></div>
     <div class="slider"><label for="maxLTV">Borrow up to <b id="maxLTVV"></b></label><input id="maxLTV" type="range" min="0" max="90" step="5" value="60"></div>
     <div class="slider"><label for="interest">Interest / wk <b id="interestV"></b></label><input id="interest" type="range" min="0" max="100" step="5" value="20"></div>
     <div class="slider"><label for="fee">Trade fee <b id="feeV"></b></label><input id="fee" type="range" min="0" max="10" step="0.5" value="4"></div>
-    <div class="slider"><label for="allowance">Allowance / wk <b id="allowanceV"></b></label><input id="allowance" type="range" min="0" max="100" step="5" value="10"></div>
+    <div class="slider"><label for="allowance">Allowance / wk <b id="allowanceV"></b></label><input id="allowance" type="range" min="0" max="2000" step="100" value="200"></div>
     <div class="slider"><label for="packEdge">Pack edge <b id="packEdgeV"></b></label><input id="packEdge" type="range" min="0" max="60" step="5" value="25"></div>
     <div class="slider"><label for="passesPerWeek">Passes / wk <b id="passesPerWeekV"></b></label><input id="passesPerWeek" type="range" min="0" max="6" step="1" value="3"></div>
     <div class="slider"><label for="knowledgeWeeks">Notes last <b id="knowledgeWeeksV"></b></label><input id="knowledgeWeeks" type="range" min="2" max="40" step="1" value="12"></div>
@@ -102,14 +102,14 @@
 
   <div class="grid main">
     <section class="panel" aria-labelledby="floor-h">
-      <div class="head"><h2 id="floor-h">Floor</h2><span class="note">lane = a bot's strongest gene (strategies emerge, they aren't assigned) · click a bot · x = worth · dashed = thief</span></div>
-      <canvas id="floor" aria-label="Every bot by worth, one lane per strategy"></canvas>
+      <div class="head"><h2 id="floor-h">Floor</h2><span class="note">x = worth · y = average OVR of the cards it holds · blue = gaining, red = losing (4 weeks) · gold ring = AI bot · dashed = thief · faint ring = flagged by 5+ · click a bot</span></div>
+      <canvas id="floor" aria-label="Every bot by worth and the average OVR of its cards, coloured by its 4-week return"></canvas>
       <div class="tip" id="floorTip" hidden></div>
     </section>
     <div class="stack">
       <section class="panel" aria-labelledby="cons-h">
         <div class="head"><h2 id="cons-h">Where the money goes</h2><span class="note">last 20 weeks · bills and interest leave the economy</span></div>
-        <div class="tablewrap"><table id="pnl"><thead><tr><th>Strategy</th><th class="num">Realized P&amp;L</th><th class="bar"><span class="sr-only">P&amp;L bar</span></th><th class="num">Net cash</th><th class="num">Quick flips</th></tr></thead><tbody></tbody></table></div>
+        <div class="tablewrap"><table id="pnl"><thead><tr><th>Wealth group</th><th class="num">Realized P&amp;L</th><th class="bar"><span class="sr-only">P&amp;L bar</span></th><th class="num">Net cash</th><th class="num">Quick flips</th></tr></thead><tbody></tbody></table></div>
         <p class="note" id="consNote"></p>
       </section>
       <section class="panel" aria-labelledby="ct-h">
@@ -126,26 +126,26 @@
   </div>
 
   <section class="panel" aria-labelledby="hg-h">
-    <div class="head"><h2 id="hg-h">What evolution selects</h2><span class="scale" id="scaleGene"></span></div>
-    <p class="note">Each row is one gene: the average weight across all bots against where it started. Genes spread when bots copy the best returns and when long-lived lineages pass them to heirs. Blue = spreading.</p>
-    <canvas id="hmGene" class="hm hm--short" aria-label="Heatmap of the wealth-weighted genome over time"></canvas>
+    <div class="head"><h2 id="hg-h">What they learned</h2><span class="scale" id="scaleGene"></span></div>
+    <p class="note">Each row is one thing the card network sees. The colour is how much raising it moves the richest 10% of bots toward buying (red) or selling (blue), measured on their own networks every 4 weeks. Nobody programmed these: they are what survived selection.</p>
+    <canvas id="hmGene" class="hm hm--tall" aria-label="Heatmap of how strongly each input moves the richest bots toward buying or selling, over time"></canvas>
     <div class="tip" id="hmGeneTip" hidden></div>
   </section>
 
   <div class="grid two">
     <section class="panel" aria-labelledby="hf-h">
-      <div class="head"><h2 id="hf-h">Families · price ÷ value</h2><span class="scale" id="scaleFam"></span></div>
-      <canvas id="hmFam" class="hm" aria-label="Heatmap of price over hidden value per player family over time"></canvas>
+      <div class="head"><h2 id="hf-h">OVR bands · price ÷ value</h2><span class="scale" id="scaleFam"></span></div>
+      <canvas id="hmFam" class="hm" aria-label="Heatmap of price over hidden value per OVR band over time"></canvas>
       <div class="tip" id="hmFamTip" hidden></div>
     </section>
     <section class="panel" aria-labelledby="hh-h">
-      <div class="head"><h2 id="hh-h">Who holds which families</h2><span class="scale" id="scaleHold"></span></div>
-      <canvas id="hmHold" class="hm" aria-label="Heatmap of each strategy's share of every family's card value"></canvas>
+      <div class="head"><h2 id="hh-h">Who holds which OVR bands</h2><span class="scale" id="scaleHold"></span></div>
+      <canvas id="hmHold" class="hm" aria-label="Heatmap of each wealth group's share of every OVR band's card value"></canvas>
       <div class="tip" id="hmHoldTip" hidden></div>
     </section>
     <section class="panel" aria-labelledby="hs-h">
-      <div class="head"><h2 id="hs-h">Strategies · 4-week return</h2><span class="scale" id="scaleRet"></span></div>
-      <canvas id="hmRet" class="hm hm--short" aria-label="Heatmap of each strategy's average 4-week return over time"></canvas>
+      <div class="head"><h2 id="hs-h">Wealth groups · 4-week return</h2><span class="scale" id="scaleRet"></span></div>
+      <canvas id="hmRet" class="hm hm--short" aria-label="Heatmap of each wealth group's average 4-week return over time"></canvas>
       <div class="tip" id="hmRetTip" hidden></div>
     </section>
     <section class="panel" aria-labelledby="hb-h">
@@ -162,7 +162,7 @@
       <canvas id="wins" class="ch ch--short" aria-label="Average skill index across games, 4-week average"></canvas>
       <div class="tip" id="winsTip" hidden></div>
       <div class="tablewrap"><table id="gTopic"><thead><tr><th>Game</th><th>Topic</th><th class="num">Entries</th><th class="num">Pots</th><th class="num">Skill</th><th class="bar"><span class="sr-only">Skill bar</span></th></tr></thead><tbody></tbody></table></div>
-      <div class="tablewrap"><table id="gArch"><thead><tr><th>Strategy</th><th class="num">Entries</th><th class="num">Won</th><th class="bar"><span class="sr-only">Win rate bar</span></th><th class="num">Net coins</th></tr></thead><tbody></tbody></table></div>
+      <div class="tablewrap"><table id="gArch"><thead><tr><th>Wealth group</th><th class="num">Entries</th><th class="num">Won</th><th class="bar"><span class="sr-only">Win rate bar</span></th><th class="num">Net coins</th></tr></thead><tbody></tbody></table></div>
     </section>
     <section class="panel" aria-labelledby="nt-h">
       <div class="head"><h2 id="nt-h">Notes</h2><span class="legend"><span><i class="line" style="background:#3987e5"></i>Swaps</span><span><i class="line" style="background:#e66767"></i>Thefts</span></span></div>
@@ -174,7 +174,7 @@
     <section class="panel" aria-labelledby="st-h">
       <div class="head"><h2 id="st-h">Wealth share</h2></div>
       <div class="legend" id="stratLegend"></div>
-      <canvas id="strat" class="ch" aria-label="Share of total wealth by strategy"></canvas>
+      <canvas id="strat" class="ch" aria-label="Share of total wealth held by the richest 10%, the next 40% and the bottom 50%"></canvas>
       <div class="tip" id="stratTip" hidden></div>
       <div class="head"><h2 class="h3">Gini</h2><span class="note">0 = equal · 1 = one bot owns all</span></div>
       <canvas id="gini" class="ch ch--short" aria-label="Gini coefficient over time"></canvas>

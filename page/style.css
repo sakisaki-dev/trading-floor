@@ -90,6 +90,7 @@
   .ch--short { height: 90px; }
   .hm { height: 320px; }
   .hm--short { height: 190px; }
+  .hm--tall { height: 440px; }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 500 11.5px/1.2 var(--body); color: var(--muted); }
   .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
   .legend i.line { height: 2px; width: 13px; border-radius: 1px; vertical-align: 3px; }

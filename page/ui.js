@@ -2,17 +2,17 @@
    Everything draws from FRAMES (one compact record per week, engine frame()): live mode appends one per tick, replay
    mode loads them from a run file written by sandbox/run.mjs. */
 
-// Presets change the laws of the world only. Strategies are never assigned: every bot starts with a random genome.
+// Presets change the laws of the world only. Strategies are never assigned: every bot starts with random networks.
 const PRESETS = {
-  laws: { label: 'Default laws', set: {}, hyp: '<b>Default laws.</b> Random genomes, real seasons as news, credit between bots, no outside buyers. Watch which strategies selection favours, and whether bubbles form.' },
-  loose: { label: 'Loose money', set: { allowance: 25 }, hyp: '<b>Loose money.</b> A 25-coin weekly allowance. More coins chasing the same cards.' },
+  laws: { label: 'Default laws', set: {}, hyp: '<b>Default laws.</b> 250 neural bots with random weights, the site\'s real prices and rarities, real seasons as news, credit between bots. Nothing tells them what to do: watch what they learn, who gets rich and whether bubbles form.' },
+  loose: { label: 'Loose money', set: { allowance: 500 }, hyp: '<b>Loose money.</b> A 500-coin weekly allowance. More coins chasing the same cards.' },
   tight: { label: 'Tight money', set: { allowance: 0 }, hyp: '<b>Tight money.</b> No allowance: only trading, games and lending earn coins.' },
   nocredit: { label: 'No credit', set: { credit: false }, hyp: '<b>No credit.</b> Bots cannot lend or borrow. Compare the size of booms and busts.' },
   nopass: { label: 'No pass market', set: { passesTradable: false }, hyp: '<b>No pass market.</b> Three passes each, untradable. Nobody can buy an information edge.' },
   nogames: { label: 'No games', set: { games: false }, hyp: '<b>No games.</b> No contests: knowledge only pays through trading.' },
-  thieves: { label: "Thieves' den", set: { social: { sharer: 0.2, reciprocator: 0.2, thief: 0.6 } }, hyp: "<b>Thieves' den.</b> 60% of bots start as thieves." },
-  honest: { label: 'Sharing circle', set: { social: { sharer: 0.7, reciprocator: 0.3, thief: 0 }, stealing: false }, hyp: '<b>Sharing circle.</b> No theft. Knowledge spreads freely.' },
-  noevolve: { label: 'No selection', set: { evolve: false }, hyp: '<b>No selection.</b> Genomes never change: the starting mix plays out.' },
+  honest: { label: 'No theft', set: { stealing: false }, hyp: '<b>No theft.</b> Notes can be swapped but never stolen.' },
+  noevolve: { label: 'No selection', set: { evolve: false }, hyp: '<b>No selection.</b> Nobody copies anybody: each bot keeps the random networks it started with.' },
+  genome: { label: 'Older genome bots', set: { brain: 'genome', population: 100 }, hyp: '<b>Older genome bots.</b> The earlier design: 100 bots with random weights on seven hand-picked signals, for comparison.' },
   priceonly: { label: 'Price-only world', set: { priceOnly: true }, hyp: '<b>Price-only world.</b> No hidden value anywhere: a card is worth only what someone pays. No royalties, packs priced from market prices, research shows past trades. With nothing to anchor them, prices drift toward zero.' },
   policy: { label: 'Policy: all safeguards', set: { store: true, priceLimit: 0.15, centralBank: true, wealthTax: 0.002, positionLimit: 0.25 }, hyp: '<b>Policy: all safeguards.</b> Store ceiling, price limits, central bank, wealth tax and position caps, for comparison.' },
 };
@@ -31,13 +31,47 @@ const FAMS = familyList(LIBRARY);
 
 /* ---------- State ---------- */
 let opts = { seed: 88 }, presetKey = 'laws';
-let WORLD = null, FRAMES = [], H = null, mode = 'live', RUN = null, cursor = 0;
+let FRAMES = [], H = null, mode = 'live', RUN = null, cursor = 0;
+// The live world runs in a background worker (the same engine), so a slow week never freezes the page. The worker sends
+// each finished week as a frame, the world's settings, and details for whatever player and bot are selected.
+let LIVECFG = null, LIVE = { p: null, b: null }, dirty = false, worker = null;
+const ix = () => (mode === 'replay' ? cursor : FRAMES.length - 1);
+function startWorker() {
+  if (worker) return worker;
+  const src = ENGINE_SRC + '\n' + WORKER_SRC;
+  let got = false, sent = [];
+  try { worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' }))); }
+  catch (err) { worker = inlineWorker(); }
+  // If the host blocks background workers, run the same worker code on the page instead (slower to interact with)
+  worker.onerror = () => { if (got) return; const w = inlineWorker(); w.onmessage = worker.onmessage; worker = w; w.postMessage({ cmd: 'init', lib: LIBRARY }); for (const m of sent) w.postMessage(m); };
+  const post0 = worker.postMessage.bind(worker); worker.postMessage = (m) => { if (!got) sent.push(m); post0(m); };
+  const onmsg = (e) => { got = true; handle(e); };
+  const handle = (e) => {
+    const m = e.data;
+    if (m.cfg) LIVECFG = m.cfg;
+    if (m.detail) { if (m.detail.p !== undefined) LIVE.p = m.detail.p; if (m.detail.b !== undefined) LIVE.b = m.detail.b; }
+    if (m.type === 'reset') { if (mode !== 'live') return; FRAMES = []; newHist(); arcs = []; pos.clear(); }
+    if (m.type === 'frame' || m.type === 'reset') { if (mode !== 'live') return; for (const f of m.frames || []) { pushFrame(f); for (const [s2, b2] of f.arcs || []) arcs.push({ s: s2, b: b2, age: 0 }); } if (m.type === 'reset') { syncControls(); redrawAll(); } dirty = true; }
+    if (m.type === 'detail' && mode === 'live') { drawDetail(); drawAcct(); }
+  };
+  worker.onmessage = onmsg;
+  worker.postMessage({ cmd: 'init', lib: LIBRARY });
+  return worker;
+}
+function inlineWorker() {
+  const w = { onmessage: null, onerror: null };
+  const api = new Function('postMessage', 'let onmessage; const INLINE = true;\n' + WORKER_SRC + '\nreturn (m) => onmessage({ data: m });')((d) => setTimeout(() => w.onmessage && w.onmessage({ data: d }), 0));
+  w.postMessage = (m) => setTimeout(() => api(m), 0);
+  return w;
+}
+const tell = (m) => { if (worker) worker.postMessage(m); };
+const sendSel = () => tell({ cmd: 'sel', p: SEL.type === 'card' ? SEL.id : null, b: ACCT });
 let playing = !matchMedia('(prefers-reduced-motion: reduce)').matches, speed = 1, acc = 0, lastT = 0, panelT = 0, chartT = 0;
 const KEYS = ['p', 'f', 'bub', 'gini', 'share', 'trades', 'pass', 'informed', 'flags', 'shares', 'thefts', 'gamePacks'];
 function newHist() { H = Object.fromEntries(KEYS.map((k) => [k, []])); H.ticket = []; H.skill = []; H.mcap = []; H.vcap = []; H.cashTop = []; H.bank = []; }
 // Games over the last k frames: per game [entries, pots, skill sum, skill n], per strategy [entries, wins, net]
 function gamesOver(i, k) {
-  const out = { game: {}, arch: ARCH.map(() => [0, 0, 0]), skill: [0, 0] };
+  const out = { game: {}, arch: GROUPS.map(() => [0, 0, 0]), skill: [0, 0] };
   for (let j = Math.max(0, i - k + 1); j <= i; j++) {
     const f = FRAMES[j]; if (!f?.gs) continue;
     for (const [g, [e, pot, , sk]] of Object.entries(f.gs)) { const o = (out.game[g] ||= [0, 0, 0, 0]); o[0] += e; o[1] += pot; if (sk != null) { o[2] += sk; o[3]++; out.skill[0] += sk; out.skill[1]++; } }
@@ -53,27 +87,24 @@ function pushFrame(f) {
   const g = gamesOver(FRAMES.length - 1, 4);
   H.skill.push(g.skill[1] ? g.skill[0] / g.skill[1] : null);
 }
-const gpw = () => (mode === 'replay' ? RUN.config.weeksPerGeneration : WORLD.cfg.weeksPerGeneration);
+const gpw = () => (mode === 'replay' ? RUN.config.weeksPerGeneration : LIVECFG?.weeksPerGeneration ?? 20);
 const when = (t) => (t ? `Week ${t}` : 'Start');
 const cur = () => FRAMES[mode === 'replay' ? cursor : FRAMES.length - 1];
 const nNow = () => (mode === 'replay' ? cursor + 1 : FRAMES.length);
-function setPlay(v) { playing = v; $('play').textContent = v ? 'Pause' : 'Play'; }
+function setPlay(v) { playing = v; $('play').textContent = v ? 'Pause' : 'Play'; if (mode === 'live') tell({ cmd: 'play', v }); }
 
 function startLive() {
   mode = 'live'; RUN = null; $('liveBtn').hidden = true; $('runFile').value = '';
-  WORLD = createWorld(LIBRARY, { ...opts, ...PRESETS[presetKey].set });
-  FRAMES = []; newHist(); pushFrame(frame(WORLD));
-  for (let i = 0; i < 60; i++) { step(WORLD); pushFrame(frame(WORLD)); } // open three generations in, so every chart has data at rest
-  syncControls();
+  startWorker(); LIVE = { p: null, b: null };
+  tell({ cmd: 'start', opts: { ...opts, ...PRESETS[presetKey].set }, playing, speed });
   $('hyp').innerHTML = PRESETS[presetKey].hyp; $('preset').value = presetKey;
-  arcs = []; pos.clear(); redrawAll();
 }
 function startReplay(run) {
-  mode = 'replay'; RUN = run; FRAMES = []; newHist();
+  tell({ cmd: 'play', v: false }); mode = 'replay'; RUN = run; FRAMES = []; newHist();
   for (const f of run.frames) pushFrame(f);
   cursor = 0; $('liveBtn').hidden = false; setPlay(true);
   const ai = run.meta?.aiBots || [];
-  $('hyp').innerHTML = `<b>Replay ${esc(run.meta?.id || '')}.</b> ${run.frames.length - 1} weeks · ${ai.length} AI bots (${[...new Set(ai.map((b) => b.model))].map(esc).join(', ') || 'none'}) · $${(run.meta?.costUsd ?? 0).toFixed(2)} API cost. Hover a red dot for its memo.`;
+  $('hyp').innerHTML = `<b>Replay ${esc(run.meta?.id || '')}.</b> ${run.frames.length - 1} weeks · ${ai.length} AI bots (${[...new Set(ai.map((b) => b.model))].map(esc).join(', ') || 'none'}) · $${(run.meta?.costUsd ?? 0).toFixed(2)} API cost. Hover a gold-ringed dot (an AI bot) for its memo.`;
   arcs = []; pos.clear(); redrawAll();
 }
 
@@ -82,60 +113,64 @@ function fit(cv) { const r = cv.getBoundingClientRect(), d = window.devicePixelR
 function placeTip(tip, cv, px, py) { const r = cv.getBoundingClientRect(), pr = cv.parentElement.getBoundingClientRect(); tip.style.left = C(px + (r.left - pr.left) + 12, 8, Math.max(8, pr.width - 250)) + 'px'; tip.style.top = C(py + (r.top - pr.top) + 12, 8, Math.max(8, pr.height - 100)) + 'px'; tip.hidden = false; }
 
 /* ---------- Floor ---------- */
+// A scatter of every bot: x = worth (log), y = the average OVR of the cards it holds (by value), colour = its return
+// over the last 4 weeks. Nothing is grouped by strategy: no bot is given one.
 const floor = $('floor'), floorTip = $('floorTip');
-let dom = [2.5, 4], pos = new Map(), hover = null, arcs = [];
-function lanes() { const f = cur(); const has = (RUN && RUN.frames.some((x) => x.bots.some((b) => b[9]))) || (f && f.bots.some((b) => b[9])); return ARCH.map((a, i) => i).filter((i) => i < AI || has); }
+let dom = [2.5, 4], oDom = [60, 95], pos = new Map(), hover = null, arcs = [];
+const retColor = (r) => divergeInv(C((r || 0) / 0.15, -1, 1));
+const grpColor = (b) => GROUPS[b[17] ?? 2].color;
 function drawFloor() {
   const f = cur(); if (!f) return;
   const [x, Wd, Ht] = fit(floor); x.clearRect(0, 0, Wd, Ht);
-  const LW = Wd < 560 ? 86 : 132, ln = lanes(), lh = Ht / ln.length, small = Wd < 560 ? 0.62 : 1;
-  const vals = f.bots.map((b) => b[3]);
-  dom = [L(dom[0], Math.log10(Math.max(20, Math.min(...vals))), 0.08), L(dom[1], Math.log10(Math.max(...vals) * 1.05), 0.08)];
-  const X = (v) => LW + 8 + ((Math.log10(Math.max(1, v)) - dom[0]) / Math.max(0.01, dom[1] - dom[0])) * (Wd - LW - 22);
-  ln.forEach((a, row) => {
-    const y0 = row * lh, n = f.bots.filter((b) => b[1] === a).length;
-    x.fillStyle = row % 2 ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.035)'; x.fillRect(LW, y0, Wd - LW, lh);
-    x.fillStyle = ARCH[a].color; x.fillRect(0, y0 + lh / 2 - 7, 3, 14);
-    x.fillStyle = COL.chalk; x.font = `800 ${LW < 110 ? 12 : 14}px ${css('--display')}`; x.textBaseline = 'middle'; x.fillText(ARCH[a].label.toUpperCase(), 9, y0 + lh / 2 - 7);
-    x.fillStyle = COL.muted; x.font = `500 10.5px ${css('--mono')}`; x.fillText(`${n} · ${pct(f.h.share[a] || 0)}`, 9, y0 + lh / 2 + 8);
-  });
-  x.font = `500 10px ${css('--mono')}`; x.fillStyle = COL.faint; x.textBaseline = 'bottom';
-  for (let e = Math.ceil(dom[0] * 2) / 2; e <= dom[1]; e += 0.5) { const v = 10 ** e, px = X(v); if (px < LW + 20 || px > Wd - 20) continue; x.fillRect(px, 0, 1, Ht - 13); x.fillText(fmt(v), px + 3, Ht - 1); }
+  const pad = { l: 34, r: 10, t: 8, b: 16 }, small = Wd < 560 ? 0.7 : 1;
+  const vals = f.bots.map((b) => b[3]).filter((v) => v > 0), ovs = f.bots.map((b) => b[15]).filter((v) => v != null);
+  if (vals.length) dom = [L(dom[0], Math.log10(Math.max(10, Math.min(...vals))), 0.08), L(dom[1], Math.log10(Math.max(...vals) * 1.05), 0.08)];
+  if (ovs.length) oDom = [L(oDom[0], Math.min(...ovs) - 1, 0.08), L(oDom[1], Math.max(...ovs) + 1, 0.08)];
+  const X = (v) => pad.l + ((Math.log10(Math.max(1, v)) - dom[0]) / Math.max(0.01, dom[1] - dom[0])) * (Wd - pad.l - pad.r);
+  const Y = (o) => pad.t + (1 - ((o ?? oDom[0]) - oDom[0]) / Math.max(1, oDom[1] - oDom[0])) * (Ht - pad.t - pad.b);
+  x.font = `500 10px ${css('--mono')}`;
+  x.fillStyle = COL.faint; x.textBaseline = 'bottom';
+  for (let e = Math.ceil(dom[0] * 2) / 2; e <= dom[1]; e += 0.5) { const v = 10 ** e, px = X(v); if (px < pad.l + 20 || px > Wd - 30) continue; x.fillStyle = 'rgba(255,255,255,0.05)'; x.fillRect(px, pad.t, 1, Ht - pad.t - pad.b); x.fillStyle = COL.faint; x.fillText(fmt(v), px + 3, Ht - 1); }
+  x.textBaseline = 'middle'; x.textAlign = 'right';
+  for (let o = Math.ceil(oDom[0] / 5) * 5; o <= oDom[1]; o += 5) { const py = Y(o); x.fillStyle = 'rgba(255,255,255,0.05)'; x.fillRect(pad.l, py, Wd - pad.l - pad.r, 1); x.fillStyle = COL.faint; x.fillText(String(o), pad.l - 4, py); }
+  x.textAlign = 'left'; x.fillStyle = COL.faint; x.textBaseline = 'top'; x.fillText('OVR held ↑', pad.l + 4, pad.t); x.textBaseline = 'bottom'; x.textAlign = 'right'; x.fillText('worth →', Wd - pad.r, Ht - pad.b - 2); x.textAlign = 'left';
   const ids = new Set();
   for (const b of f.bots) {
-    const [id, a, , w, n] = b; ids.add(id);
-    const row = ln.indexOf(a), jit = ((id * 2654435761) % 1000) / 1000, ty = row * lh + 9 + jit * (lh - 18);
+    const [id, , , w, n] = b; ids.add(id);
+    const jit = (((id * 2654435761) % 1000) / 1000 - 0.5) * 6, ty = b[15] == null ? Ht - pad.b - 4 + jit / 3 : Y(b[15]) + jit;
     const p = pos.get(id) || { x: X(w), y: ty };
-    p.x = L(p.x, X(w), 0.15); p.y = L(p.y, ty, 0.2); p.r = C(2 + Math.sqrt(n) * 0.5, 2.5, 9) * small * (b[9] ? 1.4 : 1); p.b = b; pos.set(id, p);
+    p.x = L(p.x, X(w), 0.15); p.y = L(p.y, ty, 0.2); p.r = C(2 + Math.sqrt(n) * 0.35, 2.5, 8) * small * (b[9] ? 1.5 : 1); p.b = b; pos.set(id, p);
   }
   for (const id of [...pos.keys()]) if (!ids.has(id)) pos.delete(id);
   arcs = arcs.filter((a) => a.age < 36); x.lineWidth = 1;
-  for (const a of arcs) { const s = pos.get(a.s), b = pos.get(a.b); a.age++; if (!s || !b) continue; x.strokeStyle = `rgba(238,241,250,${0.28 * (1 - a.age / 36)})`; x.beginPath(); x.moveTo(s.x, s.y); x.quadraticCurveTo((s.x + b.x) / 2, Math.min(s.y, b.y) - 24, b.x, b.y); x.stroke(); }
+  for (const a of arcs) { const s = pos.get(a.s), b = pos.get(a.b); a.age++; if (!s || !b) continue; x.strokeStyle = `rgba(238,241,250,${0.22 * (1 - a.age / 36)})`; x.beginPath(); x.moveTo(s.x, s.y); x.quadraticCurveTo((s.x + b.x) / 2, Math.min(s.y, b.y) - 24, b.x, b.y); x.stroke(); }
   for (const [id, p] of pos) {
-    const b = p.b, col = ARCH[b[1]].color;
-    x.beginPath(); x.arc(p.x, p.y, p.r + 1.5, 0, Math.PI * 2); x.fillStyle = COL.panel; x.fill();
-    x.beginPath(); x.arc(p.x, p.y, p.r, 0, Math.PI * 2); x.fillStyle = hover && hover !== id ? rgba(col, 0.4) : col; x.fill();
-    if (b[5] === 2) { x.setLineDash([2, 2]); x.strokeStyle = COL.chalk; x.lineWidth = 1.1; x.beginPath(); x.arc(p.x, p.y, p.r + 2.5, 0, Math.PI * 2); x.stroke(); x.setLineDash([]); }
-    if (b[6] >= 5) { x.strokeStyle = '#ff6b6b'; x.lineWidth = 1.5; x.beginPath(); x.arc(p.x, p.y, p.r + 4.5, 0, Math.PI * 2); x.stroke(); }
+    const b = p.b, col = retColor(b[16]);
+    x.beginPath(); x.arc(p.x, p.y, p.r + 1.2, 0, Math.PI * 2); x.fillStyle = COL.panel; x.fill();
+    x.beginPath(); x.arc(p.x, p.y, p.r, 0, Math.PI * 2); x.fillStyle = hover && hover !== id ? 'rgba(120,130,160,0.35)' : col; x.fill();
+    if (b[9]) { x.strokeStyle = COL.gold; x.lineWidth = 1.6; x.beginPath(); x.arc(p.x, p.y, p.r + 2.5, 0, Math.PI * 2); x.stroke(); }
+    if (b[5] === 2) { x.setLineDash([2, 2]); x.strokeStyle = COL.chalk; x.lineWidth = 1; x.beginPath(); x.arc(p.x, p.y, p.r + 2.5, 0, Math.PI * 2); x.stroke(); x.setLineDash([]); }
+    if (b[6] >= 5) { x.strokeStyle = 'rgba(238,241,250,0.28)'; x.lineWidth = 1; x.beginPath(); x.arc(p.x, p.y, p.r + 4, 0, Math.PI * 2); x.stroke(); }
     if (hover === id) { x.strokeStyle = COL.gold; x.lineWidth = 2; x.beginPath(); x.arc(p.x, p.y, p.r + 6, 0, Math.PI * 2); x.stroke(); }
   }
 }
+const kindOf = (b) => (b[9] ? 'AI bot' : b[18] ? 'Neural bot' : 'Genome bot');
 function floorPointer(e) {
   const r = floor.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
   let best = null, bd = 196;
   for (const [id, p] of pos) { const d = (p.x - mx) ** 2 + (p.y - my) ** 2; if (d < bd) { bd = d; best = [id, p]; } }
   hover = best ? best[0] : null;
   if (!best) { floorTip.hidden = true; return; }
-  const [id, a, name, w, n, soc, flaggedBy, cash, notes, isAi, gen, model] = best[1].b;
+  const b = best[1].b, [id, , name, w, n, soc, flaggedBy, cash, notes, isAi, gen, model] = b;
   let extra = '';
   if (mode === 'live') {
-    const b = WORLD.bots.find((x) => x.id === id);
-    if (b) extra = (b.g?.w ? `<br><span class="k">Genome: ${SIGNALS.map((k) => [k, b.g.w[k]]).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(' · ')} · borrow ${b.g.lev.toFixed(2)} · lend ${b.g.lendShare.toFixed(2)}</span>` : '') + `<br><span class="k">Swaps ${b.stats.shared} · thefts ${b.stats.stolen} (caught ${b.stats.caught}) · researched ${b.stats.researched}</span>`;
+    const bot = LIVE.b?.id === id ? LIVE.b : null;
+    if (bot) extra = (bot.g ? `<br><span class="k">Keeps ${pct(bot.g.keep)} in cash · borrows up to ${bot.g.lev.toFixed(2)}× · lends ${pct(bot.g.lendShare)} of idle cash</span>` : '') + `<br><span class="k">Swaps ${bot.stats.shared} · thefts ${bot.stats.stolen} (caught ${bot.stats.caught}) · researched ${bot.stats.researched}</span>`;
   } else if (isAi && RUN.memos?.[name]) {
     const m = Object.entries(RUN.memos[name]).filter(([t]) => +t <= cur().t).pop()?.[1];
     if (m) extra = `<br><span class="k">Memo:</span> ${esc(m).slice(0, 240)}`;
   }
-  floorTip.innerHTML = `<b><span class="sw" style="background:${ARCH[a].color}"></span>${esc(name)}</b><br><span class="k">${ARCH[a].label}${model ? ` · ${esc(model)}` : ''} · ${SOC[soc]} · gen ${gen}</span><br>Worth <span class="mono">${fmt(w)}</span> · cash <span class="mono">${fmt(cash)}</span> · ${n} cards · ${notes} notes · flagged by ${flaggedBy}${extra}`;
+  floorTip.innerHTML = `<b><span class="sw" style="background:${grpColor(b)}"></span>${esc(name)}</b><br><span class="k">${kindOf(b)}${model ? ` · ${esc(model)}` : ''} · ${GROUPS[b[17] ?? 2].label} · ${SOC[soc]} · gen ${gen}</span><br>Worth <span class="mono">${fmt(w)}</span> · cash <span class="mono">${fmt(cash)}</span> · ${n} cards · ${notes} notes<br>4-week return <span class="mono">${b[16] >= 0 ? '+' : ''}${((b[16] || 0) * 100).toFixed(1)}%</span> · cards' average OVR <span class="mono">${b[15] ?? '–'}</span>${flaggedBy ? ` · flagged by ${flaggedBy}` : ''}${extra}`;
   placeTip(floorTip, floor, best[1].x, best[1].y);
 }
 floor.addEventListener('pointermove', floorPointer); floor.addEventListener('pointerdown', floorPointer);
@@ -177,7 +212,7 @@ function stack(id, layers) {
   const X = (i) => pad.l + ((Wd - pad.l - pad.r) * i) / Math.max(1, n - 1), Y = (v) => pad.t + (Ht - pad.t - pad.b) * (1 - v);
   axes(x, Wd, Ht, pad, 0, 1, (v) => pct(v), n);
   const base = new Array(n).fill(0);
-  ARCH.forEach((a, k) => {
+  GROUPS.forEach((a, k) => {
     const top = Ls.map((s, i) => base[i] + (s[k] || 0));
     x.beginPath(); top.forEach((v, i) => (i ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)))); for (let i = n - 1; i >= 0; i--) x.lineTo(X(i), Y(base[i])); x.closePath(); x.fillStyle = a.color; x.fill();
     x.beginPath(); top.forEach((v, i) => (i ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)))); x.strokeStyle = COL.panel; x.lineWidth = 2; x.stroke();
@@ -197,7 +232,7 @@ crosshair('access', (i) => `<b>${when(FRAMES[i].t)}</b><br>Research pass <span c
 crosshair('wins', (i) => `<b>${when(FRAMES[i].t)}</b><br>Skill index <span class="mono">${H.skill[i] == null ? '–' : H.skill[i].toFixed(2)}</span><br><span class="k">Rank correlation between what entrants knew and how they scored, all games, 4-week average</span>`);
 crosshair('gini', (i) => `<b>${when(FRAMES[i].t)}</b><br>Gini <span class="mono">${H.gini[i].toFixed(3)}</span>`);
 crosshair('notes', (i) => `<b>${when(FRAMES[i].t)}</b><br>Swaps <span class="mono">${H.shares[i]}</span> · thefts <span class="mono">${H.thefts[i]}</span><br><span class="k">${H.flags[i]} flags in force</span>`);
-crosshair('strat', (i) => `<b>${when(FRAMES[i].t)}</b><br>` + ARCH.map((a, k) => [a, H.share[i][k] || 0]).filter(([, v]) => v > 0).sort((x, y) => y[1] - x[1]).map(([a, v]) => `<span class="sw" style="background:${a.color}"></span>${a.label} <span class="mono">${pct(v)}</span>`).join('<br>'));
+crosshair('strat', (i) => `<b>${when(FRAMES[i].t)}</b><br>` + GROUPS.map((a, k) => [a, H.share[i][k] || 0]).map(([a, v]) => `<span class="sw" style="background:${a.color}"></span>${a.label} hold <span class="mono">${pct(v)}</span>`).join('<br>'));
 function drawCharts() {
   line('cashTop', [{ data: H.cashTop, color: '#e66767', fill: true }], { fy: (v) => pct(v), min: 0 });
   drawMain();
@@ -242,45 +277,47 @@ function hmHover(id) {
 ['hmGene', 'hmFam', 'hmHold', 'hmRet', 'hmBots'].forEach(hmHover);
 function buckets(n, width) { const cols = Math.max(1, Math.min(n, Math.floor(width / 7))); return { cols, range: (j) => { const a = Math.floor((j * n) / cols); return [a, Math.max(a, Math.floor(((j + 1) * n) / cols) - 1)]; } }; }
 const avg = (xs) => { const v = xs.filter((y) => y != null && isFinite(y)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
-function archWorth(f) { if (f._aw) return f._aw; const s = ARCH.map(() => [0, 0]); for (const b of f.bots) { s[b[1]][0] += b[3]; s[b[1]][1]++; } return (f._aw = s.map(([w, k]) => (k ? w / k : null))); }
+// Average worth of each wealth group in a frame (groups as the engine placed them that week)
+function grpWorth(f) { if (f._gw) return f._gw; const s = GROUPS.map(() => [0, 0]); for (const b of f.bots) { const g = s[b[17] ?? 2]; g[0] += b[3]; g[1]++; } return (f._gw = s.map(([w, k]) => (k ? w / k : null))); }
 function botMap(f) { if (f._bm) return f._bm; const ws = f.bots.map((b) => b[3]).sort((a, b) => a - b); f._med = ws[Math.floor(ws.length / 2)] || 1; return (f._bm = new Map(f.bots.map((b) => [b[0], b[3]]))); }
 const hmWidth = (id) => $(id).getBoundingClientRect().width - 132;
-const GENES = ['Value', 'Market making', 'Momentum', 'Herd', 'Pack arbitrage', 'Hoarding', 'Dip buying', 'Borrowing', 'Lending'];
+const SENS_ROWS = CARD_IN.map((k, i) => [k, i]).filter(([, i]) => i > 0);
 function drawHeatmaps() {
-  const n = nNow(), f = cur(), ln = lanes();
-  { // What evolution selects: the wealth-weighted genome of the population over time
-    const { cols, range } = buckets(n, hmWidth('hmGene')), rows = GENES.map((g, i) => ({ label: g, color: i < 7 ? ARCH[i].color : i === 7 ? '#e66767' : '#4fd18b' }));
-    const base = FRAMES.find((x) => x.genome)?.genome;
-    const val = (i, j) => { const [a, b] = range(j); const xs = []; for (let k = a; k <= b; k++) if (FRAMES[k].genome) xs.push(FRAMES[k].genome[i]); const v = avg(xs); return v == null || !base ? null : v / Math.max(0.01, base[i]); };
-    heatmap('hmGene', rows, cols, val, (v) => divergeInv(Math.log(v) / Math.log(2.5)), (i, j) => { const [a, b] = range(j); const xs = []; for (let k = a; k <= b; k++) if (FRAMES[k].genome) xs.push(FRAMES[k].genome[i]); const v = avg(xs); return `<b>${GENES[i]}</b><br>Weeks ${FRAMES[a].t}–${FRAMES[b].t}<br>Average weight <span class="mono">${v == null ? '–' : v.toFixed(3)}</span> · ${val(i, j)?.toFixed(2) ?? '–'}× the start<br><span class="k">Weighted by wealth: what is paying</span>`; }, (j) => `W${FRAMES[range(j)[0]].t}`);
+  const n = nNow(), f = cur();
+  { // What the networks learned: how much each input pushes the richest 10% toward buying (red) or selling (blue)
+    const { cols, range } = buckets(n, hmWidth('hmGene')), rows = SENS_ROWS.map(([k]) => ({ label: k }));
+    // measured every 4 weeks: each column uses the latest measurement at or before its last week
+    const sensAt = (k) => { if (FRAMES[k]._sens !== undefined) return FRAMES[k]._sens; let s = null; for (let i = k; i >= 0 && i > k - 8; i--) if (FRAMES[i].sens) { s = FRAMES[i].sens; break; } return (FRAMES[k]._sens = s); };
+    const at = (i, j, who) => { const s = sensAt(range(j)[1]); return s ? s[who][SENS_ROWS[i][1]] : null; };
+    heatmap('hmGene', rows, cols, (i, j) => at(i, j, 'top'), (v) => divergeInv(-v / 0.3), (i, j) => { const [a, b] = range(j), t = at(i, j, 'top'), al = at(i, j, 'all'); return `<b>${esc(rows[i].label)}</b><br>Weeks ${FRAMES[a].t}–${FRAMES[b].t}<br>Richest 10% <span class="mono">${t == null ? '–' : (t > 0 ? '+' : '') + t.toFixed(2)}</span> · everyone <span class="mono">${al == null ? '–' : (al > 0 ? '+' : '') + al.toFixed(2)}</span><br><span class="k">How much raising this input moves the card network toward buying (+) or selling (−)</span>`; }, (j) => `W${FRAMES[range(j)[0]].t}`);
   }
-  { // Families: price ÷ hidden value over time
-    const { cols, range } = buckets(n, hmWidth('hmFam')), rows = FAMS.map((fm) => ({ label: `${fm.pos} ${fm.name}` }));
-    const val = (i, j) => { const [a, b] = range(j); const xs = []; for (let k = a; k <= b; k++) xs.push(FRAMES[k].fam?.[i]); return avg(xs); };
-    heatmap('hmFam', rows, cols, val, (v) => diverge(Math.log(v) / Math.log(1.6)), (i, j) => { const [a, b] = range(j); const v = val(i, j); const fx = FRAMES[b].fashion?.[i]; return `<b>${esc(rows[i].label)}</b><br>${FAMS[i].n} players · weeks ${FRAMES[a].t}–${FRAMES[b].t}<br>Price ÷ value <span class="mono">${v == null ? '–' : v.toFixed(2) + '×'}</span>${fx != null ? `<br><span class="k">Collector demand ${Math.exp(fx).toFixed(2)}× normal</span>` : ''}`; }, (j) => `W${FRAMES[range(j)[0]].t}`);
+  { // OVR bands: price ÷ hidden value over time
+    const { cols, range } = buckets(n, hmWidth('hmFam')), rows = OVR_BANDS.map((b) => ({ label: `OVR ${b.label}` }));
+    const val = (i, j) => { const [a, b] = range(j); const xs = []; for (let k = a; k <= b; k++) xs.push(FRAMES[k].bands?.[i]); return avg(xs); };
+    heatmap('hmFam', rows, cols, val, (v) => diverge(Math.log(v) / Math.log(1.6)), (i, j) => { const [a, b] = range(j); const v = val(i, j); return `<b>${esc(rows[i].label)}</b><br>Weeks ${FRAMES[a].t}–${FRAMES[b].t}<br>Price ÷ value <span class="mono">${v == null ? '–' : v.toFixed(2) + '×'}</span><br><span class="k">Cards in circulation, every design and finish</span>`; }, (j) => `W${FRAMES[range(j)[0]].t}`);
   }
-  { // Holdings: each strategy's share of a family's held card value, now
-    const held = f.hold || [], tot = FAMS.map((_, j) => ln.reduce((s, a) => s + (held[a]?.[j] || 0), 0));
-    const rows = ln.map((a) => ({ label: ARCH[a].label, color: ARCH[a].color }));
-    const val = (i, j) => (tot[j] ? (held[ln[i]]?.[j] || 0) / tot[j] : null);
-    heatmap('hmHold', rows, FAMS.length, val, (v) => seq(Math.min(1, v / 0.5)), (i, j) => `<b>${ARCH[ln[i]].label}</b> · ${esc(FAMS[j].pos + ' ' + FAMS[j].name)}<br>${pct(val(i, j))} of the family's held value<br><span class="k">${fmt(held[ln[i]]?.[j] || 0)} coins</span>`, Object.assign((j) => FAMS[j].pos, { groups: true }));
+  { // Who holds which OVR bands: each wealth group's share of a band's held value, now
+    const held = f.bandHold || [], tot = OVR_BANDS.map((_, j) => GROUPS.reduce((s, _g, a) => s + (held[a]?.[j] || 0), 0));
+    const rows = GROUPS.map((g) => ({ label: g.label, color: g.color }));
+    const val = (i, j) => (tot[j] ? (held[i]?.[j] || 0) / tot[j] : null);
+    heatmap('hmHold', rows, OVR_BANDS.length, val, (v) => seq(Math.min(1, v / 0.7)), (i, j) => `<b>${GROUPS[i].label}</b> · OVR ${esc(OVR_BANDS[j].label)}<br>${pct(val(i, j))} of the band's held value<br><span class="k">${fmt(held[i]?.[j] || 0)} coins</span>`, Object.assign((j) => OVR_BANDS[j].label, { groups: true }));
   }
-  { // Strategy returns: average worth vs 4 weeks earlier
-    const { cols, range } = buckets(n, hmWidth('hmRet')), rows = ln.map((a) => ({ label: ARCH[a].label, color: ARCH[a].color }));
-    const r4 = (k, a) => { if (k < 4) return null; const now = archWorth(FRAMES[k])[a], then = archWorth(FRAMES[k - 4])[a]; return now && then ? now / then - 1 : null; };
-    const val = (i, j) => { const [a, b] = range(j); const xs = []; for (let k = a; k <= b; k++) xs.push(r4(k, ln[i])); return avg(xs); };
-    heatmap('hmRet', rows, cols, val, (v) => divergeInv(v / 0.12), (i, j) => { const [a, b] = range(j); const v = val(i, j); return `<b>${ARCH[ln[i]].label}</b><br>Weeks ${FRAMES[a].t}–${FRAMES[b].t}<br>4-week return <span class="mono">${v == null ? '–' : (v > 0 ? '+' : '') + (v * 100).toFixed(1) + '%'}</span>`; }, (j) => `W${FRAMES[range(j)[0]].t}`);
+  { // Wealth groups: average 4-week return over time
+    const { cols, range } = buckets(n, hmWidth('hmRet')), rows = GROUPS.map((g) => ({ label: g.label, color: g.color }));
+    const r4 = (k, a) => { if (k < 4) return null; const now = grpWorth(FRAMES[k])[a], then = grpWorth(FRAMES[k - 4])[a]; return now && then ? now / then - 1 : null; };
+    const val = (i, j) => { const [a, b] = range(j); const xs = []; for (let k = a; k <= b; k++) xs.push(r4(k, i)); return avg(xs); };
+    heatmap('hmRet', rows, cols, val, (v) => divergeInv(v / 0.12), (i, j) => { const [a, b] = range(j); const v = val(i, j); return `<b>${GROUPS[i].label}</b><br>Weeks ${FRAMES[a].t}–${FRAMES[b].t}<br>4-week return of the group's average worth <span class="mono">${v == null ? '–' : (v > 0 ? '+' : '') + (v * 100).toFixed(1) + '%'}</span>`; }, (j) => `W${FRAMES[range(j)[0]].t}`);
   }
   { // Top 20 bots now: worth vs the median bot, over time
     const top = f.bots.slice().sort((a, b) => b[3] - a[3]).slice(0, 20), { cols, range } = buckets(n, hmWidth('hmBots'));
-    const rows = top.map((b) => ({ label: b[2], color: ARCH[b[1]].color }));
+    const rows = top.map((b) => ({ label: b[2], color: b[9] ? COL.gold : COL.muted }));
     const val = (i, j) => { const fr = FRAMES[range(j)[1]], m = botMap(fr).get(top[i][0]); return m == null ? null : m / fr._med; };
-    heatmap('hmBots', rows, cols, val, (v) => divergeInv(Math.log(v) / Math.log(4)), (i, j) => { const fr = FRAMES[range(j)[1]], v = val(i, j); return `<b>${esc(top[i][2])}</b> · ${ARCH[top[i][1]].label}<br>Week ${fr.t}<br>${v == null ? 'not born yet' : `Worth <span class="mono">${fmt(botMap(fr).get(top[i][0]))}</span> · ${v.toFixed(2)}× median`}`; }, (j) => `W${FRAMES[range(j)[0]].t}`);
+    heatmap('hmBots', rows, cols, val, (v) => divergeInv(Math.log(v) / Math.log(4)), (i, j) => { const fr = FRAMES[range(j)[1]], v = val(i, j); return `<b>${esc(top[i][2])}</b> · ${kindOf(top[i])}<br>Week ${fr.t}<br>${v == null ? 'not born yet' : `Worth <span class="mono">${fmt(botMap(fr).get(top[i][0]))}</span> · ${v.toFixed(2)}× median`}`; }, (j) => `W${FRAMES[range(j)[0]].t}`);
   }
 }
 scale('scaleFam', 'cheap', 'rich', (t) => diverge(t * 2 - 1));
-scale('scaleGene', 'fading', 'spreading', (t) => divergeInv(t * 2 - 1));
-scale('scaleHold', '0%', '50%+', (t) => seq(t));
+scale('scaleGene', 'sell', 'buy', (t) => divergeInv(1 - t * 2));
+scale('scaleHold', '0%', '70%+', (t) => seq(t));
 scale('scaleRet', '−12%', '+12%', (t) => divergeInv(t * 2 - 1));
 scale('scaleBots', '¼×', '4× median', (t) => divergeInv(t * 2 - 1));
 
@@ -288,9 +325,8 @@ scale('scaleBots', '¼×', '4× median', (t) => divergeInv(t * 2 - 1));
 const pill = (r) => (r > 1.2 ? '<span class="pill pill--hot">▲ rich</span>' : r < 0.85 ? '<span class="pill pill--cool">▼ cheap</span>' : '<span class="pill pill--fair">fair</span>');
 let libId = 0;
 function series(id) {
-  if (mode === 'live') { const c = WORLD.cards[id]; return [c.Ph.slice(-60), Array(Math.min(60, c.Ph.length)).fill(c.F)]; }
-  const from = Math.max(0, cursor - 59), P = [], F = []; let v = null;
-  for (let i = 0; i <= cursor; i++) { if (FRAMES[i].values) v = FRAMES[i].values; if (i >= from) { P.push(FRAMES[i].prices?.[id]); F.push(v?.[id]); } }
+  const at = ix(), from = Math.max(0, at - 59), P = [], F = []; let v = null;
+  for (let i = 0; i <= at; i++) { if (FRAMES[i].values) v = FRAMES[i].values; if (i >= from) { P.push(FRAMES[i].prices?.[id]); F.push(v?.[id]); } }
   return [P, F];
 }
 function gameRows(tableId, rows) {
@@ -309,11 +345,11 @@ function drawPanels() {
   $('kWin').textContent = g4.skill[1] ? (g4.skill[0] / g4.skill[1]).toFixed(2) : '–'; $('kWinS').textContent = games ? `${games.toLocaleString()} entries · ${fmt(pots)} coins in pots` : 'no games';
   const ranked = f.bots.slice().sort((a, b) => b[3] - a[3]);
   $('kBank').textContent = f.mkt?.rate == null ? '–' : (f.mkt.rate * 100).toFixed(2) + '%'; $('kBankS').textContent = `per week · loans ${f.mkt?.mcap ? pct(f.mkt.debt / f.mkt.mcap) : '–'} of market · ${f.mkt?.defaults ?? 0} defaults`;
-  $('lb').tBodies[0].innerHTML = ranked.slice(0, 12).map((b) => `<tr data-bot="${b[0]}"><td><span class="sw" style="background:${ARCH[b[1]].color}"></span>${esc(b[2])}</td><td class="num">${fmt(b[3])}</td><td class="num ${(b[13] ?? 0) >= 0 ? 'up' : 'down'}">${b[13] == null ? '–' : (b[13] >= 0 ? '+' : '') + Math.round(b[13] * 100) + '%'}</td><td class="num">gen ${b[10]}</td><td>${SOC[b[5]]}${b[6] >= 5 ? ' <span class="pill pill--hot">flagged</span>' : ''}</td></tr>`).join('');
+  $('lb').tBodies[0].innerHTML = ranked.slice(0, 12).map((b) => `<tr data-bot="${b[0]}"><td><span class="sw" style="background:${grpColor(b)}"></span>${esc(b[2])}</td><td class="num">${fmt(b[3])}</td><td class="num ${(b[13] ?? 0) >= 0 ? 'up' : 'down'}">${b[13] == null ? '–' : (b[13] >= 0 ? '+' : '') + Math.round(b[13] * 100) + '%'}</td><td class="num">gen ${b[10]}</td><td>${SOC[b[5]]}${b[6] >= 5 ? ' <span class="pill pill--hot">flagged</span>' : ''}</td></tr>`).join('');
   { const rows = Object.entries(GAMES).map(([g, d]) => [g, d, g4.game[g] || [0, 0, 0, 0]]).sort((a, b) => (b[2][3] ? b[2][2] / b[2][3] : -1) - (a[2][3] ? a[2][2] / a[2][3] : -1));
     $('gTopic').tBodies[0].innerHTML = rows.map(([g, d, [e, pot, sk, kn]]) => { const r = kn ? sk / kn : null; return `<tr title="${esc(d.skill)}"><td>${esc(d.label)}</td><td class="k">${esc(f.topics?.[g] || '')}</td><td class="num">${e.toLocaleString()}</td><td class="num">${fmt(pot)}</td><td class="num">${r == null ? '–' : r.toFixed(2)}</td><td class="bar"><span class="${r != null && r < 0 ? 'neg' : ''}" style="width:${r == null ? 0 : Math.min(100, Math.abs(r) * 100)}%"></span></td></tr>`; }).join(''); }
-  { const rows = lanes().map((a) => [a, g4.arch[a]]), max = Math.max(0.01, ...rows.map(([, x]) => (x[0] ? x[1] / x[0] : 0)));
-    $('gArch').tBodies[0].innerHTML = rows.filter(([, x]) => x[0]).map(([a, [e, w, net]]) => `<tr><td><span class="sw" style="background:${ARCH[a].color}"></span>${ARCH[a].label}</td><td class="num">${e.toLocaleString()}</td><td class="num">${pct(w / e)}</td><td class="bar"><span style="width:${((w / e) / max) * 100}%;background:${ARCH[a].color}"></span></td><td class="num ${net >= 0 ? 'up' : 'down'}">${net >= 0 ? '+' : ''}${fmt(net)}</td></tr>`).join('') || '<tr><td colspan="5" class="k">No games played.</td></tr>'; }
+  { const rows = GROUPS.map((g, a) => [a, g4.arch[a]]), max = Math.max(0.01, ...rows.map(([, x]) => (x[0] ? x[1] / x[0] : 0)));
+    $('gArch').tBodies[0].innerHTML = rows.filter(([, x]) => x[0]).map(([a, [e, w, net]]) => `<tr><td><span class="sw" style="background:${GROUPS[a].color}"></span>${GROUPS[a].label}</td><td class="num">${e.toLocaleString()}</td><td class="num">${pct(w / e)}</td><td class="bar"><span style="width:${((w / e) / max) * 100}%;background:${GROUPS[a].color}"></span></td><td class="num ${net >= 0 ? 'up' : 'down'}">${net >= 0 ? '+' : ''}${fmt(net)}</td></tr>`).join('') || '<tr><td colspan="5" class="k">No games played.</td></tr>'; }
   const soc = [0, 1, 2].map((s) => { const xs = f.bots.filter((b) => b[5] === s); return [s, xs.length, avg(xs.map((b) => b[3])), avg(xs.map((b) => b[6]))]; });
   $('social').tBodies[0].innerHTML = soc.map(([s, k, w, fl]) => `<tr><td>${SOC[s]}</td><td class="num">${k}</td><td class="num">${fmt(w)}</td><td class="num">${fl == null ? '–' : fl.toFixed(1)}</td></tr>`).join('');
   $('researched').textContent = f.researched.length ? 'Most researched: ' + f.researched.map(([id, k]) => `${LIBRARY.players[id].name} (${k})`).join(', ') : '';
@@ -387,30 +423,31 @@ $('libPick').addEventListener('change', (e) => { libId = +e.target.value; drawLi
 const SLIDERS = { livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'] };
 const TOGGLES = ['credit', 'passesTradable', 'games', 'sharing', 'stealing', 'gossip', 'outsideCollectors', 'royalties', 'evolve', 'leagueUpdates', 'centralBank', 'store', 'closedEconomy'];
 function syncControls() {
-  const c = WORLD.cfg;
+  const c = cfgNow(); if (!c) return;
   for (const [k, [s, f]] of Object.entries(SLIDERS)) { $(k).value = Math.round((c[k] / s) * 100) / 100; $(k + 'V').textContent = f(+$(k).value); }
   for (const k of TOGGLES) $(k).checked = !!c[k];
 }
-for (const [k, [s, f]] of Object.entries(SLIDERS)) $(k).addEventListener('input', () => { const v = +$(k).value; $(k + 'V').textContent = f(v); opts[k] = v * s; if (WORLD && mode === 'live') WORLD.cfg[k] = v * s; });
-for (const k of TOGGLES) $(k).addEventListener('change', (e) => { opts[k] = e.target.checked; if (WORLD && mode === 'live') WORLD.cfg[k] = e.target.checked; });
+for (const [k, [s, f]] of Object.entries(SLIDERS)) $(k).addEventListener('input', () => { const v = +$(k).value; $(k + 'V').textContent = f(v); opts[k] = v * s; if (mode === 'live') tell({ cmd: 'cfg', k, v: v * s }); });
+for (const k of TOGGLES) $(k).addEventListener('change', (e) => { opts[k] = e.target.checked; if (mode === 'live') tell({ cmd: 'cfg', k, v: e.target.checked }); });
 $('rulesBtn').addEventListener('click', () => { const open = $('rules').hidden; $('rules').hidden = !open; $('rulesBtn').setAttribute('aria-expanded', String(open)); $('rulesBtn').textContent = open ? 'Rules ▴' : 'Rules ▾'; });
 function advance() {
-  if (mode === 'live') { step(WORLD); const f = frame(WORLD); pushFrame(f); for (const [s, b] of f.arcs) arcs.push({ s, b, age: 0 }); return true; }
+  if (mode === 'live') { tell({ cmd: 'step' }); return false; }
   if (cursor < FRAMES.length - 1) { cursor++; for (const [s, b] of FRAMES[cursor].arcs) arcs.push({ s, b, age: 0 }); return true; }
   setPlay(false); return false;
 }
 function loop(ts) {
   const dt = Math.min(0.1, (ts - lastT) / 1000 || 0); lastT = ts;
   let ran = false;
-  if (playing) { acc += dt * 3 * speed; while (acc >= 1) { if (!advance()) { acc = 0; break; } acc -= 1; ran = true; } }
+  if (mode === 'live') { ran = dirty; dirty = false; } // the worker sets the pace
+  else if (playing) { acc += dt * 3 * speed; while (acc >= 1) { if (!advance()) { acc = 0; break; } acc -= 1; ran = true; } }
   drawFloor();
   if (ran && ts - chartT > 120) { drawCharts(); chartT = ts; }
-  if (ran && ts - panelT > 300) { drawPanels(); panelT = ts; }
+  if (ran && ts - panelT > 500) { drawPanels(); panelT = ts; }
   requestAnimationFrame(loop);
 }
-function redrawAll() { $('stratLegend').innerHTML = lanes().map((i) => `<span><i style="background:${ARCH[i].color}"></i>${ARCH[i].label}</span>`).join(''); drawFloor(); drawCharts(); drawPanels(); libId = cur().hot[0]?.[0] ?? 0; $('libPick').value = libId; drawLibrary(); }
+function redrawAll() { $('stratLegend').innerHTML = GROUPS.map((g) => `<span><i style="background:${g.color}"></i>${g.label}</span>`).join(''); drawFloor(); drawCharts(); drawPanels(); libId = cur().hot[0]?.[0] ?? 0; $('libPick').value = libId; drawLibrary(); }
 $('play').addEventListener('click', () => setPlay(!playing));
-$('step').addEventListener('click', () => { setPlay(false); advance(); drawCharts(); drawPanels(); });
+$('step').addEventListener('click', () => { setPlay(false); advance(); if (mode === 'replay') { drawCharts(); drawPanels(); } });
 $('reset').addEventListener('click', () => { if (mode === 'replay') { cursor = 0; arcs = []; redrawAll(); return; } opts.seed = Number($('seed').value) || 88; startLive(); });
 $('seed').addEventListener('change', () => { opts.seed = Number($('seed').value) || 88; if (mode === 'live') startLive(); });
 $('preset').addEventListener('change', (e) => { presetKey = e.target.value; opts = { seed: opts.seed }; startLive(); });
@@ -420,32 +457,37 @@ $('runFile').addEventListener('change', async (e) => {
   try { const run = JSON.parse(await file.text()); if (!run.frames?.length) throw new Error('no frames'); startReplay(run); }
   catch (err) { $('hyp').innerHTML = `<b>Not a sandbox run.</b> Pick a run.json from <span class="mono">sandbox/runs/</span> (${esc(err.message)}).`; }
 });
-document.querySelectorAll('[data-speed]').forEach((b) => b.addEventListener('click', () => { speed = Number(b.dataset.speed); document.querySelectorAll('[data-speed]').forEach((o) => o.setAttribute('aria-pressed', String(o === b))); }));
+document.querySelectorAll('[data-speed]').forEach((b) => b.addEventListener('click', () => { speed = Number(b.dataset.speed); tell({ cmd: 'speed', v: speed }); document.querySelectorAll('[data-speed]').forEach((o) => o.setAttribute('aria-pressed', String(o === b))); }));
 Object.assign(COL, { chalk: css('--chalk'), muted: css('--muted'), faint: css('--faint'), gold: css('--gold'), panel: css('--panel') });
 
 
 /* ---------- Stock-market desk: selection, tape, watchlist, main chart, detail, account ---------- */
 let SEL = { type: 'market' }, ACCT = null, TF = 52, CMODE = 'line', wsortKey = 'vol', wq = '';
-const cfgNow = () => (mode === 'replay' ? RUN.config : WORLD.cfg);
-function select(s) { SEL = s; $('toMarket').hidden = s.type === 'market'; if (s.type === 'card') { libId = s.id; $('libPick').value = s.id; drawLibrary(); } drawMain(); drawDetail(); drawWatch(); }
-function selectBot(id) { ACCT = id; SEL = { type: 'bot', id }; $('toMarket').hidden = false; drawMain(); drawDetail(); drawAcct(); }
+const cfgNow = () => (mode === 'replay' ? RUN.config : LIVECFG || {});
+function select(s) { SEL = s; if (mode === 'live') sendSel(); $('toMarket').hidden = s.type === 'market'; if (s.type === 'card') { libId = s.id; $('libPick').value = s.id; drawLibrary(); } drawMain(); drawDetail(); drawWatch(); }
+function selectBot(id) { ACCT = id; SEL = { type: 'bot', id }; if (mode === 'live') sendSel(); $('toMarket').hidden = false; drawMain(); drawDetail(); drawAcct(); }
 $('toMarket').addEventListener('click', () => select({ type: 'market' }));
 document.querySelectorAll('#tf [data-tf]').forEach((b) => b.addEventListener('click', () => { TF = +b.dataset.tf; document.querySelectorAll('#tf [data-tf]').forEach((o) => o.setAttribute('aria-pressed', String(o === b))); drawMain(); }));
 document.querySelectorAll('#cmode [data-m]').forEach((b) => b.addEventListener('click', () => { CMODE = b.dataset.m; document.querySelectorAll('#cmode [data-m]').forEach((o) => o.setAttribute('aria-pressed', String(o === b))); drawMain(); }));
 $('wsort').addEventListener('change', (e) => { wsortKey = e.target.value; drawWatch(); });
 $('wfilter').addEventListener('input', (e) => { wq = e.target.value.trim().toLowerCase(); drawWatch(); });
 
-// Card state now (live: the world; replay: the frame's price vector)
+// A player's state now (live: the world; replay: the frame's price vector). His price is what his cards trade for,
+// brought back to a Prizm Base equivalent; his value is his Prizm Base card's hidden value.
 function cardNow(id) {
-  if (mode === 'live') { const c = WORLD.cards[id]; return { P: c.P, F: c.F, circ: c.circ, pool: c.pool, chg: ret4(c.Ph), vol4: c.volH.slice(-4).reduce((a, b) => a + b, 0), spark: c.Ph.slice(-24) }; }
-  const P = FRAMES[cursor].prices?.[id] ?? null, back = FRAMES[Math.max(0, cursor - 4)].prices?.[id];
-  let F = null; for (let i = cursor; i >= 0; i--) if (FRAMES[i].values) { F = FRAMES[i].values[id]; break; }
-  let vol4 = 0; for (let i = Math.max(0, cursor - 3); i <= cursor; i++) vol4 += FRAMES[i].vol?.[id] || 0;
-  const spark = []; for (let i = Math.max(0, cursor - 23); i <= cursor; i++) spark.push(FRAMES[i].prices?.[id]);
-  return { P, F, circ: null, pool: null, chg: P != null && back ? P / back - 1 : 0, vol4, spark };
+  const at = ix(), fr = FRAMES[at]; if (!fr) return { P: null };
+  const P = fr.prices?.[id] ?? null, back = FRAMES[Math.max(0, at - 4)].prices?.[id];
+  let F = null; for (let i = at; i >= 0; i--) if (FRAMES[i].values) { F = FRAMES[i].values[id]; break; }
+  let vol4 = 0; for (let i = Math.max(0, at - 3); i <= at; i++) vol4 += FRAMES[i].vol?.[id] || 0;
+  const spark = []; for (let i = Math.max(0, at - 23); i <= at; i++) spark.push(FRAMES[i].prices?.[id]);
+  return { P, F, circ: fr.circ?.[id] ?? null, pool: fr.pool?.[id] ?? null, chg: P != null && back ? P / back - 1 : 0, vol4, spark };
 }
 const ret4 = (h) => (h.length > 4 ? h[h.length - 1] / h[h.length - 5] - 1 : 0);
 const chgSpan = (x) => `<span class="${x >= 0 ? 'up' : 'down'}">${x >= 0 ? '▲' : '▼'} ${(Math.abs(x) * 100).toFixed(1)}%</span>`;
+const mktMult = (mid) => FINISH_MULTS[mid & 3] * DESIGN_MULTS[(mid >> 2) & 3];
+const mktLabel = (mid) => { const p = LIBRARY.players[mid >> 4]; return `${p.pos} ${p.name} · ${FINISHES[mid & 3]} ${DESIGNS[(mid >> 2) & 3]}`; };
+const ovrOf = (id) => FRAMES[ix()]?.ovr?.[id] ?? LIBRARY.players[id].ovr ?? 60;
+const oddsOf = (id) => { const c = cfgNow(); return C(0.5 + (ovrOf(id) - 80) / 50, c.walkMin ?? 0.15, c.walkMax ?? 0.85); };
 
 function drawTape() {
   const m = cur().movers; if (!m) { $('tapeTrack').innerHTML = ''; return; }
@@ -457,7 +499,7 @@ function drawWatch() {
   const rows = LIBRARY.players.map((p, id) => ({ id, p, ...cardNow(id) })).filter((r) => r.P != null && (!wq || r.p.name.toLowerCase().includes(wq) || r.p.pos.toLowerCase() === wq));
   const by = { vol: (a, b) => b.vol4 - a.vol4, up: (a, b) => b.chg - a.chg, down: (a, b) => a.chg - b.chg, cap: (a, b) => b.P * (b.circ ?? 1) - a.P * (a.circ ?? 1), rich: (a, b) => b.P / b.F - a.P / a.F, cheap: (a, b) => a.P / a.F - b.P / b.F }[wsortKey];
   rows.sort(by);
-  $('watch').innerHTML = rows.slice(0, 80).map((r) => `<button type="button" class="wrow" role="option" data-card="${r.id}" aria-selected="${SEL.type === 'card' && SEL.id === r.id}"><b>${r.p.pos} ${esc(r.p.name)}</b><span class="px">${fmt(r.P)}</span><small>${esc(teamShort(r.p.team))} · ${r.vol4} trades · ${(r.P / r.F).toFixed(2)}×</small><span class="chg">${chgSpan(r.chg)}</span></button>`).join('');
+  $('watch').innerHTML = rows.slice(0, 80).map((r) => `<button type="button" class="wrow" role="option" data-card="${r.id}" aria-selected="${SEL.type === 'card' && SEL.id === r.id}"><b>${r.p.pos} ${esc(r.p.name)}</b><span class="px">${fmt(r.P)}</span><small>${esc(teamShort(r.p.team))} · OVR ${ovrOf(r.id)} · ${r.vol4} trades · ${(r.P / r.F).toFixed(2)}×</small><span class="chg">${chgSpan(r.chg)}</span></button>`).join('');
 }
 
 // Bars for the main chart: [{t, o, h, l, c, v, val}]
@@ -467,13 +509,13 @@ function barsFor(sel) {
   // cards entering circulation don't look like rising prices
   if (sel.type === 'market') { for (let i = 0; i < n; i++) { const f = FRAMES[i], prev = FRAMES[i - 1]?.h.p ?? f.h.p, c = f.h.p; out.push({ t: f.t, o: prev, h: Math.max(prev, c), l: Math.min(prev, c), c, v: f.h.trades, val: f.h.f }); } return out; }
   if (sel.type === 'card') {
-    if (mode === 'live') { const c = WORLD.cards[sel.id], o = c.ohlc || []; return o.map((x, i) => ({ t: WORLD.t - o.length + 1 + i, o: x[0], h: x[1], l: x[2], c: x[3], v: x[4], val: c.F })); }
     let val = null; for (let i = 0; i < n; i++) { const f = FRAMES[i]; if (f.values) val = f.values[sel.id]; const c = f.prices?.[sel.id]; if (c == null) continue; const prev = FRAMES[i - 1]?.prices?.[sel.id] ?? c; out.push({ t: f.t, o: prev, h: Math.max(prev, c), l: Math.min(prev, c), c, v: f.vol?.[sel.id] || 0, val }); }
     return out;
   }
   for (let i = 0; i < n; i++) { const f = FRAMES[i], w = botMap(f).get(sel.id); if (w == null) continue; const pw = FRAMES[i - 1] ? botMap(FRAMES[i - 1]).get(sel.id) ?? w : w; out.push({ t: f.t, o: pw, h: Math.max(pw, w), l: Math.min(pw, w), c: w, v: 0, val: f._med }); }
   return out;
 }
+
 const MAIN = {};
 function drawMain() {
   const sel = SEL, all = barsFor(sel), bars = TF ? all.slice(-TF) : all;
@@ -481,8 +523,8 @@ function drawMain() {
   const vc = $('volc'), [vx, vW, vH] = fit(vc); vx.clearRect(0, 0, vW, vH);
   // Header
   let name = 'Vault index', sub = 'every player, fixed basket · start = 100', valLabel = 'Hidden value';
-  if (sel.type === 'card') { const p = LIBRARY.players[sel.id]; name = `${p.pos} ${p.name}`; sub = `${teamShort(p.team)} · ${p.family || ''}`; }
-  if (sel.type === 'bot') { const b = cur().bots.find((b) => b[0] === sel.id); name = b ? b[2] : 'Bot'; sub = b ? `${ARCH[b[1]].label} · ${SOC[b[5]]} · worth` : 'not in the market now'; valLabel = 'Median bot'; }
+  if (sel.type === 'card') { const p = LIBRARY.players[sel.id]; name = `${p.pos} ${p.name}`; sub = `${teamShort(p.team)} · OVR ${ovrOf(sel.id)} · value up-odds ${pct(oddsOf(sel.id))} a week · price shown as Prizm Base`; }
+  if (sel.type === 'bot') { const b = cur().bots.find((b) => b[0] === sel.id); name = b ? b[2] : 'Bot'; sub = b ? `${kindOf(b)} · ${GROUPS[b[17] ?? 2].label} · worth` : 'not in the market now'; valLabel = 'Median bot'; }
   $('ch-name').textContent = name; $('chSub').textContent = sub;
   const last = bars[bars.length - 1], first = bars[0];
   $('chLast').textContent = last ? fmt(last.c) : '–'; $('chChg').innerHTML = last && first ? chgSpan(last.c / first.o - 1) + ` <span class="k">${TF ? TF + 'W' : 'all'}</span>` : '';
@@ -530,66 +572,67 @@ function drawDetail() {
     return;
   }
   if (SEL.type === 'card') {
-    const id = SEL.id, p = LIBRARY.players[id], now = cardNow(id), c = cfgNow();
-    let book = '<p class="note">Order book shows in live mode.</p>', tape = '<p class="note">Time &amp; sales shows in live mode.</p>', holders = '';
-    if (mode === 'live') {
-      const card = WORLD.cards[id], bk = card.book || { bids: [], asks: [] };
-      const rows = Math.max(bk.bids.length, bk.asks.length);
-      book = rows ? `<table class="book"><thead><tr><th>Bidder</th><th class="num">Bid</th><th class="num">Ask</th><th>Seller</th></tr></thead><tbody>${Array.from({ length: rows }, (_, i) => `<tr><td>${esc(bk.bids[i]?.[1] ?? '')}</td><td class="num up">${bk.bids[i] ? fmt(bk.bids[i][0]) : ''}</td><td class="num down">${bk.asks[i] ? fmt(bk.asks[i][0]) : ''}</td><td>${esc(bk.asks[i]?.[1] ?? '')}</td></tr>`).join('')}</tbody></table>` : '<p class="note">No orders this week.</p>';
-      const tr = (WORLD.cardLog?.get(p.key) || []).filter((j) => j.type === 'trade' || j.type === 'auctionResult').slice(-12).reverse();
-      tape = tr.length ? `<table class="book"><thead><tr><th>Wk</th><th>Buyer</th><th>Seller</th><th class="num">Price</th></tr></thead><tbody>${tr.map((j) => `<tr><td class="k">${j.t}</td><td>${esc(j.buyer || j.winner || '–')}</td><td>${esc(j.seller)}</td><td class="num">${fmt(j.price)}</td></tr>`).join('')}</tbody></table>` : '<p class="note">No trades yet.</p>';
-      const hs = WORLD.bots.filter((b) => b.h.get(id)).map((b) => [b, b.h.get(id)]).sort((a, b) => b[1] - a[1]).slice(0, 5);
-      holders = `<div style="grid-column:1/-1"><h3>Top holders</h3><table class="book"><tbody>${hs.map(([b, q]) => `<tr data-bot="${b.id}"><td><span class="sw" style="background:${ARCH[b.a].color}"></span>${esc(b.name)}</td><td class="num">${q}</td><td class="num k">${pct(q / Math.max(1, card.circ))}</td><td class="num k">avg ${fmt(avgCost(b, id))}</td></tr>`).join('') || '<tr><td class="k">Nobody</td></tr>'}</tbody></table></div>`;
-    }
-    $('detail').innerHTML = `<div class="stats">${tile('Last', fmt(now.P))}${tile('Hidden value', fmt(now.F))}${tile('Price ÷ value', now.F ? (now.P / now.F).toFixed(2) + '×' : '–')}${tile('4-wk change', chgSpan(now.chg))}${now.circ != null ? tile('In circulation', now.circ) + tile('Left in pool', now.pool) : ''}${c.store ? tile('Store price', fmt(now.F * (1 + c.storePremium))) : ''}${tile('4-wk trades', now.vol4)}</div><div><h3>Order book</h3>${book}</div><div><h3>Time &amp; sales</h3>${tape}</div>${holders}`;
+    const id = SEL.id, p = LIBRARY.players[id], now = cardNow(id), odds = oddsOf(id);
+    // His 16 card markets: design × finish, each with its own price; and his one-of-a-kind cards
+    let grid = '', items = '', tape = '<p class="note">Time &amp; sales shows in live mode.</p>', holders = '';
+    const D = mode === 'live' && LIVE.p?.id === id ? LIVE.p : null;
+    const cell = (d, fi) => { const mid = id * 16 + d * 4 + fi; if (D) { const g = D.grid[d * 4 + fi], m = { P: g[0], F: g[1], circ: g[2] }; return `<td class="num" title="value ${fmt(m.F)} · ${m.circ} out">${m.circ ? fmt(m.P) : '<span class="k">' + fmt(m.P) + '</span>'}<br><span class="k">${m.circ} out</span></td>`; } return `<td class="num">${now.P == null ? '–' : fmt(now.P * mktMult(mid))}</td>`; };
+    grid = `<div style="grid-column:1/-1"><h3>His 16 cards</h3><div class="tablewrap"><table class="book"><thead><tr><th></th>${FINISHES.map((x) => `<th class="num">${x}</th>`).join('')}</tr></thead><tbody>${[0, 1, 2, 3].map((d) => `<tr><td>${DESIGNS[d]}</td>${[0, 1, 2, 3].map((fi) => cell(d, fi)).join('')}</tr>`).join('')}</tbody></table></div><p class="note">${D ? 'Price of each card market; grey = none in circulation (quoted from the player\'s price).' : 'Replays record one price per player; each card shown at that price × its rarity premium.'}</p></div>`;
+    if (D) {
+      items = `<div style="grid-column:1/-1"><h3>One of a kind (${D.nItems})</h3>${D.items.length ? `<div class="tablewrap"><table class="book"><tbody>${D.items.slice(0, 10).map(([label, owner, oid, mark]) => `<tr data-bot="${oid}"><td>${esc(label.split(' · ').slice(1).join(' · '))}</td><td>${esc(owner)}</td><td class="num">${fmt(mark)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="note">None pulled yet.</p>'}</div>`;
+      tape = D.tape.length ? `<table class="book"><thead><tr><th>Wk</th><th>Card</th><th>Buyer</th><th class="num">Price</th></tr></thead><tbody>${D.tape.map((j) => `<tr><td class="k">${j.t}</td><td class="k">${esc(String(j.card).split('|').slice(1).join(' ') || String(j.card).split(' · ').slice(1).join(' · '))}</td><td>${esc(j.buyer || '–')}</td><td class="num">${fmt(j.price)}</td></tr>`).join('')}</tbody></table>` : '<p class="note">No trades yet.</p>';
+      holders = `<div style="grid-column:1/-1"><h3>Top holders</h3><table class="book"><tbody>${D.holders.map(([bid, bname, grp, q, v]) => `<tr data-bot="${bid}"><td><span class="sw" style="background:${GROUPS[grp].color}"></span>${esc(bname)}</td><td class="num">${q} cards</td><td class="num k">${fmt(v)}</td></tr>`).join('') || '<tr><td class="k">Nobody</td></tr>'}</tbody></table></div>`;
+    } else if (mode === 'live') { items = '<p class="note" style="grid-column:1/-1">Loading his cards…</p>'; }
+    $('detail').innerHTML = `<div class="stats">${tile('Price (Prizm Base)', fmt(now.P))}${tile('Hidden value', fmt(now.F))}${tile('Price ÷ value', now.F ? (now.P / now.F).toFixed(2) + '×' : '–')}${tile('4-wk change', chgSpan(now.chg))}${tile('OVR', ovrOf(id))}${tile('Value up-odds / wk', pct(odds))}${now.circ != null ? tile('Cards out', now.circ) + tile('Left in pool', now.pool) : ''}${tile('4-wk trades', now.vol4)}</div>${grid}${items}<div style="grid-column:1/-1"><h3>Time &amp; sales</h3>${tape}</div>${holders}`;
     return;
   }
   $('detail').innerHTML = '<p class="note">The account panel shows this bot\'s positions and activity.</p>';
 }
 function botLogFor(name) {
-  if (mode === 'live') return (WORLD.botLog.get(name) || []).slice(-50).reverse();
+  if (mode === 'live') return LIVE.b?.log || [];
   const out = []; for (let i = cursor; i >= 0 && out.length < 50; i--) for (const j of (FRAMES[i].aiLog || []).slice().reverse()) { if (Object.values(j).includes(name)) out.push(j); if (out.length >= 50) break; }
   return out;
 }
 function drawAcct() {
   const f = cur(); if (!f) return;
-  if (ACCT == null || !f.bots.some((b) => b[0] === ACCT)) { const pick = f.bots.filter((b) => b[9]).sort((a, b) => b[3] - a[3])[0] || f.bots.slice().sort((a, b) => b[3] - a[3])[0]; ACCT = pick[0]; }
-  const b = f.bots.find((x) => x[0] === ACCT), [id, a, name, w, n, soc, flaggedBy, cash, notes, isAi, gen, model] = b;
+  if (ACCT == null || !f.bots.some((b) => b[0] === ACCT)) { const pick = f.bots.filter((b) => b[9]).sort((a, b) => b[3] - a[3])[0] || f.bots.slice().sort((a, b) => b[3] - a[3])[0]; ACCT = pick[0]; if (mode === 'live') sendSel(); }
+  const b = f.bots.find((x) => x[0] === ACCT), [id, , name, w, n, soc, flaggedBy, cash, notes, isAi, gen, model] = b;
   const rank = f.bots.slice().sort((x, y) => y[3] - x[3]).findIndex((x) => x[0] === id) + 1;
   let positions = [], realized = null, extra = '', debt = null;
-  if (mode === 'live') {
-    const bot = WORLD.bots.find((x) => x.id === id);
-    realized = bot.stats.realized || 0; debt = bot.debt || 0;
-    positions = [...bot.h].map(([cid, q]) => { const c = WORLD.cards[cid], ac = avgCost(bot, cid); return { cid, q, ac, P: c.P, pnl: ac == null ? null : (c.P - ac) * q }; });
-    const gw = bot.g?.w; extra = (gw ? `<div class="genome">${SIGNALS.map((k, i) => `<span title="${k}"><i style="width:${Math.round(gw[k] * 100)}%;background:${ARCH[i].color}"></i>${k} ${Math.round(gw[k] * 100)}</span>`).join('')}<span><i style="width:${Math.min(100, Math.round(bot.g.lev * 60))}%;background:#e66767"></i>borrow ${bot.g.lev.toFixed(2)}</span><span><i style="width:${Math.round(bot.g.lendShare * 160)}%;background:#4fd18b"></i>lend ${bot.g.lendShare.toFixed(2)}</span></div>` : '') + `<div class="note">Lent ${fmt(bot.lent || 0)} · Swaps ${bot.stats.shared} · thefts ${bot.stats.stolen} (caught ${bot.stats.caught}) · researched ${bot.stats.researched} · ${bot.passes.length} passes · ${bot.tickets.length} tickets${bot.memo ? `<br>Memo: ${esc(bot.memo).slice(0, 200)}` : ''}</div>`;
+  if (mode === 'live' && LIVE.b?.id === id) {
+    const bot = LIVE.b;
+    realized = bot.realized; debt = bot.debt;
+    positions = bot.positions.map(([pid, label, q, ac, P]) => ({ pid, label, q, ac, P, pnl: ac == null ? null : (P - ac) * q }));
+    const g = bot.g, bar = (label, v, max, col) => `<span title="${label}"><i style="width:${Math.round(C(v / max, 0, 1) * 100)}%;background:${col}"></i>${label}</span>`;
+    extra = (g ? `<div class="genome">${bar(`cash target ${pct(g.keep)}`, g.keep, 0.6, '#3987e5')}${bar(`borrow ${g.lev.toFixed(2)}×`, g.lev, 1.5, '#e66767')}${bar(`lend ${pct(g.lendShare)}`, g.lendShare, 0.7, '#4fd18b')}${bar(`pass bid ${fmt(g.passBid)}`, g.passBid, 30 * (cfgNow().coinScale || 1), '#c98500')}${bar(`ticket bid ${fmt(g.ticketBid)}`, g.ticketBid, 10 * (cfgNow().coinScale || 1), '#9085e9')}</div>` : '') + `<div class="note">Lent ${fmt(bot.lent)} · Swaps ${bot.stats.shared} · thefts ${bot.stats.stolen} (caught ${bot.stats.caught}) · researched ${bot.stats.researched} · ${bot.passes} passes · ${bot.tickets} tickets${bot.games ? ` · enters ${bot.games} games` : ''}${bot.memo ? `<br>Memo: ${esc(bot.memo).slice(0, 200)}` : ''}</div>`;
   } else if (isAi && f.aiDetail?.[name]) {
     const d = f.aiDetail[name]; realized = d.realized; debt = d.debt ?? null;
-    positions = d.positions.map(([cid, q, ac]) => { const P = f.prices?.[cid] ?? 0; return { cid, q, ac, P, pnl: (P - ac) * q }; });
+    positions = d.positions.map(([cid, q, ac]) => { const P = (f.prices?.[cid >> 4] ?? 0) * mktMult(cid); return { cid, pid: cid >> 4, label: mktLabel(cid), q, ac, P, pnl: (P - ac) * q }; });
     const m = RUN.memos?.[name] && Object.entries(RUN.memos[name]).filter(([t]) => +t <= f.t).pop()?.[1];
     extra = m ? `<div class="note">Memo: ${esc(m).slice(0, 240)}</div>` : '';
   }
   positions.sort((x, y) => y.q * y.P - x.q * x.P);
   const unreal = positions.reduce((s, p) => s + (p.pnl || 0), 0);
   const log = botLogFor(name).slice(0, 40).map((j) => { const r = ACT[j.type]?.(j); return r ? `<div><time>W${j.t}</time><span class="k">${r[0]}</span> ${r[1]}</div>` : ''; }).join('');
-  $('acct').innerHTML = `<div class="who"><b><span class="sw" style="background:${ARCH[a].color}"></span>${esc(name)}</b><span class="note">${ARCH[a].label}${model ? ` · ${esc(model)}` : ''} · ${SOC[soc]} · gen ${gen} · rank ${rank}/${f.bots.length}</span></div>
-  <div class="stats">${tile('Worth', fmt(w))}${tile('Cash', fmt(cash))}${tile('Realized', realized == null ? '–' : `<span class="${realized >= 0 ? 'up' : 'down'}">${realized >= 0 ? '+' : ''}${fmt(realized)}</span>`)}${tile('Unrealized', positions.length ? `<span class="${unreal >= 0 ? 'up' : 'down'}">${unreal >= 0 ? '+' : ''}${fmt(unreal)}</span>` : '–')}${tile('Loan', debt == null ? '–' : fmt(debt))}${tile('Cards', n)}${tile('Notes', notes)}${tile('Flagged by', flaggedBy)}</div>
+  $('acct').innerHTML = `<div class="who"><b><span class="sw" style="background:${grpColor(b)}"></span>${esc(name)}</b><span class="note">${kindOf(b)}${model ? ` · ${esc(model)}` : ''} · ${GROUPS[b[17] ?? 2].label} · ${SOC[soc]} · gen ${gen} · rank ${rank}/${f.bots.length}</span></div>
+  <div class="stats">${tile('Worth', fmt(w))}${tile('Cash', fmt(cash))}${tile('Realized', realized == null ? '–' : `<span class="${realized >= 0 ? 'up' : 'down'}">${realized >= 0 ? '+' : ''}${fmt(realized)}</span>`)}${tile('Unrealized', positions.length ? `<span class="${unreal >= 0 ? 'up' : 'down'}">${unreal >= 0 ? '+' : ''}${fmt(unreal)}</span>` : '–')}${tile('Loan', debt == null ? '–' : fmt(debt))}${tile('Cards', n)}${tile('Notes', notes)}${tile('Cards\' avg OVR', b[15] ?? '–')}</div>
   <canvas id="acctSpark" aria-label="${esc(name)} worth over time"></canvas>${extra}
   <h3 style="margin:6px 0 0;font:800 13px/1 var(--display);text-transform:uppercase;letter-spacing:.04em">Positions</h3>
-  ${positions.length ? `<div class="tablewrap"><table><thead><tr><th>Card</th><th class="num">Qty</th><th class="num">Avg</th><th class="num">Last</th><th class="num">P&amp;L</th></tr></thead><tbody>${positions.slice(0, 25).map((p) => `<tr data-card="${p.cid}"><td>${LIBRARY.players[p.cid].pos} ${esc(LIBRARY.players[p.cid].name)}</td><td class="num">${p.q}</td><td class="num">${fmt(p.ac)}</td><td class="num">${fmt(p.P)}</td><td class="num ${(p.pnl || 0) >= 0 ? 'up' : 'down'}">${p.pnl == null ? '–' : (p.pnl >= 0 ? '+' : '') + fmt(p.pnl)}</td></tr>`).join('')}</tbody></table></div>` : `<p class="note">${mode === 'replay' ? 'Replays record positions for AI bots only.' : 'No cards.'}</p>`}
+  ${positions.length ? `<div class="tablewrap"><table><thead><tr><th>Card</th><th class="num">Qty</th><th class="num">Avg</th><th class="num">Last</th><th class="num">P&amp;L</th></tr></thead><tbody>${positions.slice(0, 25).map((p) => `<tr data-card="${p.pid}"><td>${esc(p.label)}</td><td class="num">${p.q}</td><td class="num">${fmt(p.ac)}</td><td class="num">${fmt(p.P)}</td><td class="num ${(p.pnl || 0) >= 0 ? 'up' : 'down'}">${p.pnl == null ? '–' : (p.pnl >= 0 ? '+' : '') + fmt(p.pnl)}</td></tr>`).join('')}</tbody></table></div>` : `<p class="note">${mode === 'replay' ? 'Replays record positions for AI bots only.' : 'No cards.'}</p>`}
   <h3 style="margin:6px 0 0;font:800 13px/1 var(--display);text-transform:uppercase;letter-spacing:.04em">Activity</h3>
   <div class="log">${log || '<p class="note">Nothing recorded yet.</p>'}</div>`;
   const ws = []; for (let i = Math.max(0, nNow() - 80); i < nNow(); i++) ws.push(botMap(FRAMES[i]).get(id) ?? null);
   const cv = $('acctSpark'), [x, Wd, Ht] = fit(cv), vals = ws.filter((v) => v != null);
-  if (vals.length > 1) { const lo = Math.min(...vals), hi = Math.max(...vals), sp = hi - lo || 1; x.beginPath(); let on = false; ws.forEach((v, k) => { if (v == null) { on = false; return; } const px = (k / (ws.length - 1)) * (Wd - 4) + 2, py = Ht - 4 - ((v - lo) / sp) * (Ht - 8); on ? x.lineTo(px, py) : x.moveTo(px, py); on = true; }); x.strokeStyle = ARCH[a].color; x.lineWidth = 2; x.stroke(); }
+  if (vals.length > 1) { const lo = Math.min(...vals), hi = Math.max(...vals), sp = hi - lo || 1; x.beginPath(); let on = false; ws.forEach((v, k) => { if (v == null) { on = false; return; } const px = (k / (ws.length - 1)) * (Wd - 4) + 2, py = Ht - 4 - ((v - lo) / sp) * (Ht - 8); on ? x.lineTo(px, py) : x.moveTo(px, py); on = true; }); x.strokeStyle = grpColor(b); x.lineWidth = 2; x.stroke(); }
 }
 function drawCons() {
-  const n = nNow(), from = Math.max(0, n - 20), ln = lanes();
+  const n = nNow(), from = Math.max(0, n - 20);
   const sum = (k, a) => { let s = 0; for (let i = from; i < n; i++) s += FRAMES[i].flow?.[k]?.[a] || 0; return s; };
-  const rows = ln.map((a) => ({ a, real: sum('realized', a), net: sum('net', a), trips: sum('trips', a) }));
+  const rows = GROUPS.map((g, a) => ({ g, real: sum('realized', a), net: sum('net', a), trips: sum('trips', a) }));
   const max = Math.max(1, ...rows.map((r) => Math.abs(r.real)));
-  $('pnl').tBodies[0].innerHTML = rows.map((r) => `<tr><td><span class="sw" style="background:${ARCH[r.a].color}"></span>${ARCH[r.a].label}</td><td class="num ${r.real >= 0 ? 'up' : 'down'}">${r.real >= 0 ? '+' : ''}${fmt(r.real)}</td><td class="bar"><span class="${r.real < 0 ? 'neg' : ''}" style="width:${(Math.abs(r.real) / max) * 100}%"></span></td><td class="num">${r.net >= 0 ? '+' : ''}${fmt(r.net)}</td><td class="num">${r.trips}</td></tr>`).join('');
-  const rt = rows.find((r) => r.a === 3), c0 = H.cashTop.find((v) => v != null), c1 = H.cashTop[n - 1];
-  $('consNote').textContent = `${rt ? `The retail herd realized ${rt.real >= 0 ? '+' : ''}${fmt(rt.real)} coins over 20 weeks. ` : ''}The richest 10% hold ${pct(c1)} of all cash (${pct(c0)} at the start). Quick flips: sold within 12 weeks of buying.`;
+  $('pnl').tBodies[0].innerHTML = rows.map((r) => `<tr><td><span class="sw" style="background:${r.g.color}"></span>${r.g.label}</td><td class="num ${r.real >= 0 ? 'up' : 'down'}">${r.real >= 0 ? '+' : ''}${fmt(r.real)}</td><td class="bar"><span class="${r.real < 0 ? 'neg' : ''}" style="width:${(Math.abs(r.real) / max) * 100}%"></span></td><td class="num">${r.net >= 0 ? '+' : ''}${fmt(r.net)}</td><td class="num">${r.trips}</td></tr>`).join('');
+  const c0 = H.cashTop.find((v) => v != null), c1 = H.cashTop[n - 1];
+  $('consNote').textContent = `Groups are by worth each week. The richest 10% hold ${pct(c1)} of all cash (${pct(c0)} at the start). Quick flips: sold within 12 weeks of buying.`;
 }
 
 /* ---------- Start ---------- */
