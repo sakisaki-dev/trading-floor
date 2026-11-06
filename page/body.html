@@ -39,6 +39,9 @@
     <div class="slider"><label for="cardLendFee">Card lending fee <b id="cardLendFeeV"></b></label><input id="cardLendFee" type="range" min="0" max="200" step="5" value="50"></div>
     <div class="slider"><label for="shortMargin">Short collateral <b id="shortMarginV"></b></label><input id="shortMargin" type="range" min="10" max="150" step="5" value="50"></div>
     <div class="slider"><label for="cardLoanWeeks">Return borrowed cards within <b id="cardLoanWeeksV"></b></label><input id="cardLoanWeeks" type="range" min="2" max="52" step="1" value="12"></div>
+    <div class="slider"><label for="nnMutation">Mutation per weight <b id="nnMutationV"></b></label><input id="nnMutation" type="range" min="0" max="50" step="1" value="15"></div>
+    <div class="slider"><label for="nnReset">Weights redrawn <b id="nnResetV"></b></label><input id="nnReset" type="range" min="0" max="10" step="0.5" value="1"></div>
+    <div class="slider"><label for="evolveShare">Worst copy the best <b id="evolveShareV"></b></label><input id="evolveShare" type="range" min="0" max="40" step="1" value="10"></div>
     <div class="slider"><label for="packEdge">Pack edge <b id="packEdgeV"></b></label><input id="packEdge" type="range" min="0" max="60" step="5" value="25"></div>
     <div class="slider"><label for="passesPerWeek">Passes / wk <b id="passesPerWeekV"></b></label><input id="passesPerWeek" type="range" min="0" max="6" step="1" value="3"></div>
     <div class="slider"><label for="knowledgeWeeks">Notes last <b id="knowledgeWeeksV"></b></label><input id="knowledgeWeeks" type="range" min="2" max="40" step="1" value="12"></div>
@@ -119,90 +122,15 @@
     </section>
   </div>
 
-  <section class="panel mod" aria-labelledby="g-market">
-    <div class="head"><h2 id="g-market">Market</h2><span class="note">the market as a whole: its index, value, volume and volatility</span></div>
-    <div class="mod__body">
-      <div class="tablewrap"><table class="qtab" data-group="Market"><thead><tr><th>Indicator</th><th class="num">Last</th><th class="num">1W</th><th class="num">52W</th><th class="rng">52-week range</th><th class="sp">52 weeks</th></tr></thead><tbody></tbody></table></div>
-      <div class="mod__side"><div class="fx"><div class="head"><h3>Market value vs hidden value</h3><span class="legend"><span><i class="line" style="background:var(--gold)"></i>Market value</span><span><i class="dash" style="background:var(--chalk)"></i>Hidden value</span></span></div><canvas id="fxMkt" class="ch" aria-label="Market value vs hidden value"></canvas><div class="tip" id="fxMktTip" hidden></div></div><div class="fx"><div class="head"><h3>Premium (market ÷ hidden value − 1)</h3><span class="legend"><span><i class="line" style="background:#9cc7ff"></i>Premium</span></span></div><canvas id="fxPrem" class="ch" aria-label="Premium (market ÷ hidden value − 1)"></canvas><div class="tip" id="fxPremTip" hidden></div></div></div>
-    </div>
-  </section>
-  <section class="panel mod" aria-labelledby="g-breadth">
-    <div class="head"><h2 id="g-breadth">Breadth</h2><span class="note">how many players are rising or falling, not just how much</span></div>
-    <div class="mod__body">
-      <div class="tablewrap"><table class="qtab" data-group="Breadth"><thead><tr><th>Indicator</th><th class="num">Last</th><th class="num">1W</th><th class="num">52W</th><th class="rng">52-week range</th><th class="sp">52 weeks</th></tr></thead><tbody></tbody></table></div>
-      <div class="mod__side"><div class="fx"><div class="head"><h3>Advance–decline line</h3><span class="legend"><span><i class="line" style="background:#26c281"></i>Advancers minus decliners, running total</span></span></div><canvas id="fxAD" class="ch" aria-label="Advance–decline line"></canvas><div class="tip" id="fxADTip" hidden></div></div><div class="minis"><div class="mini"><div class="head"><h3>Top gainers</h3><span class="note">4 weeks</span></div><table id="mvUp"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></div><div class="mini"><div class="head"><h3>Top losers</h3><span class="note">4 weeks</span></div><table id="mvDown"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></div><div class="mini"><div class="head"><h3>New 12-week highs</h3><span class="note" id=mvHiN></span></div><table id="mvHi"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></div><div class="mini"><div class="head"><h3>New 12-week lows</h3><span class="note" id=mvLoN></span></div><table id="mvLo"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></div></div></div>
-    </div>
-  </section>
-  <section class="panel mod" aria-labelledby="g-flow">
-    <div class="head"><h2 id="g-flow">Order flow</h2><span class="note">what bots asked to buy and sell in the weekly market</span></div>
-    <div class="mod__body">
-      <div class="tablewrap"><table class="qtab" data-group="Order flow"><thead><tr><th>Indicator</th><th class="num">Last</th><th class="num">1W</th><th class="num">52W</th><th class="rng">52-week range</th><th class="sp">52 weeks</th></tr></thead><tbody></tbody></table></div>
-      <div class="mod__side"><div class="fx"><div class="head"><h3>Bids vs offers per week</h3><span class="legend"><span><i class="line" style="background:#26c281"></i>Bids</span><span><i class="line" style="background:#ff8a8a"></i>Offers</span></span></div><canvas id="fxFlow" class="ch" aria-label="Bids vs offers per week"></canvas><div class="tip" id="fxFlowTip" hidden></div></div><div class="minis minis--one"><div class="mini"><div class="head"><h3>Most active</h3><span class="note">trades, 4 weeks</span></div><table id="mvAct"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">Volume</th></tr></thead><tbody></tbody></table></div></div></div>
-    </div>
-  </section>
-  <section class="panel mod" aria-labelledby="g-shorts">
-    <div class="head"><h2 id="g-shorts">Short selling</h2><span class="note">borrowed cards sold short, and what it costs to hold them</span></div>
-    <div class="mod__body">
-      <div class="tablewrap"><table class="qtab" data-group="Short selling"><thead><tr><th>Indicator</th><th class="num">Last</th><th class="num">1W</th><th class="num">52W</th><th class="rng">52-week range</th><th class="sp">52 weeks</th></tr></thead><tbody></tbody></table></div>
-      <div class="mod__side"><div class="fx"><div class="head"><h3>Short interest (copies on loan)</h3><span class="legend"><span><i class="line" style="background:#ff8a8a"></i>Short interest</span><span><i class="line" style="background:#9cc7ff"></i>Copies offered to lend</span></span></div><canvas id="fxShort" class="ch" aria-label="Short interest (copies on loan)"></canvas><div class="tip" id="fxShortTip" hidden></div></div><div class="minis minis--one"><div class="mini"><div class="head"><h3>Most shorted</h3><span class="note">copies out on loan</span></div><table id="mvShort"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">Short</th></tr></thead><tbody></tbody></table></div></div></div>
-    </div>
-  </section>
-  <section class="panel mod" aria-labelledby="g-supply">
-    <div class="head"><h2 id="g-supply">Supply</h2><span class="note">new cards from packs, cards in circulation, auctions</span></div>
-    <div class="mod__body">
-      <div class="tablewrap"><table class="qtab" data-group="Supply"><thead><tr><th>Indicator</th><th class="num">Last</th><th class="num">1W</th><th class="num">52W</th><th class="rng">52-week range</th><th class="sp">52 weeks</th></tr></thead><tbody></tbody></table></div>
-      <div class="mod__side"><div class="fx"><div class="head"><h3>Cards out</h3><span class="legend"><span><i class="line" style="background:var(--gold)"></i>Cards in circulation</span></span></div><canvas id="fxCards" class="ch" aria-label="Cards out"></canvas><div class="tip" id="fxCardsTip" hidden></div></div><div class="fx"><div class="head"><h3>New cards and packs per week</h3><span class="legend"><span><i class="line" style="background:var(--gold)"></i>New cards</span><span><i class="line" style="background:#9cc7ff"></i>Packs</span></span></div><canvas id="fxMint" class="ch ch--short" aria-label="New cards and packs per week"></canvas><div class="tip" id="fxMintTip" hidden></div></div></div>
-    </div>
-  </section>
-  <section class="panel mod" aria-labelledby="g-money">
-    <div class="head"><h2 id="g-money">Money</h2><span class="note">where coins come from, where they go, and who holds them</span></div>
-    <div class="mod__body">
-      <div class="tablewrap"><table class="qtab" data-group="Money"><thead><tr><th>Indicator</th><th class="num">Last</th><th class="num">1W</th><th class="num">52W</th><th class="rng">52-week range</th><th class="sp">52 weeks</th></tr></thead><tbody></tbody></table></div>
-      <div class="mod__side"><div class="fx">        <div class="head"><h3 id="ct-h">Cash held by the richest 10%</h3></div>
-        <canvas id="cashTop" class="ch" aria-label="Share of all cash held by the richest 10% of bots"></canvas>
-        <div class="tip" id="cashTopTip" hidden></div>
-      </div><div class="fx">        <div class="head"><h3 id="cons-h">Where the money goes</h3><span class="note">last 20 weeks · bills and interest leave the economy</span></div>
-        <div class="tablewrap"><table id="pnl"><thead><tr><th>Wealth group</th><th class="num">Realized P&amp;L</th><th class="bar"><span class="sr-only">P&amp;L bar</span></th><th class="num">Net cash</th><th class="num">Quick flips</th></tr></thead><tbody></tbody></table></div>
-        <p class="note" id="consNote"></p>
-      </div></div>
-    </div>
-  </section>
-  <section class="panel mod" aria-labelledby="g-credit">
-    <div class="head"><h2 id="g-credit">Credit</h2><span class="note">coins lent between bots, and what borrowing costs</span></div>
-    <div class="mod__body">
-      <div class="tablewrap"><table class="qtab" data-group="Credit"><thead><tr><th>Indicator</th><th class="num">Last</th><th class="num">1W</th><th class="num">52W</th><th class="rng">52-week range</th><th class="sp">52 weeks</th></tr></thead><tbody></tbody></table></div>
-      <div class="mod__side"><div class="fx"><div class="head"><h3>Loans out</h3><span class="legend"><span><i class="line" style="background:var(--gold)"></i>Coins lent</span></span></div><canvas id="fxDebt" class="ch" aria-label="Loans out"></canvas><div class="tip" id="fxDebtTip" hidden></div></div><div class="fx"><div class="head"><h3>Loan rate per week</h3><span class="legend"><span><i class="line" style="background:#9cc7ff"></i>Rate</span></span></div><canvas id="fxRate" class="ch ch--short" aria-label="Loan rate per week"></canvas><div class="tip" id="fxRateTip" hidden></div></div></div>
-    </div>
-  </section>
-  <section class="panel mod" aria-labelledby="g-trust">
-    <div class="head"><h2 id="g-trust">Knowledge and trust</h2><span class="note">research, notes, theft and the flags that follow</span></div>
-    <div class="mod__body">
-      <div class="tablewrap"><table class="qtab" data-group="Knowledge and trust"><thead><tr><th>Indicator</th><th class="num">Last</th><th class="num">1W</th><th class="num">52W</th><th class="rng">52-week range</th><th class="sp">52 weeks</th></tr></thead><tbody></tbody></table></div>
-      <div class="mod__side"><div class="fx">        <div class="head"><h3 id="ac-h">Cost of access</h3><span class="legend"><span><i class="line" style="background:var(--gold)"></i>Research pass</span><span><i class="line" style="background:#9cc7ff"></i>Game ticket</span></span></div>
-        <canvas id="access" class="ch" aria-label="Research pass and game ticket prices in coins"></canvas>
-        <div class="tip" id="accessTip" hidden></div>
-      </div><div class="fx">      <div class="head"><h3 id="nt-h">Notes</h3><span class="legend"><span><i class="line" style="background:#3987e5"></i>Swaps</span><span><i class="line" style="background:#e66767"></i>Thefts</span></span></div>
-      <canvas id="notes" class="ch" aria-label="Note swaps and thefts per week"></canvas>
-      <div class="tip" id="notesTip" hidden></div>
-      <div class="tablewrap"><table id="social"><thead><tr><th>Style</th><th class="num">Bots</th><th class="num">Avg worth</th><th class="num">Flags</th></tr></thead><tbody></tbody></table></div>
-      <p class="note" id="researched"></p>
-    </div></div>
-    </div>
-  </section>
-  <section class="panel mod" aria-labelledby="g-people">
-    <div class="head"><h2 id="g-people">Population</h2><span class="note">who is trading, how long their families last, how wealth is shared</span></div>
-    <div class="mod__body">
-      <div class="tablewrap"><table class="qtab" data-group="Population"><thead><tr><th>Indicator</th><th class="num">Last</th><th class="num">1W</th><th class="num">52W</th><th class="rng">52-week range</th><th class="sp">52 weeks</th></tr></thead><tbody></tbody></table></div>
-      <div class="mod__side"><div class="fx">      <div class="head"><h3 id="st-h">Wealth share</h3></div>
-      <div class="legend" id="stratLegend"></div>
-      <canvas id="strat" class="ch" aria-label="Share of total wealth held by the richest 10%, the next 40% and the bottom 50%"></canvas>
-      <div class="tip" id="stratTip" hidden></div>
-      <div class="head"><h3 class="h3">Gini</h3><span class="note">0 = equal · 1 = one bot owns all</span></div>
-      <canvas id="gini" class="ch ch--short" aria-label="Gini coefficient over time"></canvas>
-      <div class="tip" id="giniTip" hidden></div>
-    </div></div>
-    </div>
-  </section>
+
+  <div class="movers">
+    <section class="panel"><div class="head"><h2>Top gainers</h2><span class="note">4 weeks</span></div><table id="mvUp"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>Top losers</h2><span class="note">4 weeks</span></div><table id="mvDown"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>Most active</h2><span class="note">trades, 4 weeks</span></div><table id="mvAct"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">Volume</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>New highs</h2><span class="note" id="mvHiN"></span></div><table id="mvHi"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>Most shorted</h2><span class="note">copies out on loan</span></div><table id="mvShort"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">Short</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>New lows</h2><span class="note" id="mvLoN"></span></div><table id="mvLo"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
+  </div>
 
   <div class="grid main">
     <section class="panel" aria-labelledby="sec-h">
@@ -218,11 +146,30 @@
     </section>
   </div>
 
-  <section class="panel" aria-labelledby="floor-h">
+  <div class="grid main">
+    <section class="panel" aria-labelledby="floor-h">
       <div class="head"><h2 id="floor-h">Floor</h2><span class="note">x = worth · y = average OVR of the cards it holds · blue = gaining, red = losing (4 weeks) · gold ring = AI bot · dashed = thief · faint ring = flagged by 5+ · click a bot</span></div>
       <canvas id="floor" aria-label="Every bot by worth and the average OVR of its cards, coloured by its 4-week return"></canvas>
       <div class="tip" id="floorTip" hidden></div>
-  </section>
+    </section>
+    <div class="stack">
+      <section class="panel" aria-labelledby="cons-h">
+        <div class="head"><h2 id="cons-h">Where the money goes</h2><span class="note">last 20 weeks · bills and interest leave the economy</span></div>
+        <div class="tablewrap"><table id="pnl"><thead><tr><th>Wealth group</th><th class="num">Realized P&amp;L</th><th class="bar"><span class="sr-only">P&amp;L bar</span></th><th class="num">Net cash</th><th class="num">Quick flips</th></tr></thead><tbody></tbody></table></div>
+        <p class="note" id="consNote"></p>
+      </section>
+      <section class="panel" aria-labelledby="ct-h">
+        <div class="head"><h2 id="ct-h">Cash held by the richest 10%</h2></div>
+        <canvas id="cashTop" class="ch" aria-label="Share of all cash held by the richest 10% of bots"></canvas>
+        <div class="tip" id="cashTopTip" hidden></div>
+      </section>
+      <section class="panel" aria-labelledby="ac-h">
+        <div class="head"><h2 id="ac-h">Cost of access</h2><span class="legend"><span><i class="line" style="background:var(--gold)"></i>Research pass</span><span><i class="line" style="background:#9cc7ff"></i>Game ticket</span></span></div>
+        <canvas id="access" class="ch" aria-label="Research pass and game ticket prices in coins"></canvas>
+        <div class="tip" id="accessTip" hidden></div>
+      </section>
+    </div>
+  </div>
 
   <section class="panel" aria-labelledby="hg-h">
     <div class="head"><h2 id="hg-h">What they learned</h2><span class="scale" id="scaleGene"></span></div>
@@ -263,6 +210,25 @@
       <div class="tablewrap"><table id="gTopic"><thead><tr><th>Game</th><th>Topic</th><th class="num">Entries</th><th class="num">Pots</th><th class="num">Skill</th><th class="bar"><span class="sr-only">Skill bar</span></th></tr></thead><tbody></tbody></table></div>
       <div class="tablewrap"><table id="gArch"><thead><tr><th>Wealth group</th><th class="num">Entries</th><th class="num">Won</th><th class="bar"><span class="sr-only">Win rate bar</span></th><th class="num">Net coins</th></tr></thead><tbody></tbody></table></div>
     </section>
+    <section class="panel" aria-labelledby="nt-h">
+      <div class="head"><h2 id="nt-h">Notes</h2><span class="legend"><span><i class="line" style="background:#3987e5"></i>Swaps</span><span><i class="line" style="background:#e66767"></i>Thefts</span></span></div>
+      <canvas id="notes" class="ch" aria-label="Note swaps and thefts per week"></canvas>
+      <div class="tip" id="notesTip" hidden></div>
+      <div class="tablewrap"><table id="social"><thead><tr><th>Style</th><th class="num">Bots</th><th class="num">Avg worth</th><th class="num">Flags</th></tr></thead><tbody></tbody></table></div>
+      <p class="note" id="researched"></p>
+    </section>
+    <section class="panel" aria-labelledby="st-h">
+      <div class="head"><h2 id="st-h">Wealth share</h2></div>
+      <div class="legend" id="stratLegend"></div>
+      <canvas id="strat" class="ch" aria-label="Share of total wealth held by the richest 10%, the next 40% and the bottom 50%"></canvas>
+      <div class="tip" id="stratTip" hidden></div>
+      <div class="head"><h2 class="h3">Gini</h2><span class="note">0 = equal · 1 = one bot owns all</span></div>
+      <canvas id="gini" class="ch ch--short" aria-label="Gini coefficient over time"></canvas>
+      <div class="tip" id="giniTip" hidden></div>
+    </section>
+  </div>
+
+  <div class="grid two">
     <section class="panel" aria-labelledby="sp-h">
       <div class="head"><h2 id="sp-h">Most traded</h2><span class="legend"><span><i class="line" style="background:var(--gold)"></i>Price</span><span><i class="dash"></i>Value</span></span></div>
       <div class="cards" id="spot"></div>
@@ -272,6 +238,12 @@
       <div id="libPage"></div>
     </section>
   </div>
+
+  <section class="panel" aria-labelledby="map-h">
+    <div class="head"><h2 id="map-h">Market map</h2><div class="maptools"><span class="note">each box is a player, sized by the market value of his cards out, coloured by price change · grouped by position · click to open</span><div class="seg" role="group" aria-label="Colour by" id="mapTf"><button type="button" data-k="1" aria-pressed="false">1W</button><button type="button" data-k="4" aria-pressed="true">4W</button><button type="button" data-k="12" aria-pressed="false">12W</button></div><span class="scale" id="scaleMap"></span></div></div>
+    <canvas id="map" aria-label="Market map: every player sized by market value and coloured by price change"></canvas>
+    <div class="tip" id="mapTip" hidden></div>
+  </section>
 
   <section class="panel" aria-labelledby="fd-h">
     <div class="head">
@@ -296,14 +268,14 @@
     <button type="button" class="more" id="feedMore">Show more</button>
   </section>
 
+  <section class="panel" aria-labelledby="ind-h">
+    <div class="head"><h2 id="ind-h">Indicators</h2><span class="note">every gauge of the market over the last 52 weeks · the i says what each one measures · click one to chart it full size</span></div>
+    <div id="ind" class="indboard"></div>
+  </section>
+
   <section class="panel acct" id="acctPanel" aria-labelledby="a-h">
     <div class="head"><h2 id="a-h">Account</h2><span class="note">click any bot on the floor, the leaderboard or a holders list</span></div>
     <div id="acct"></div>
   </section>
 
-  <section class="panel" aria-labelledby="map-h">
-    <div class="head"><h2 id="map-h">Market map</h2><div class="maptools"><span class="note">each box is a player, sized by the market value of his cards out, coloured by price change · grouped by position · click to open</span><div class="seg" role="group" aria-label="Colour by" id="mapTf"><button type="button" data-k="1" aria-pressed="false">1W</button><button type="button" data-k="4" aria-pressed="true">4W</button><button type="button" data-k="12" aria-pressed="false">12W</button></div><span class="scale" id="scaleMap"></span></div></div>
-    <canvas id="map" aria-label="Market map: every player sized by market value and coloured by price change"></canvas>
-    <div class="tip" id="mapTip" hidden></div>
-  </section>
 </div>

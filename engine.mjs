@@ -85,6 +85,11 @@ export const DEFAULTS = {
   closedEconomy: false, // instead: allowances and royalties paid only from what the house collects (no printed money)
   wealthTax: 0, // weekly tax on worth above 2× the median bot, paid into the house treasury (0 = off)
   positionLimit: 0, // no bot may hold more than this share of a card's circulation (at least 3 copies allowed; 0 = off)
+  // The liquidator sells the cards of bots that defaulted or left. 'cutWhenUnsold': each card's asking price is set
+  // once when it arrives (liqStart × its price that day) and cut by liqStep only in weeks when no copy of it sells,
+  // so it never chases its own falling price. 'chase': the old rule, liqStart is ignored and it asks 80% of each
+  // week's price (which pulls prices down by itself).
+  liquidation: 'cutWhenUnsold', liqStart: 0.95, liqStep: 0.05,
   twoSidedQuotes: true, // between trades, a price is marked to the spread only when the book has both an unfilled bid and an unfilled offer; off: any unfilled bid above or offer below pulls it (the old rule, which dragged every price down while random bots posted far more offers than bids)
   quotePull: 0.25, // how far unfilled orders pull the quoted price toward them each week
   shorting: true, // bots may borrow cards from holders who lend them, sell them, and buy them back later
@@ -103,7 +108,8 @@ export const DEFAULTS = {
   updateEvery: 40,
   population: 250, // non-AI bots at the start
   brain: 'nn', // 'nn': each bot is two small neural networks with random weights; 'genome': the older strategy-genome bots
-  nnMutation: 0.05, // weight noise when a bot copies a better bot's networks (standard deviation per weight)
+  nnMutation: 0.15, // weight noise when a bot copies a better bot's networks (standard deviation per weight)
+  nnReset: 0.01, // chance each copied weight is redrawn from scratch instead (bigger jumps)
   nnResearchError: 0.2, // how far a neural bot's research note can be off the hidden value (log-normal)
   nnFitnessGens: 3,
   nnStartBias: 0, // newborn networks lean toward doing nothing: this is subtracted from the buy, sell, pack and borrow outputs' starting bias
@@ -921,7 +927,7 @@ function startBias(W, card, bot) {
 function randomBrain(W) { const card = randomNet(W, CARD_SHAPE), bot = randomNet(W, BOT_SHAPE); startBias(W, card, bot); return { nn: true, card, bot, w: { ...FLAT, __nn: true }, err: W.cfg.nnResearchError, targets: [], book: [], keep: 0.2, lev: 0, lendShare: 0, lendRate: 0.004, maxRate: 0.006, passBid: 100, passAsk: 100, ticketBid: 20, ticketAsk: 20 }; }
 function mutateBrain(W, g) {
   const s = W.cfg.nnMutation, o = { ...g, card: Float64Array.from(g.card), bot: Float64Array.from(g.bot), w: { ...g.w }, targets: [], book: [] };
-  for (const net of [o.card, o.bot]) for (let i = 0; i < net.length; i++) { net[i] += W.gauss() * s; if (W.rand() < 0.002) net[i] = W.gauss(); }
+  for (const net of [o.card, o.bot]) for (let i = 0; i < net.length; i++) { net[i] += W.gauss() * s; if (W.rand() < W.cfg.nnReset) net[i] = W.gauss(); }
   return o;
 }
 let CUR_T = -1;
@@ -1041,7 +1047,7 @@ function creditMarket(W) {
     if (b.debt > b.cash + hv || W.loans.some((L) => L.borrower === b && L.late >= 3)) { // default: lenders recover the cash, lose the rest
       const mine = W.loans.filter((L) => L.borrower === b), tot = mine.reduce((s, L) => s + L.amount, 0);
       for (const L of mine) { const rec = tot ? (b.cash * L.amount) / tot : 0; L.lender.cash += rec; L.lender.lent -= L.amount; C.writtenOff += L.amount - rec; L.amount = 0; }
-      for (const [id, q] of b.h) W.liq.set(id, (W.liq.get(id) || 0) + q);
+      for (const [id, q] of b.h) toLiq(W, id, q);
       for (const uid of b.items || []) { const it = W.items.get(uid); if (it) { it.owner = null; W.liqItems.push(uid); } } b.items = new Set();
       b.h.clear(); b.n = 0; b.lots = new Map(); b.cash = 0; b.debt = 0; C.defaults++; jot(W, { type: 'default', bot: b.name, debt: r2(tot) }); continue;
     }
@@ -1202,12 +1208,13 @@ export function step(W) {
   const order = W.bots.slice().sort(() => W.rand() - 0.5);
   for (const b of order) b.kind === 'ai' ? aiOrders(W, b) : b.g.nn ? nnAct(W, b) : act(W, b);
   if (cfg.outsideCollectors) for (const c of W.cards) { if (c.on === false) continue; const fx = W.fashion ? W.fashion[c.fam] || 0 : 0; if (W.rand() < 0.05 * Math.exp(fx)) bids[c.id].push({ b: null, p: c.F * lerp(0.85, 1.08, W.rand()) * Math.exp(0.5 * fx) }); }
-  for (const [id, q] of W.liq) for (let k = 0; k < Math.min(q, 4); k++) asks[id].push({ b: 'liq', p: W.cards[id].P * 0.8 });
+  for (const [id, q] of W.liq) { const p = cfg.liquidation === 'chase' ? W.cards[id].P * 0.8 : liqAsk(W, id); for (let k = 0; k < Math.min(q, 4); k++) asks[id].push({ b: 'liq', p }); }
   // Forced sellers (margin calls, bills they can't pay) dump cards at a discount
   for (const b of W.bots) if (b.forced > 0) { const pend = new Map(); let need = b.forced; for (const id of [...b.h.keys()].sort((x, y) => W.cards[y].P - W.cards[x].P)) { if (need <= 0) break; const c = W.cards[id]; const q = b.h.get(id); for (let k = 0; k < q && need > 0; k++) { ask(b, c, c.P * 0.88, pend); need -= c.P * 0.88; } }
     for (const uid of [...(b.items || [])]) { if (need <= 0) break; const it = W.items.get(uid); if (!it) continue; const r = markItem(W, it) * 0.7; if (listItem(W, b, it, r)) need -= r; } }
   clear(W);
   if (cfg.shorting || W.cardLoans?.length) settleShorts(W);
+  liqCut(W);
   // Sale proceeds of a bot under a margin call go to its lender first
   for (const b of W.bots) if (b.forced > 0 && b.debt > 0) { for (const L of (W.loans || []).filter((L) => L.borrower === b)) { if (b.cash <= 0) break; W.credit.repaid += repayLoan(W, L, b.cash); } b.forced = 0; }
   for (const b of W.bots) { b.nwh.push(worth(W, b)); if (b.nwh.length > 12) b.nwh.shift(); b.pending = null; b.pendingShares = []; b.acceptAll = false; }
@@ -1242,7 +1249,7 @@ function clear(W) {
           if (bd.p < price || ak.p > price) continue; // the price limit kept this pair from crossing
           const buyer = bd.b, seller = ak.b; bd.used = ak.used = true;
           if (buyer && buyer.cash < price) continue;
-          if (seller === 'liq') { const q = W.liq.get(c.id) || 0; if (!q) continue; q > 1 ? W.liq.set(c.id, q - 1) : W.liq.delete(c.id); }
+          if (seller === 'liq') { const q = W.liq.get(c.id) || 0; if (!q) continue; q > 1 ? W.liq.set(c.id, q - 1) : (W.liq.delete(c.id), W.liqPrice?.delete(c.id)); (W.liqSold ||= new Set()).add(c.id); }
           else if (seller === 'store') { if (c.pool < 1) continue; c.pool--; c.circ++; W.house.store = (W.house.store || 0) + price; W.treasury += price; packCache = null; }
           else { if ((seller.h.get(c.id) || 0) < 1) continue; give(seller, c, -1); seller.cash += price * (1 - cfg.fee); W.house.fees += price * cfg.fee; W.treasury += price * cfg.fee; fill(seller, c, 'sell', price); flowIn(W, seller, price * (1 - cfg.fee)); sellLot(W, seller, c, price * (1 - cfg.fee)); }
           if (buyer) { buyer.cash -= price; give(buyer, c, 1); fill(buyer, c, 'buy', price); flowOut(W, buyer, price); addLot(buyer, c, price, W.t); } else { c.circ--; W.house.outside += price; }
@@ -1336,7 +1343,7 @@ function settleEstate(W, b, heirs) {
 // A bot leaving the market: its cards go to the liquidator; loans it made are forgiven, loans it owes default
 export function removeBot(W, b, reason) {
   const w = worth(W, b);
-  for (const [id, q] of b.h) W.liq.set(id, (W.liq.get(id) || 0) + q);
+  for (const [id, q] of b.h) toLiq(W, id, q);
   for (const uid of b.items || []) { const it = W.items.get(uid); if (it) { it.owner = null; W.liqItems.push(uid); } }
   for (const L of W.loans || []) {
     if (L.lender === b && L.amount > 0) { L.borrower.debt -= L.amount; L.amount = 0; }
@@ -1812,4 +1819,15 @@ function settleShorts(W) {
     closeLoan(W, L, null, null, false);
   }
   for (const L of W.cardLoans || []) if (L.week === W.t && !L.logged) { L.logged = true; if (W.ord) W.ord.shorts = (W.ord.shorts || 0) + 1; jot(W, { type: 'short', bot: L.borrower.name, lender: L.lender.name, card: W.cards[L.id].key, price: r2(W.cards[L.id].P) }); }
+}
+
+/* ---------- The liquidator ---------- */
+// Cards of bots that defaulted or left. Each card's price is fixed when it arrives and only falls in weeks when no copy
+// of it sells: the discount never resets against a price the liquidator itself is pushing down.
+function toLiq(W, id, q) { if (!(q > 0)) return; W.liq.set(id, (W.liq.get(id) || 0) + q); const L = (W.liqPrice ||= new Map()); if (!L.has(id)) L.set(id, W.cfg.liqStart * W.cards[id].P); }
+function liqAsk(W, id) { const L = (W.liqPrice ||= new Map()); if (!L.has(id)) L.set(id, W.cfg.liqStart * W.cards[id].P); return L.get(id); }
+function liqCut(W) {
+  const sold = W.liqSold || new Set(); W.liqSold = new Set();
+  if (W.cfg.liquidation === 'chase' || !W.liqPrice) return;
+  for (const [id] of W.liq) if (!sold.has(id) && W.liqPrice.has(id)) W.liqPrice.set(id, Math.max(0.05 * W.cfg.coinScale, W.liqPrice.get(id) * (1 - W.cfg.liqStep)));
 }

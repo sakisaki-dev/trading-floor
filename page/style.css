@@ -3,13 +3,13 @@
      Single dark world (the Retro Vault site's navy and gold), chosen on purpose. */
   :root {
     color-scheme: dark;
-    --bg: #090d1a;
-    --panel: #111627;
-    --panel-2: #1a2137;
-    --line: #262f4a;
-    --chalk: #eef1fa;
-    --muted: #96a2c4;
-    --faint: #5d6889;
+    --bg: #000000;
+    --panel: #0b0b0c;
+    --panel-2: #151517;
+    --line: #232326;
+    --chalk: #f3f3f3;
+    --muted: #a0a0a7;
+    --faint: #64646c;
     --gold: #ffc83d;
     --display: "Barlow Condensed", "Arial Narrow", sans-serif;
     --body: "Barlow", "Helvetica Neue", Arial, sans-serif;
@@ -21,7 +21,7 @@
   html { background: var(--bg); }
   body {
     margin: 0; color: var(--chalk); font: 14px/1.45 var(--body);
-    background: radial-gradient(1200px 500px at 70% -10%, rgb(255 200 61 / 0.06), transparent 60%), var(--bg);
+    background: var(--bg);
     padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 18px 48px;
   }
   .wrap { max-width: 1360px; margin: 0 auto; display: grid; gap: 12px; }
@@ -140,7 +140,7 @@
 
   /* Stock-market desk */
   .tape { overflow: hidden; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
-  .tape__track { display: inline-flex; gap: 28px; padding: 8px 14px; white-space: nowrap; animation: tape 60s linear infinite; }
+  .tape__track { display: flex; flex-wrap: nowrap; gap: 26px; padding: 8px 14px; height: 34px; overflow: hidden; white-space: nowrap; }
   .tape:hover .tape__track { animation-play-state: paused; }
   @keyframes tape { from { transform: translateX(0); } to { transform: translateX(-50%); } }
   @media (prefers-reduced-motion: reduce) { .tape__track { animation: none; flex-wrap: wrap; white-space: normal; } }
@@ -185,7 +185,7 @@
   .stat--btn canvas { width: 100%; height: 30px; display: block; }
   .stat--btn[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--gold); }
   .stat--btn:focus-visible { box-shadow: inset 0 0 0 2px var(--gold); }
-  .lbp td:first-child { white-space: normal; overflow-wrap: anywhere; }
+  .lbp table { table-layout: fixed; } .lbp th:first-child { width: 46%; } .lbp td:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lbp .pill { font-size: 9px; padding: 0 4px; }
   #acct { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr); gap: 18px; align-items: start; }
   #acct > div { display: grid; gap: 8px; min-width: 0; }
@@ -211,7 +211,7 @@
   /* Terminal additions: status line, market map, indicators board, movers, sectors, calendar */
   .wrap { max-width: 1520px; grid-template-columns: minmax(0, 1fr); }
   .wrap > * { min-width: 0; }
-  .status { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: baseline; padding: 7px 12px; border-radius: 10px; background: rgb(9 13 26 / 0.92); backdrop-filter: blur(6px); box-shadow: inset 0 0 0 1px var(--line), 0 6px 18px rgb(0 0 0 / 0.35); font: 600 12px/1.3 var(--mono); }
+  .status { position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: baseline; padding: 7px 12px; border-radius: 10px; background: rgb(0 0 0 / 0.94); backdrop-filter: blur(6px); box-shadow: inset 0 0 0 1px var(--line), 0 6px 18px rgb(0 0 0 / 0.35); font: 600 12px/1.3 var(--mono); }
   .status > span { white-space: nowrap; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .status b { color: var(--chalk); font-weight: 700; margin-left: 4px; }
   .status .live { color: #4fd18b; } .status .live::before { content: '●'; margin-right: 5px; }
@@ -222,13 +222,13 @@
   .indboard { display: grid; gap: 14px; }
   .indg { display: grid; gap: 6px; }
   .indg h3 { font: 800 13px/1 var(--display); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0; }
-  .indt { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(188px, 100%), 1fr)); gap: 6px; }
+  .indt { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(188px, 100%), 1fr)); gap: 6px; }
   .qt { overflow: hidden; }
   .qt__row b { flex: 1 1 auto; min-width: 0; }
   .qt__chg { flex: none; }
   .qt__name { min-width: 0; flex: 1 1 auto; }
   .qt__tf { flex: none; }
-  .qt { all: unset; cursor: pointer; display: grid; gap: 4px; padding: 10px 11px 9px; border-radius: 8px; background: #0d1222; box-shadow: inset 0 0 0 1px var(--line); min-width: 0; }
+  .qt { all: unset; cursor: pointer; display: grid; gap: 4px; padding: 10px 11px 9px; border-radius: 8px; background: #060607; box-shadow: inset 0 0 0 1px var(--line); min-width: 0; }
   .qt:hover { box-shadow: inset 0 0 0 1px var(--muted); }
   .qt[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--gold); }
   .qt:focus-visible { box-shadow: inset 0 0 0 2px var(--gold); }
@@ -243,7 +243,7 @@
   .qt canvas { width: 100%; height: 62px; display: block; margin-top: 2px; }
   .qt small { font: 500 10.5px/1.3 var(--body); color: var(--faint); white-space: normal; }
   .movers { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
-  .movers table { font-size: 12px; } .movers td:first-child { white-space: normal; }
+  .movers table { font-size: 12px; table-layout: fixed; } .movers th:first-child { width: 52%; } .movers td:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cal { display: grid; gap: 0; }
   .cal div { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }
   .cal div:first-child { border-top: 0; }
@@ -295,14 +295,22 @@
   /* Info cards */
   .info { all: unset; cursor: pointer; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%; font: 700 10px/1 var(--body); font-style: italic; color: var(--muted); box-shadow: inset 0 0 0 1px var(--faint); vertical-align: 1px; text-transform: none; letter-spacing: 0; }
   .info:hover, .info:focus-visible { color: var(--bg); background: var(--gold); box-shadow: none; }
-  .infocard { position: absolute; z-index: 50; padding: 10px 12px; border-radius: 10px; background: #1d2540; box-shadow: 0 10px 30px rgb(0 0 0 / 0.55), inset 0 0 0 1px var(--line); font: 500 12.5px/1.5 var(--body); color: var(--chalk); }
+  .infocard { position: absolute; z-index: 50; padding: 10px 12px; border-radius: 10px; background: #18181b; box-shadow: 0 10px 30px rgb(0 0 0 / 0.55), inset 0 0 0 1px var(--line); font: 500 12.5px/1.5 var(--body); color: var(--chalk); }
   .infocard b { font: 800 14px/1.2 var(--display); letter-spacing: 0.02em; display: inline-block; margin-bottom: 3px; }
   @media (max-width: 1100px) { .mod__body { grid-template-columns: minmax(0, 1fr); } }
   @media (max-width: 640px) { th.rng, td.rng { display: none; } th.sp, td.sp { width: 70px; } td.sp canvas { width: 66px; } .minis { grid-template-columns: minmax(0, 1fr); } .qtab td:first-child { white-space: normal; } }
-  /* A row whose number just moved flashes, then fades */
-  @keyframes flashUp { from { background: rgb(38 194 129 / 0.28); } to { background: transparent; } }
-  @keyframes flashDn { from { background: rgb(255 92 92 / 0.26); } to { background: transparent; } }
-  .flash-up, .flash-up td { animation: flashUp 0.9s ease-out; } .flash-dn, .flash-dn td { animation: flashDn 0.9s ease-out; }
-  @media (prefers-reduced-motion: reduce) { .flash-up, .flash-up td, .flash-dn, .flash-dn td { animation: none; } }
   @media (max-width: 640px) { .qtab th:nth-child(3), .qtab td:nth-child(3) { display: none; } }
+  /* Stable heights: live areas reserve their space so nothing below them moves */
+  .ev { white-space: nowrap; } .ev > div { overflow: hidden; text-overflow: ellipsis; }
+  tr.pad td { border-top-color: transparent; }
+  .cal { min-height: 330px; align-content: start; }
+  #detail { min-height: 470px; align-content: start; }
+  #researched, #consNote { min-height: 3em; }
+  .mvc { min-height: 64px; }
+  html { overflow-anchor: auto; }
+  .status { flex-wrap: nowrap; overflow: hidden; min-height: 33px; } .status > span { flex: none; max-width: none; } .status > span:last-child { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .wrow small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .feed { min-height: calc(60 * 29px); align-content: start; }
+  .ev { height: 29px; box-sizing: border-box; align-items: center; padding: 0; overflow: hidden; } .ev time, .ev .tag { line-height: 1; }
+  @media (max-width: 820px) { .status { flex-wrap: wrap; overflow: visible; min-height: 64px; } }
 </style>
