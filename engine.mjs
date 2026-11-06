@@ -7,6 +7,8 @@
 // Bots trade cards in a weekly call auction, buy packs that mint from the pool, trade research passes, and swap or
 // steal research notes. Every decision a run depends on is in DEFAULTS below.
 
+let PRACTICE_HOOK = null; // called (week, of) during practice generations, so a page can show progress
+export function setPracticeHook(f) { PRACTICE_HOOK = f; }
 export const DEFAULTS = {
   seed: 88,
   weeksPerGeneration: 20, // evolution and royalties happen at the end of each generation
@@ -114,7 +116,7 @@ export const DEFAULTS = {
   quotePull: 0.25, // how far unfilled orders pull the quoted price toward them each week (priceRule 'quotes' only)
   priceRule: 'comps', compsWeeks: 4, vaultIndex: 'repeatSales', // 'comps' (default): an untraded card is marked from its player's other cards' trades in the last compsWeeks weeks (comparable sales); 'lastTrade': its own last trade only. vaultIndex 'repeatSales': from pairs of trades of the same card; 'basket': every card's mark
   // 'lastTrade': a card's price is the last price it traded at; best bid and ask are shown, never move it. 'quotes': the old pull
-  outsideMode: 'budget', // 'budget': outsideBudget coins a week buy the lowest asks, spread by real popularity (Career Legacy), and outsideResale of what collectors hold is sold back into the best bids. 'band': the old 5% chance of a bid at 0.85–1.08× value
+  outsideMode: 'value', collectors: 25, collectorError: 0.15, collectorStock: 40, // 'value' (default): two-sided dealers trading around last week's public value (see valueCollectors); 'budget': a price-taking budget; // 'budget': outsideBudget coins a week buy the lowest asks, spread by real popularity (Career Legacy), and outsideResale of what collectors hold is sold back into the best bids. 'band': the old 5% chance of a bid at 0.85–1.08× value
   outsideBudget: 250000, outsideResale: 0.02, outsideNews: true, // outsideNews: each player's share is his Career Legacy × his current form (the public news: a hot streak draws more, a slump or an injury less)
   forcedSale: 'book', // 'book': a margin-called or broke bot sells into the best bids, then lists the rest at auction with no minimum. 'discount': the old 88% ask and 70% item reserve
   packSale: 'auction', // 'auction': packsPerWeek are released and sold by uniform-price auction (everyone pays the lowest winning bid). 'markup': the old expected value + packEdge
@@ -138,7 +140,7 @@ export const DEFAULTS = {
   nnResearchError: 0.2, // how far a neural bot's research note can be off the hidden value (log-normal)
   nnFitnessGens: 6, // fitness = the mean return over this many generations (a longer window rewards consistency over luck)
   nnStartBias: 0, // newborn networks lean toward doing nothing: this is subtracted from the buy, sell, pack and borrow outputs' starting bias
-  practiceGens: 0, // before the market opens, the bots play this many generations in a private practice market with the same rules and open with what they learned // neural bots are ranked by their average return over this many generations
+  practiceGens: 3, // before the market opens, the bots play this many generations in a private practice market with the same rules and open with what they learned // neural bots are ranked by their average return over this many generations
   social: { sharer: 0.45, reciprocator: 0.35, thief: 0.2 }, // social style shares among rule bots
 };
 
@@ -210,7 +212,7 @@ export function createWorld(library, overrides = {}) {
   // same rules (another seed); the real market opens with the networks that came out of it
   if (cfg.practiceGens > 0 && cfg.brain === 'nn' && W.bots.length) {
     const P = createWorld(library, { ...overrides, seed: (cfg.seed || 88) * 7919 + 1, practiceGens: 0 });
-    for (let t = 0; t < cfg.practiceGens * cfg.weeksPerGeneration; t++) step(P);
+    const T = cfg.practiceGens * cfg.weeksPerGeneration; for (let t = 0; t < T; t++) { step(P); if (PRACTICE_HOOK) PRACTICE_HOOK(t + 1, T); }
     const pb = P.bots.filter((b) => b.g?.nn).sort((x, y) => (y.fit ?? 0) - (x.fit ?? 0));
     W.bots.forEach((b, i) => { const s = pb[i % pb.length]; if (s && b.g?.nn) b.g = { ...s.g, card: Float64Array.from(s.g.card), bot: Float64Array.from(s.g.bot), w: { ...s.g.w }, targets: [], book: [] }; });
     W.practice = { gens: cfg.practiceGens, endIndex: P.hist.p[P.hist.p.length - 1], endPF: bubble(P) };
@@ -426,14 +428,14 @@ function ripPack(W, b, free = false, type = 'standard', paid = null) {
 
 /* ---------- Order helpers ---------- */
 let bids, asks, passBids, passAsks;
-function bid(b, c, p) {
+function bid(b, c, p, x) {
   if (!(p > 0) || b.cash < p) return;
   const lim = W_.cfg.positionLimit;
   if (lim > 0 && (b.h.get(c.id) || 0) >= Math.max(3, Math.floor(lim * c.circ))) return;
-  bids[c.id].push({ b, p });
+  bids[c.id].push(x ? { b, p, x } : { b, p });
 }
 let W_ = null; // the world the module-level order helpers act on
-function ask(b, c, p, pend) { const q = b.h.get(c.id) || 0, used = pend.get(c.id) || 0; if (q > used && p > 0) { asks[c.id].push({ b, p }); pend.set(c.id, used + 1); } }
+function ask(b, c, p, pend, x) { const q = b.h.get(c.id) || 0, used = pend.get(c.id) || 0; if (q > used && p > 0) { asks[c.id].push(x ? { b, p, x } : { b, p }); pend.set(c.id, used + 1); } }
 function sample(W, k) { const live = W._live || W.cards; const o = []; for (let i = 0; i < k * 3 && o.length < k; i++) { const c = live[Math.floor(W.rand() * live.length)]; if (c && c.on !== false) o.push(c); } return o; }
 let hot = [], mood = { drop: 0 };
 
@@ -1057,13 +1059,13 @@ function nnAct(W, b) {
   for (const c of cand) {
     if (!c || c.on === false) continue;
     const o = cardNet(W, b, c, nw, ctx), q = b.h.get(c.id) || 0, px = c.P * (1 + 0.15 * Math.tanh(o[2]));
-    if (o[0] > 0 && o[0] > o[1]) buys.push([c, o[0], px, 1 + Math.floor(2 * sigm(o[3]))]);
-    else if (q && o[1] > 0) { for (let k = 0; k < Math.min(q, 1 + Math.floor(2 * sigm(o[3]))); k++) ask(b, c, px, pend); }
+    if (o[0] > 0 && o[0] > o[1]) buys.push([c, o[0], px, 1 + Math.floor(2 * sigm(o[3])), Float64Array.from(XC)]);
+    else if (q && o[1] > 0) { const x = Float64Array.from(XC); for (let k = 0; k < Math.min(q, 1 + Math.floor(2 * sigm(o[3]))); k++) ask(b, c, px, pend, x); }
     if (q && o[5] > 1 && !listed && W.cfg.auctions && (b.h.get(c.id) || 0) - (pend.get(c.id) || 0) > 0) { listAuction(W, b, c, c.P * (1 + 0.2 * Math.tanh(o[2]))); listed++; }
     if (W.cfg.shorting && !q && shorts < 3 && o[6] > 0.5 && o[6] > o[0] && (W.lendable?.get(c.id) || 0) > 0 && borrowCard(W, b, c)) { ask(b, c, px, pend); shorts++; }
   }
   let spare = b.cash - g.keep * nw, n = 0;
-  for (const [c, , px, qn] of buys.sort((p, q) => q[1] - p[1])) { if (n >= W.cfg.deployOrders) break; for (let k = 0; k < qn && spare > px; k++) { bid(b, c, px); spare -= px; } n++; }
+  for (const [c, , px, qn, x] of buys.sort((p, q) => q[1] - p[1])) { if (n >= W.cfg.deployOrders) break; for (let k = 0; k < qn && spare > px; k++) { bid(b, c, px, x); spare -= px; } n++; }
   for (const it of itemsOf(W, b)) { if (listed > 1) break; const c = W.cards[mktId(it.pid, it.d === 4 ? 0 : it.d, it.f)], o = cardNet(W, b, c, nw, ctx, it); if (o[1] > 0 && o[5] > 0) { listItem(W, b, it, markItem(W, it) * (1 + 0.2 * Math.tanh(o[2]))); listed++; } }
   let packs = 0; for (const [t, k] of b._nnPacks || []) for (let i = 0; i < k && packs < 3; i++, packs++) if (b.cash - packInfo(W, t).price < g.keep * nw * 0.5 || !buyPack(W, b, t, b._nnPackBid?.[t] ?? 1)) break;
 }
@@ -1235,6 +1237,7 @@ function aiOrders(W, b) {
 export function step(W) {
   const cfg = W.cfg;
   W.t++; packCache = null; W_ = W;
+  for (const p of W.players) p.Fpub = p.F; // last week's value: what the public (and the value collectors) know this week
   if (W.timeline && W.t % cfg.seasonWeeks === 0) nextSeason(W);
   if (cfg.valueModel === 'league') { // the simulated league takes over after the last real season
     if (!W.L && W.timeline && W.seasonIx >= W.timeline.seasons.length - 1) leagueStart(W);
@@ -1285,7 +1288,7 @@ export function step(W) {
   if (cfg.forcedSale === 'discount') for (const b of W.bots) if (b.forced > 0) { const pend = new Map(); let need = b.forced; for (const id of [...b.h.keys()].sort((x, y) => W.cards[y].P - W.cards[x].P)) { if (need <= 0) break; const c = W.cards[id]; const q = b.h.get(id); for (let k = 0; k < q && need > 0; k++) { ask(b, c, c.P * 0.88, pend); need -= c.P * 0.88; } }
     for (const uid of [...(b.items || [])]) { if (need <= 0) break; const it = W.items.get(uid); if (!it) continue; const r = markItem(W, it) * 0.7; if (listItem(W, b, it, r)) need -= r; } }
   clear(W);
-  if (cfg.outsideCollectors && cfg.outsideMode !== 'band') outsideFlow(W);
+  if (cfg.outsideCollectors && cfg.outsideMode === 'value') valueCollectors(W); else if (cfg.outsideCollectors && cfg.outsideMode === 'budget') outsideFlow(W);
   if (cfg.forcedSale !== 'discount') forcedSales(W);
   if (cfg.shorting || W.cardLoans?.length) settleShorts(W);
   liqCut(W);
@@ -1312,12 +1315,25 @@ function compsMark(W) {
     for (let j = 0; j < 16; j++) { const m = W.cards[p.id * 16 + j]; if (m.lastTradeT === W.t) continue; m.P = med * m.mult; if (m.Ph.length) m.Ph[m.Ph.length - 1] = m.P; }
   }
 }
+// Why a neural bot made a trade: the card-network input that pushed hardest toward it (setting that input to zero lowers
+// "buy minus sell", or "sell minus buy", the most). Worked out only for orders that filled.
+function tradeWhy(b, x, side) {
+  if (!x || !b?.g?.nn) return null;
+  const score = (v) => { const o = forward(CARD_SHAPE, b.g.card, v, CB); return side === 'buy' ? o[0] - o[1] : o[1] - o[0]; };
+  const base = score(x), v = Float64Array.from(x); let best = -Infinity, at = -1;
+  for (let i = 1; i < x.length; i++) { if (x[i] === 0) continue; const keep = v[i]; v[i] = 0; const d = base - score(v); v[i] = keep; if (d > best) { best = d; at = i; } }
+  return at > 0 ? CARD_IN[at] : null;
+}
+function noteWhy(W, j, bd, ak) {
+  const wb = bd ? tradeWhy(bd.b, bd.x, 'buy') : null, ws = ak ? tradeWhy(ak.b, ak.x, 'sell') : null; const w = (W.whyWeek ||= { buy: {}, sell: {} });
+  if (wb) { j.buyerWhy = wb; w.buy[wb] = (w.buy[wb] || 0) + 1; } if (ws) { j.sellerWhy = ws; w.sell[ws] = (w.sell[ws] || 0) + 1; }
+}
 function noteTrade(W, c, price) {
   const t0 = c.lastTradeT ?? 0, p0 = c.lastTradeP ?? c.P0;
   if (t0 < W.t && W.t - t0 <= 52 && p0 > 0 && price > 0) (W.rsPairs ||= []).push([t0, Math.log(price / p0)]);
   if (c.lastTradeT !== W.t) { c.lastTradeT = W.t; c.lastTradeP = price; } else c.lastTradeP = price;
 }
-function xfer(W, c, buyer, seller, price) {
+function xfer(W, c, buyer, seller, price, bd = null, ak = null) {
   const cfg = W.cfg;
   if (buyer && buyer !== 'out' && buyer.cash < price) return false;
   if (seller === 'out') { const q = W.outside.get(c.id) || 0; if (!q) return false; q > 1 ? W.outside.set(c.id, q - 1) : W.outside.delete(c.id); c.circ++; W.house.outside -= price; }
@@ -1327,7 +1343,7 @@ function xfer(W, c, buyer, seller, price) {
   if (buyer === 'out') { W.outside.set(c.id, (W.outside.get(c.id) || 0) + 1); c.circ--; W.house.outside += price; }
   else { buyer.cash -= price; give(buyer, c, 1); flowOut(W, buyer, price); addLot(buyer, c, price, W.t); }
   c.P = price; noteTrade(W, c, price); if (c.Ph.length) c.Ph[c.Ph.length - 1] = price; if (c.volH.length) c.volH[c.volH.length - 1]++; W.lastTrades = (W.lastTrades || 0) + 1; if (W.ord) W.ord.coins += price;
-  jot(W, { type: 'trade', card: c.key, price: r2(price), buyer: buyer === 'out' ? 'outside collector' : buyer.name, seller: seller === 'out' ? 'outside collector' : seller === 'liq' ? 'liquidator' : seller === 'store' ? 'Vault store' : seller.name });
+  { const j = { type: 'trade', card: c.key, price: r2(price), buyer: buyer === 'out' ? 'outside collector' : buyer.name, seller: seller === 'out' ? 'outside collector' : seller === 'liq' ? 'liquidator' : seller === 'store' ? 'Vault store' : seller.name }; noteWhy(W, j, bd, ak); jot(W, j); }
   return true;
 }
 const leftBids = (c) => (bids[c.id] || []).filter((o) => !o.used && o.b && o.b !== 'liq').sort((x, y) => y.p - x.p);
@@ -1342,15 +1358,40 @@ function outsideFlow(W) {
     const share = (cfg.outsideBudget * w) / tot, save = (W.outsideSave ||= new Map()); let coins = Math.min(4 * share, (save.get(p.id) || 0) + share); if (coins <= 0) continue; // unspent money waits, up to 4 weeks' worth
     const book = []; for (let j = 0; j < 16; j++) { const c = W.cards[p.id * 16 + j]; for (const o of leftAsks(c)) book.push([c, o]); }
     book.sort((x, y) => x[1].p - y[1].p);
-    for (const [c, o] of book) { if (o.p > coins) break; if (xfer(W, c, 'out', o.b, o.p)) { o.used = true; coins -= o.p; spent += o.p; } }
+    for (const [c, o] of book) { if (o.p > coins) break; if (xfer(W, c, 'out', o.b, o.p, null, o)) { o.used = true; coins -= o.p; spent += o.p; } }
     save.set(p.id, coins);
   }
   let sold = 0;
   for (const [id, q] of [...out]) {
     const want = q * cfg.outsideResale, k = Math.floor(want) + (W.rand() < want - Math.floor(want) ? 1 : 0), c = W.cards[id];
-    for (const o of leftBids(c).slice(0, k)) if (xfer(W, c, o.b, 'out', o.p)) { o.used = true; sold++; }
+    for (const o of leftBids(c).slice(0, k)) if (xfer(W, c, o.b, 'out', o.p, o)) { o.used = true; sold++; }
   }
   W.outsideWeek = { spent: Math.round(spent), resold: sold, held: [...out.values()].reduce((a, b) => a + b, 0) };
+}
+// Value collectors (outsideMode 'value', the default): `collectors` outside dealers who know last week's value from the
+// site formula (never this week's, so a bot that reads the news can be earlier). Each has its own error (a fixed bias drawn
+// from collectorError, plus a per-card wobble half that size), a share of outsideBudget a week (savings capped at 4 weeks)
+// and room for collectorStock copies. Both ways: they buy the cheapest asks below their reference price and sell from their
+// own stock into bids above it. A bubble can still outrun them: their money and room run out.
+function valueCollectors(W) {
+  const cfg = W.cfg, N = cfg.collectors ?? 25, out = (W.outside ||= new Map()), share = (cfg.outsideBudget || 0) / Math.max(1, N);
+  if (!W.coll || W.coll.length !== N) W.coll = Array.from({ length: N }, (_, i) => W.coll?.[i] || { cash: 0, stock: new Map(), n: 0, err: W.gauss() * (cfg.collectorError ?? 0.15) });
+  const wob = (i, id) => { const h = Math.sin((i + 1) * 12.9898 + (id + 1) * 78.233) * 43758.5453; return ((h - Math.floor(h)) * 2 - 1) * (cfg.collectorError ?? 0.15) * 0.5; };
+  const ref = (k, c) => (W.players[c.pid].Fpub ?? W.players[c.pid].F) * c.mult * Math.exp(W.coll[k].err + wob(k, c.id));
+  const cap = cfg.collectorStock ?? 40; let bought = 0, sold = 0, spent = 0;
+  const askBook = []; for (const c of W.cards) { if (c.on === false) continue; for (const o of asks[c.id] || []) if (!o.used && o.b !== 'store') askBook.push([c, o]); }
+  for (let k = 0; k < N; k++) {
+    const C = W.coll[k]; C.cash = Math.min(4 * share, C.cash + share);
+    // sell first: anything they hold that someone bids above their reference
+    for (const [id, q] of [...C.stock]) { const c = W.cards[id]; let left = q;
+      for (const o of leftBids(c)) { if (left <= 0) break; if (o.p <= ref(k, c)) break; if (xfer(W, c, o.b, 'out', o.p, o)) { o.used = true; left--; C.cash += o.p; C.n--; sold++; } }
+      left > 0 ? C.stock.set(id, left) : C.stock.delete(id); }
+    C.cash = Math.min(4 * share, C.cash);
+    // then buy: the asks furthest below their reference, while money and room last
+    const cand = askBook.filter(([c, o]) => !o.used && o.p < ref(k, c)).sort((a, b) => a[1].p / ref(k, a[0]) - b[1].p / ref(k, b[0]));
+    for (const [c, o] of cand) { if (C.n >= cap) break; if (o.p > C.cash || o.used) continue; if (xfer(W, c, 'out', o.b, o.p, null, o)) { o.used = true; C.cash -= o.p; C.n++; C.stock.set(c.id, (C.stock.get(c.id) || 0) + 1); bought++; spent += o.p; } }
+  }
+  W.outsideWeek = { spent: Math.round(spent), bought, resold: sold, held: W.coll.reduce((a, C) => a + C.n, 0) };
 }
 // 3. Forced sellers: sell into the best bids until the debt is covered; whatever is left goes to auction with no minimum
 function forcedSales(W) {
@@ -1358,7 +1399,7 @@ function forcedSales(W) {
     if (!(b.forced > 0)) continue; let need = b.forced;
     for (const id of [...b.h.keys()].sort((x, y) => W.cards[y].P - W.cards[x].P)) {
       const c = W.cards[id];
-      for (const o of leftBids(c)) { if (need <= 0 || !(b.h.get(id) > 0)) break; if (o.b === b || blocked(o.b, b)) continue; if (xfer(W, c, o.b, b, o.p)) { o.used = true; need -= o.p * (1 - W.cfg.fee); } }
+      for (const o of leftBids(c)) { if (need <= 0 || !(b.h.get(id) > 0)) break; if (o.b === b || blocked(o.b, b)) continue; if (xfer(W, c, o.b, b, o.p, o)) { o.used = true; need -= o.p * (1 - W.cfg.fee); } }
       if (need <= 0) break;
     }
     for (const id of [...b.h.keys()]) { const c = W.cards[id]; while (need > 0 && (b.h.get(id) || 0) > 0) { if (!listAuction(W, b, c, NO_MIN)) break; need -= c.P; } if (need <= 0) break; }
@@ -1367,7 +1408,7 @@ function forcedSales(W) {
 }
 const NO_MIN = 0.01; // an auction with no minimum price (the reserve must be above zero)
 function clear(W) {
-  const cfg = W.cfg; let trades = 0;
+  const cfg = W.cfg; let trades = 0; W.whyWeek = { buy: {}, sell: {} };
   W.arcsWeek = [];
   W.fills = new Map(); // bot id -> [{player, side, price}] this week (AI observations)
   const fill = (b, c, side, price) => { if (!b || b === 'liq' || b.kind !== 'ai') return; if (!W.fills.has(b.id)) W.fills.set(b.id, []); W.fills.get(b.id).push({ player: c.key, side, price: +price.toFixed(2) }); };
@@ -1398,7 +1439,7 @@ function clear(W) {
           if (buyer) { buyer.cash -= price; give(buyer, c, 1); fill(buyer, c, 'buy', price); flowOut(W, buyer, price); addLot(buyer, c, price, W.t); } else { c.circ--; W.house.outside += price; }
           c.wk.h = Math.max(c.wk.h, price); c.wk.l = Math.min(c.wk.l, price); c.wk.v++;
           if (W.ord) W.ord.coins += price;
-          jot(W, { type: 'trade', card: c.key, price: r2(price), buyer: buyer ? buyer.name : 'outside collector', seller: seller === 'liq' ? 'liquidator' : seller === 'store' ? 'Vault store' : seller.name });
+          { const j = { type: 'trade', card: c.key, price: r2(price), buyer: buyer ? buyer.name : 'outside collector', seller: seller === 'liq' ? 'liquidator' : seller === 'store' ? 'Vault store' : seller.name }; noteWhy(W, j, bd, ak); jot(W, j); }
           done++;
           if (W.arcsWeek.length < 60 && buyer && seller !== 'liq' && seller !== 'store' && W.rand() < 0.5) W.arcsWeek.push([seller.id, buyer.id]);
         }
@@ -1635,6 +1676,7 @@ export function frame(W, { full = false } = {}) {
     sens: W.t % 4 === 0 ? (W.nnSens = nnSensitivity(W)) : null,
     house: { fees: Math.round(W.house.fees), packs: W.house.packs, gamePacks: W.house.gamePacks || 0 },
     newPlayers: W.newPlayers?.length ? W.newPlayers.splice(0) : undefined,
+    why: W.whyWeek || null,
     inj: W.L ? W.players.filter((p) => W.era[p.id]?.injured).map((p) => p.id) : undefined,
     league: W.L ? { week: W.L.week, season: W.L.season, champion: W.L.champions[W.L.champions.length - 1] || null, active: W.players.filter((p) => p.lg?.active).length, injured: W.players.filter((p) => W.era[p.id]?.injured).length } : null,
   };

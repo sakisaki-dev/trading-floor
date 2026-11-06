@@ -693,3 +693,15 @@ After the save's last real season (Y88) a simulated league plays on and sets eve
   Outside collectors' budget follows Career Legacy × current form (`outsideNews`, an assumption).
 - **Settings** (Rules ▸ Values and prices): rate players on form or career, form window, pressure, injury risk after a rise
   (`hypeInjury`, the owner's setting, not measured), injuries, injuries by age, retirement, retirement by age, rookies, awards.
+
+- **Value dealers** (`outsideMode: 'value'`, default): 25 outside dealers who know last week's value from the site formula
+  (never this week's), each with its own error (±15% bias plus a per-card wobble), a share of the outside budget and room
+  for 40 copies. They buy asks below their reference and sell from their stock into bids above it; when their money or
+  room runs out, a bubble can outrun them. The older 'budget' and 'band' modes are kept.
+- **Royalties** are paid weekly from each game (a big game pays more; injured or retired players pay nothing) and count in
+  a bot's fitness. **Fitness** is the mean return over 6 generations. **Practice generations** (3 by default): the bots
+  evolve in a private market before the one you watch (about a minute before the page starts).
+- **Why they traded:** every filled order from a neural bot is logged with the card-network input that pushed hardest
+  toward it (the trade log in each account, and the chart's market internals).
+- **Prices:** an untraded card is marked from its player's other cards' trades (comparable sales); the Vault index is a
+  repeat-sales index fitted over the last 104 weeks from all pairs of trades of the same card.

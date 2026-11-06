@@ -17,7 +17,7 @@ onmessage = (e) => {
   const m = e.data;
   if (m.cmd === 'init') { LIB = m.lib; return; }
   if (m.cmd === 'start') {
-    clearTimeout(timer); W = createWorld(LIB, m.opts); LOG = []; playing = !!m.playing; speed = m.speed || 1;
+    clearTimeout(timer); setPracticeHook((t, T) => { if (t % 2 === 0 || t === T) postMessage({ type: 'practice', t, T }); }); W = createWorld(LIB, m.opts); setPracticeHook(null); LOG = []; playing = !!m.playing; speed = m.speed || 1;
     const frames = [frame(W, { full: true })], warm = W.cfg.brain === 'nn' ? 2 : 60; // genome worlds open three generations in
     for (let i = 0; i < warm; i++) { step(W); keep(); frames.push(frame(W, { full: true })); }
     postMessage({ type: 'reset', frames, cfg: W.cfg, detail: det() }); schedule(); return;
