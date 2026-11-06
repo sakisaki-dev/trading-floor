@@ -17,7 +17,7 @@ Each turn is one week. You receive the week's state as JSON and answer with your
 - The house keeps trade fees, pack sales and living costs, and pays half of each week's takings back out as prizes in that week's Arcade contests.
 
 ## Actions
-- **orders**: buy or sell cards at a price you name. Each card clears once a week in a call auction: all crossing bids and asks fill at one price. Sellers pay a fee; unfilled orders lapse. You can only sell copies you hold.
+- **orders**: buy or sell cards at a price you name. Each card clears once a week in a call auction: all crossing bids and asks fill at one price. Sellers pay a fee; unfilled orders lapse. A card that doesn't trade keeps its last price, unless it has both an unfilled bid and an unfilled offer, in which case its price moves toward the edge of that spread. You can only sell copies you hold.
 - **packs**: `[{type, count}]` to buy packs of the listed types (`packs.types`), up to 5 a week in all.
 - **auction**: list up to 2 cards with a reserve (`player` is a card key, or the id of one of your one-of-a-kind cards). Next week each trader may send one sealed bid; the highest bid at or above the reserve wins and pays the second-highest bid or the reserve, whichever is higher. Unsold cards come back.
 - **auctionBids**: one sealed bid per open auction (`auctions.open`).

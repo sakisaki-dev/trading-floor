@@ -46,6 +46,7 @@
     <div class="slider"><label for="positionLimit">Position limit <b id="positionLimitV"></b></label><input id="positionLimit" type="range" min="0" max="100" step="5" value="0"></div>
     <div class="slider"><label for="storePremium">Store markup <b id="storePremiumV"></b></label><input id="storePremium" type="range" min="10" max="200" step="10" value="60"></div>
     <div class="toggles">
+      <label class="toggle" title="Between trades, a price is marked to the bid–ask spread only when there are buyers and sellers; off = any unfilled order pulls it (the old rule)"><input type="checkbox" id="twoSidedQuotes" checked> Two-sided quotes</label>
       <label class="toggle"><input type="checkbox" id="credit" checked> Credit</label>
       <label class="toggle"><input type="checkbox" id="centralBank"> Central bank</label>
       <label class="toggle"><input type="checkbox" id="store"> Vault store</label>
@@ -64,6 +65,8 @@
 
   <p class="hyp" id="hyp"></p>
 
+  <div class="status" id="status" role="status" aria-label="Market status"></div>
+
   <div class="tape" id="tape" aria-label="Biggest movers over four weeks"><div class="tape__track" id="tapeTrack"></div></div>
 
   <div class="kpis">
@@ -78,11 +81,18 @@
   </div>
   <div class="mvc" id="mvc" aria-live="polite"></div>
 
+  <section class="panel" aria-labelledby="map-h">
+    <div class="head"><h2 id="map-h">Market map</h2><div class="maptools"><span class="note">each box is a player, sized by the market value of his cards out, coloured by price change · grouped by position · click to open</span><div class="seg" role="group" aria-label="Colour by" id="mapTf"><button type="button" data-k="1" aria-pressed="false">1W</button><button type="button" data-k="4" aria-pressed="true">4W</button><button type="button" data-k="12" aria-pressed="false">12W</button></div><span class="scale" id="scaleMap"></span></div></div>
+    <canvas id="map" aria-label="Market map: every player sized by market value and coloured by price change"></canvas>
+    <div class="tip" id="mapTip" hidden></div>
+  </section>
+
   <div class="desk">
     <section class="panel watch" aria-labelledby="w-h">
       <div class="head"><h2 id="w-h">Watchlist</h2><select id="wsort" aria-label="Sort the watchlist"><option value="vol">Most traded</option><option value="up">Top gainers</option><option value="down">Top losers</option><option value="cap">Market value</option><option value="rich">Most overpriced</option><option value="cheap">Most underpriced</option></select></div>
       <input id="wfilter" type="search" placeholder="Search players" aria-label="Search players">
       <div class="watch__list" id="watch" role="listbox" aria-label="Cards"></div>
+      <button type="button" class="more" id="watchMore">Show all players</button>
     </section>
 
     <section class="panel chartp" aria-labelledby="ch-name">
@@ -92,11 +102,13 @@
       </div>
       <div class="chtools">
         <div class="seg" role="group" aria-label="Timeframe" id="tf"><button type="button" data-tf="20" aria-pressed="false">20W</button><button type="button" data-tf="52" aria-pressed="true">52W</button><button type="button" data-tf="0" aria-pressed="false">All</button></div>
+        <div class="seg" role="group" aria-label="Studies" id="studies"><button type="button" data-s="ma" aria-pressed="true" title="4- and 12-week moving averages">MA</button><button type="button" data-s="bb" aria-pressed="false" title="Bollinger bands: 12-week average ± 2 standard deviations">Bands</button><button type="button" data-s="rsi" aria-pressed="true" title="Relative strength index (14 weeks): above 70 overbought, below 30 oversold">RSI</button></div>
         <div class="seg" role="group" aria-label="Chart type" id="cmode"><button type="button" data-m="line" aria-pressed="true">Line</button><button type="button" data-m="candle" aria-pressed="false">Candles</button></div>
         <span class="legend" id="chLegend"></span>
       </div>
       <canvas id="chart" aria-label="Price chart for the selected market, card or bot"></canvas>
       <canvas id="volc" aria-label="Volume"></canvas>
+      <canvas id="rsic" aria-label="Relative strength index"></canvas>
       <div class="tip" id="chartTip" hidden></div>
       <div id="detail" class="detail"></div>
     </section>
@@ -104,6 +116,34 @@
     <section class="panel lbp" aria-labelledby="lb-h">
       <div class="head"><h2 id="lb-h">Leaderboard</h2><span class="note">click a bot for its account below</span></div>
       <div class="tablewrap"><table id="lb"><thead><tr><th>Bot</th><th class="num">Worth</th><th class="num">4 wk</th><th class="num">Gen</th></tr></thead><tbody></tbody></table></div>
+      <button type="button" class="more" id="lbMore">Show all bots</button>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="ind-h">
+    <div class="head"><h2 id="ind-h">Indicators</h2><span class="note">every gauge of the market, with its history since week 0 · hover for what it measures · click to chart it full size</span></div>
+    <div id="ind" class="indboard"></div>
+  </section>
+
+  <div class="movers">
+    <section class="panel"><div class="head"><h2>Top gainers</h2><span class="note">4 weeks</span></div><table id="mvUp"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>Top losers</h2><span class="note">4 weeks</span></div><table id="mvDown"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>Most active</h2><span class="note">trades, 4 weeks</span></div><table id="mvAct"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">Volume</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>New highs</h2><span class="note" id="mvHiN"></span></div><table id="mvHi"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>New lows</h2><span class="note" id="mvLoN"></span></div><table id="mvLo"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
+  </div>
+
+  <div class="grid main">
+    <section class="panel" aria-labelledby="sec-h">
+      <div class="head"><h2 id="sec-h">Sectors</h2><span class="note">the eight positions, each weighted by the cards it has out</span></div>
+      <div class="tablewrap"><table id="sectors"><thead><tr><th>Sector</th><th class="num">Players</th><th class="num">1W</th><th class="num">4W</th><th class="num">12W</th><th class="num">Price ÷ value</th><th class="num">Share of market</th><th class="num">Trades</th><th class="num">Up / down</th></tr></thead><tbody></tbody></table></div>
+      <div class="head"><h2 class="h3">Sector returns over time</h2><span class="scale" id="scaleSec"></span></div>
+      <canvas id="hmSec" class="hm hm--short" aria-label="Heatmap of each position's 4-week return over time"></canvas>
+      <div class="tip" id="hmSecTip" hidden></div>
+    </section>
+    <section class="panel" aria-labelledby="cal-h">
+      <div class="head"><h2 id="cal-h">Calendar</h2><span class="note">what the rules have scheduled</span></div>
+      <div id="cal" class="cal"></div>
     </section>
   </div>
 
@@ -219,6 +259,7 @@
       </div>
     </div>
     <div class="feed" id="feed"></div>
+    <button type="button" class="more" id="feedMore">Show more</button>
   </section>
 
   <section class="panel acct" id="acctPanel" aria-labelledby="a-h">

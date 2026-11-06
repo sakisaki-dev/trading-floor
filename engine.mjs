@@ -85,6 +85,7 @@ export const DEFAULTS = {
   closedEconomy: false, // instead: allowances and royalties paid only from what the house collects (no printed money)
   wealthTax: 0, // weekly tax on worth above 2× the median bot, paid into the house treasury (0 = off)
   positionLimit: 0, // no bot may hold more than this share of a card's circulation (at least 3 copies allowed; 0 = off)
+  twoSidedQuotes: true, // between trades, a price is marked to the spread only when the book has both an unfilled bid and an unfilled offer; off: any unfilled bid above or offer below pulls it (the old rule, which dragged every price down while random bots posted far more offers than bids)
   quotePull: 0.25, // how far unfilled orders pull the quoted price toward them each week
   flagWeeks: 26, // a caught thief can't trade with the bots that flagged it; the flags lift after this many weeks without being caught again (0 = never)
   deployOrders: 10, // most buy orders a bot places a week to put spare cash to work
@@ -99,7 +100,9 @@ export const DEFAULTS = {
   brain: 'nn', // 'nn': each bot is two small neural networks with random weights; 'genome': the older strategy-genome bots
   nnMutation: 0.05, // weight noise when a bot copies a better bot's networks (standard deviation per weight)
   nnResearchError: 0.2, // how far a neural bot's research note can be off the hidden value (log-normal)
-  nnFitnessGens: 3, // neural bots are ranked by their average return over this many generations
+  nnFitnessGens: 3,
+  nnStartBias: 0, // newborn networks lean toward doing nothing: this is subtracted from the buy, sell, pack and borrow outputs' starting bias
+  practiceGens: 0, // before the market opens, the bots play this many generations in a private practice market with the same rules and open with what they learned // neural bots are ranked by their average return over this many generations
   social: { sharer: 0.45, reciprocator: 0.35, thief: 0.2 }, // social style shares among rule bots
 };
 
@@ -167,6 +170,16 @@ export function createWorld(library, overrides = {}) {
   for (const p of W.players) for (let d = 0; d < 4; d++) for (let f = 0; f < 4; f++) { const m = makeMarket(W, p, d, f); W.cards.push(m); W.mktByKey.set(m.key, m); }
   seedHistory(W);
   for (let k = 0; k < cfg.population; k++) W.bots.push(newBot(W, null));
+  // A practice season: the same bots' networks first play cfg.practiceGens generations in a private market with the
+  // same rules (another seed); the real market opens with the networks that came out of it
+  if (cfg.practiceGens > 0 && cfg.brain === 'nn' && W.bots.length) {
+    const P = createWorld(library, { ...overrides, seed: (cfg.seed || 88) * 7919 + 1, practiceGens: 0 });
+    for (let t = 0; t < cfg.practiceGens * cfg.weeksPerGeneration; t++) step(P);
+    const pb = P.bots.filter((b) => b.g?.nn).sort((x, y) => (y.fit ?? 0) - (x.fit ?? 0));
+    W.bots.forEach((b, i) => { const s = pb[i % pb.length]; if (s && b.g?.nn) b.g = { ...s.g, card: Float64Array.from(s.g.card), bot: Float64Array.from(s.g.bot), w: { ...s.g.w }, targets: [], book: [] }; });
+    W.practice = { gens: cfg.practiceGens, endIndex: P.hist.p[P.hist.p.length - 1], endPF: bubble(P) };
+    packCache = null; packCacheT = null; hot = []; mood = { drop: 0 };
+  }
   if (W.bots.length) endow(W, W.bots);
   for (const b of W.bots) { b.nwh = [worth(W, b)]; b.genStart = b.nwh[0]; b.exo = 0; }
   if (cfg.games) { publishContests(W); publishContests(W); } // this week's contests and the ones two weeks out
@@ -295,6 +308,7 @@ export function itemLabel(W, it) {
 }
 // Put a rolled copy in a bot's hands: a market copy if it is a plain card, otherwise a one-of-a-kind item
 function mintCopy(W, b, x, cost, t = W.t, fromPool = true) {
+  if (W.ord && fromPool) W.ord.minted++;
   const p = W.players[x.pid];
   if (fromPool) { if (p.pool <= 0) return null; p.pool--; if (p.pool === 0) log(W, 'pool', `The pool has run out of ${p.pos} ${p.name} cards.`); }
   if (x.d < 4 && x.kit === 'home' && !x.par) { const m = W.cards[mktId(x.pid, x.d, x.f)]; m.circ++; if (!fromPool) m.S0++; if (b) { give(b, m, 1); addLot(b, m, cost, t); } return m; }
@@ -890,7 +904,14 @@ function forwardCard(w, x, buf) {
 function fastTanh(v) { if (v > 9) return 1; if (v < -9) return -1; const e = Math.exp(2 * v); return (e - 1) / (e + 1); }
 const CB = bufs(CARD_SHAPE), BB = bufs(BOT_SHAPE), XC = new Float64Array(CARD_SHAPE[0]), XB = new Float64Array(BOT_SHAPE[0]);
 const FLAT = Object.fromEntries(SIGNALS.map((k) => [k, 0]));
-function randomBrain(W) { return { nn: true, card: randomNet(W, CARD_SHAPE), bot: randomNet(W, BOT_SHAPE), w: { ...FLAT, __nn: true }, err: W.cfg.nnResearchError, targets: [], book: [], keep: 0.2, lev: 0, lendShare: 0, lendRate: 0.004, maxRate: 0.006, passBid: 100, passAsk: 100, ticketBid: 20, ticketAsk: 20 }; }
+function startBias(W, card, bot) {
+  const b = W.cfg.nnStartBias; if (!b) return;
+  const cOut = (CARD_SHAPE[0] + 1) * CARD_SHAPE[1] + (CARD_SHAPE[1] + 1) * CARD_SHAPE[2], cN = CARD_SHAPE[2] + 1; // the output layer's weights start here; each output has N2 weights then its bias
+  for (const j of [0, 1]) card[cOut + j * cN + CARD_SHAPE[2]] -= b; // buy, sell
+  const bOut = (BOT_SHAPE[0] + 1) * BOT_SHAPE[1], bN = BOT_SHAPE[1] + 1;
+  for (const j of [3, 10, 11, 12, 13]) bot[bOut + j * bN + BOT_SHAPE[1]] -= b; // borrow, the four pack types
+}
+function randomBrain(W) { const card = randomNet(W, CARD_SHAPE), bot = randomNet(W, BOT_SHAPE); startBias(W, card, bot); return { nn: true, card, bot, w: { ...FLAT, __nn: true }, err: W.cfg.nnResearchError, targets: [], book: [], keep: 0.2, lev: 0, lendShare: 0, lendRate: 0.004, maxRate: 0.006, passBid: 100, passAsk: 100, ticketBid: 20, ticketAsk: 20 }; }
 function mutateBrain(W, g) {
   const s = W.cfg.nnMutation, o = { ...g, card: Float64Array.from(g.card), bot: Float64Array.from(g.bot), w: { ...g.w }, targets: [], book: [] };
   for (const net of [o.card, o.bot]) for (let i = 0; i < net.length; i++) { net[i] += W.gauss() * s; if (W.rand() < 0.002) net[i] = W.gauss(); }
@@ -1128,6 +1149,7 @@ export function step(W) {
   W.flow = { net: GROUPS.map(() => 0), realized: GROUPS.map(() => 0), trips: GROUPS.map(() => 0), tax: 0, paidOut: 0 };
   assignGroups(W);
   W.week = { shares: 0, thefts: 0, caught: 0, researched: new Map() };
+  W.ord = { bids: 0, asks: 0, pullUp: 0, pullDown: 0, coins: 0, minted: 0, packs: W.house.packs };
   W.journal = W.journal.filter((j) => j.t === W.t); // keep this week's decisions, logged before the week ran
   for (const b of W.bots) {
     b.passes = b.passes.filter((e) => e > W.t); for (let k = 0; k < cfg.passesPerWeek; k++) b.passes.push(W.t + cfg.passLife);
@@ -1205,6 +1227,7 @@ function clear(W) {
           else { if ((seller.h.get(c.id) || 0) < 1) continue; give(seller, c, -1); seller.cash += price * (1 - cfg.fee); W.house.fees += price * cfg.fee; W.treasury += price * cfg.fee; fill(seller, c, 'sell', price); flowIn(W, seller, price * (1 - cfg.fee)); sellLot(W, seller, c, price * (1 - cfg.fee)); }
           if (buyer) { buyer.cash -= price; give(buyer, c, 1); fill(buyer, c, 'buy', price); flowOut(W, buyer, price); addLot(buyer, c, price, W.t); } else { c.circ--; W.house.outside += price; }
           c.wk.h = Math.max(c.wk.h, price); c.wk.l = Math.min(c.wk.l, price); c.wk.v++;
+          if (W.ord) W.ord.coins += price;
           jot(W, { type: 'trade', card: c.key, price: r2(price), buyer: buyer ? buyer.name : 'outside collector', seller: seller === 'liq' ? 'liquidator' : seller === 'store' ? 'Vault store' : seller.name });
           done++;
           if (W.arcsWeek.length < 60 && buyer && seller !== 'liq' && seller !== 'store' && W.rand() < 0.5) W.arcsWeek.push([seller.id, buyer.id]);
@@ -1216,7 +1239,12 @@ function clear(W) {
     let topBid = 0, lowAsk = Infinity;
     for (const o of B) if (!o.used && o.p > topBid) topBid = o.p;
     for (const o of A) if (!o.used && o.p < lowAsk) lowAsk = o.p;
-    if (topBid > c.P) c.P = lerp(c.P, topBid, cfg.quotePull); else if (lowAsk < c.P) c.P = lerp(c.P, lowAsk, cfg.quotePull);
+    const O = W.ord; if (O) { O.bids += B.length; O.asks += A.length; }
+    if (cfg.twoSidedQuotes) {
+      // Marked to the spread: only a two-sided book (an unfilled bid and an unfilled offer) moves the quote, toward the
+      // nearest edge of the spread when the last price sits outside it. Offers with no bids (or bids with no offers) don't.
+      if (topBid > 0 && lowAsk < Infinity) { const tgt = clamp(c.P, topBid, lowAsk); if (tgt > c.P) { c.P = lerp(c.P, tgt, cfg.quotePull); if (O) O.pullUp++; } else if (tgt < c.P) { c.P = lerp(c.P, tgt, cfg.quotePull); if (O) O.pullDown++; } }
+    } else if (topBid > c.P) { c.P = lerp(c.P, topBid, cfg.quotePull); if (O) O.pullUp++; } else if (lowAsk < c.P) { c.P = lerp(c.P, lowAsk, cfg.quotePull); if (O) O.pullDown++; }
     c.P = clamp(c.P, lim[0], lim[1]);
     (c.ohlc ||= []).push([r2(c.wk.o), r2(Math.max(c.wk.h, c.P)), r2(Math.min(c.wk.l, c.P)), r2(c.P), c.wk.v]); if (c.ohlc.length > 120) c.ohlc.shift();
     c.volH.push(done); if (c.volH.length > 60) c.volH.shift();
@@ -1387,6 +1415,7 @@ export function frame(W, { full = false } = {}) {
     flow: W.flow ? { net: W.flow.net.map(Math.round), realized: W.flow.realized.map(Math.round), trips: W.flow.trips, tax: Math.round(W.flow.tax), paidOut: Math.round(W.flow.paidOut) } : null,
     movers: movers(W),
     top: topCards(W),
+    ord: W.ord ? (() => { const ar = W.auctionResults || [], sold = ar.filter((r) => r.winner); return { bids: W.ord.bids, asks: W.ord.asks, pullUp: W.ord.pullUp, pullDown: W.ord.pullDown, coins: Math.round(W.ord.coins), minted: W.ord.minted, packs: W.house.packs - W.ord.packs, aucListed: ar.length, aucSold: sold.length, aucCoins: Math.round(sold.reduce((s, r) => s + r.price, 0)), flagged: W.bots.filter((b) => b.flaggedBy >= 5).length, due4: (W.loans || []).filter((L) => L.due - W.t <= 4).length, due4Coins: Math.round((W.loans || []).filter((L) => L.due - W.t <= 4).reduce((x, L) => x + L.amount, 0)), allowance: Math.round(W.flow?.paidOut || 0), prizes: Math.round(W.prizePool || 0) }; })() : null,
     bands: bandBubble(W),
     bandHold: bandHoldings(W),
     sens: W.t % 4 === 0 ? (W.nnSens = nnSensitivity(W)) : null,
