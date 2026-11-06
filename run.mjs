@@ -4,7 +4,8 @@
 //   node run.mjs --config configs/pilot.json --dry     # no API calls: a scripted stand-in plays the AI seats
 //   node run.mjs --config configs/pilot.json           # real run (needs ANTHROPIC_API_KEY or an `ant auth login` profile)
 //
-// Options: --weeks N, --budget USD, --id NAME, --messages (turn bot talk on), --dry.
+// Options: --weeks N, --budget USD, --id NAME, --messages (turn bot talk on), --dry, --engine cli (use the Claude Code
+// plan through `claude -p` instead of an API key; the budget then counts list-price equivalent dollars).
 // Output, in runs/<id>/:
 //   run.json         frames for every week (load it on the Trading Floor page with "AI run" to replay it),
 //                    plus each AI bot's memo per week and the run's cost
@@ -14,7 +15,9 @@
 // The run stops when the API cost reaches the budget, and run.json is saved every 10 weeks, so nothing is lost.
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import * as E from './engine.mjs';
 
@@ -25,6 +28,32 @@ const opt = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i
 
 const config = JSON.parse(fs.readFileSync(path.resolve(here, opt('config', 'configs/pilot.json')), 'utf8'));
 const DRY = flag('dry');
+// --engine cli: run each AI decision through the Claude Code CLI (`claude -p`), billed to the Claude Code plan instead
+// of an API key. The bot gets only the rulebook as its system prompt, no tools, no project files, no saved sessions.
+const ENGINE = opt('engine', 'api');
+function findClaude() {
+  if (process.env.CLAUDE_BIN) return process.env.CLAUDE_BIN;
+  const ext = path.join(process.env.HOME || '', '.vscode/extensions');
+  try { const dirs = fs.readdirSync(ext).filter((d) => d.startsWith('anthropic.claude-code-')).sort(); for (const d of dirs.reverse()) { const p = path.join(ext, d, 'resources/native-binary/claude'); if (fs.existsSync(p)) return p; } } catch {}
+  return 'claude';
+}
+const BOT_CWD = path.join(os.tmpdir(), 'rv-sandbox-bot'); // an empty folder, so a bot can't see the repo
+async function decideCli(seat, user) {
+  fs.mkdirSync(BOT_CWD, { recursive: true });
+  const model = seat.cliModel || (seat.model?.includes('opus') ? 'opus' : seat.model?.includes('sonnet') ? 'sonnet' : 'haiku');
+  const args = ['-p', '--model', model, '--effort', seat.effort || 'low', '--system-prompt', SYSTEM, '--tools', '', '--json-schema', JSON.stringify(SCHEMA), '--output-format', 'json', '--no-session-persistence', '--strict-mcp-config'];
+  const out = await new Promise((resolve, reject) => {
+    const ch = spawn(findClaude(), args, { cwd: BOT_CWD, stdio: ['pipe', 'pipe', 'pipe'] });
+    let so = '', se = ''; const timer = setTimeout(() => { ch.kill('SIGKILL'); reject(new Error('claude -p timed out')); }, 180000);
+    ch.stdout.on('data', (d) => (so += d)); ch.stderr.on('data', (d) => (se += d));
+    ch.on('error', reject); ch.on('close', (code) => { clearTimeout(timer); code === 0 ? resolve(so) : reject(new Error(`claude -p exited ${code}: ${(se || so).slice(0, 300)}`)); });
+    ch.stdin.end(user);
+  });
+  const r = JSON.parse(out);
+  if (r.is_error) throw new Error(String(r.result || r.subtype || 'error').slice(0, 300));
+  const actions = r.structured_output ?? parseJson(r.result);
+  return { actions: actions || {}, usage: r.usage || {}, cost: r.total_cost_usd || 0, note: actions ? null : 'unparsable', raw: actions ? undefined : String(r.result || '').slice(0, 2000) };
+}
 const WEEKS = Number(opt('weeks', config.weeks ?? 100));
 const BUDGET = Number(opt('budget', config.budgetUsd ?? 5));
 const ID = opt('id', `${config.id || 'run'}${DRY ? '-dry' : ''}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '')}`);
@@ -80,8 +109,9 @@ function parseJson(text) {
 let structuredOk = true;
 async function decide(bot, seat, obs) {
   if (DRY) return { actions: mockPolicy(obs), usage: {}, cost: 0 };
+  const user = `${seat.persona ? `Your style: ${seat.persona}\n\n` : ''}This week's state:\n${JSON.stringify(obs)}`;
+  if (ENGINE === 'cli') return decideCli(seat, user);
   const c = await getClient();
-  const user = `Your style: ${seat.persona || 'none assigned'}\n\nThis week's state:\n${JSON.stringify(obs)}`;
   const base = {
     model: seat.model, max_tokens: 6000,
     system: [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }],
