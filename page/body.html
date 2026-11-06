@@ -4,7 +4,7 @@
       <span class="kicker gold">Retro Vault · Sandbox</span>
       <h1>The <em>Trading</em> Floor</h1>
     </div>
-    <p class="sub">Bots trade 203 real players' cards, priced by hidden values no bot can see. Knowledge comes from research, notes and games.</p>
+    <p class="sub">Bots trade real players' cards against hidden values, replaying the save's real seasons. Every bot starts with a random strategy genome; what works spreads.</p>
   </header>
 
   <div class="bar" role="group" aria-label="Simulation controls">
@@ -49,7 +49,7 @@
       <label class="toggle"><input type="checkbox" id="sharing" checked> Sharing</label>
       <label class="toggle"><input type="checkbox" id="stealing" checked> Stealing</label>
       <label class="toggle"><input type="checkbox" id="gossip" checked> Gossip</label>
-      <label class="toggle"><input type="checkbox" id="outsideCollectors" checked> Collectors</label>
+      <label class="toggle"><input type="checkbox" id="outsideCollectors"> Outside buyers</label>
       <label class="toggle"><input type="checkbox" id="royalties" checked> Royalties</label>
       <label class="toggle"><input type="checkbox" id="evolve" checked> Evolution</label>
       <label class="toggle"><input type="checkbox" id="leagueUpdates"> League updates</label>
@@ -68,7 +68,7 @@
     <div class="kpi"><span>Pass price</span><b id="kPass">–</b><small id="kPassS"></small></div>
     <div class="kpi"><span>Ticket price</span><b id="kTicket">–</b><small id="kTicketS"></small></div>
     <div class="kpi"><span>Game skill</span><b id="kWin">–</b><small id="kWinS"></small></div>
-    <div class="kpi"><span>Leverage</span><b id="kBank">–</b><small id="kBankS"></small></div>
+    <div class="kpi"><span>Loan rate</span><b id="kBank">–</b><small id="kBankS"></small></div>
   </div>
 
   <div class="desk">
@@ -102,7 +102,7 @@
 
   <div class="grid main">
     <section class="panel" aria-labelledby="floor-h">
-      <div class="head"><h2 id="floor-h">Floor</h2><span class="note">click a bot · x = worth (log) · size = cards · dashed = thief · red ring = flagged 5+</span></div>
+      <div class="head"><h2 id="floor-h">Floor</h2><span class="note">lane = a bot's strongest gene (strategies emerge, they aren't assigned) · click a bot · x = worth · dashed = thief</span></div>
       <canvas id="floor" aria-label="Every bot by worth, one lane per strategy"></canvas>
       <div class="tip" id="floorTip" hidden></div>
     </section>
@@ -124,6 +124,13 @@
       </section>
     </div>
   </div>
+
+  <section class="panel" aria-labelledby="hg-h">
+    <div class="head"><h2 id="hg-h">What evolution selects</h2><span class="scale" id="scaleGene"></span></div>
+    <p class="note">Each row is one gene: the population's average weight on it, weighted by wealth, against where it started. Blue means it is paying and spreading.</p>
+    <canvas id="hmGene" class="hm hm--short" aria-label="Heatmap of the wealth-weighted genome over time"></canvas>
+    <div class="tip" id="hmGeneTip" hidden></div>
+  </section>
 
   <div class="grid two">
     <section class="panel" aria-labelledby="hf-h">
@@ -203,6 +210,7 @@
         <button type="button" data-f="game" aria-pressed="false">Games</button>
         <button type="button" data-f="pack" aria-pressed="false">Packs</button>
         <button type="button" data-f="talk" aria-pressed="false">Talk</button>
+        <button type="button" data-f="credit" aria-pressed="false">Credit</button>
         <button type="button" data-f="people" aria-pressed="false">People</button>
         <button type="button" data-f="ai" aria-pressed="false">AI</button>
       </div>

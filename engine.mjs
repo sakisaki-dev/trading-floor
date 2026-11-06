@@ -26,17 +26,17 @@ export const DEFAULTS = {
   stealing: true, // thieves may copy another bot's notes
   detectChance: 0.35, // chance a theft is noticed; the victim then flags the thief and stops sharing with it
   gossip: true, // a victim's friends flag the thief too
-  outsideCollectors: true, // buyers from outside the bots bid around hidden value (the market's anchor)
+  outsideCollectors: false, // buyers from outside the bots bid around hidden value (the market's anchor)
   royalties: true, // each generation, holders get 3% of hidden value per card held
   royaltyRate: 0.03,
   evolve: true, // the poorest 10% of rule bots are replaced by mutated copies of the richest 10%
   evolveShare: 0.1,
   history: true, // replay the save's real seasons as news (sandbox/data/timeline.json), then real-change draws after
   seasonWeeks: 20, // weeks per season
-  turnover: true, // bots join (faster after rallies, mostly speculators) and leave (after heavy losses, or retiring)
+  turnover: false, // bots join (faster after rallies, mostly speculators) and leave (after heavy losses, or retiring)
   entryRate: 0.25, // newcomers per week in a flat market
-  lenderCycle: true, // lenders tighten after margin calls and defaults, loosen in calm rising markets
-  fashion: true, // collectors' taste for each player family drifts, jumps on hype and feeds on price gains
+  lenderCycle: false, // (retired: credit is now between bots, so rates and limits come from their own decisions)
+  fashion: false, // collectors' taste for each player family drifts, jumps on hype and feeds on price gains
   gameStake: 2, // coins each entrant stakes into a game's pot (plus a ticket); the best scores share the pot
   games: true, // weekly Arcade contests (see GAMES)
   gameTickets: 3, // game tickets granted to every bot each week; a ticket is spent when a game starts (no restarts)
@@ -47,10 +47,11 @@ export const DEFAULTS = {
   // Real-world forces (on by default): bots must pay to live, and can borrow against their cards
   livingCost: 4, // coins a bot must spend each week just to stay in the market (leaves the economy)
   lifestyle: 0.0015, // plus this share of its worth: richer bots spend more, as people do
-  credit: true, // bots may borrow against their cards (margin); loans create coins, repayments remove them
+  credit: true, // bots may lend to and borrow from each other, secured by the borrower's cards (no bank, no new coins)
   maxLTV: 0.6, // most a bot can borrow, as a share of its cards' value
-  marginCall: 0.75, // when a loan passes this share of the cards' value, the bot must sell at a discount until it is back under maxLTV
-  interest: 0.002, // weekly interest on loans (leaves the economy)
+  marginCall: 0.75, // past this share of its cards' value, a borrower must sell at a discount until it is back under maxLTV
+  loanWeeks: 8, // loans fall due after this many weeks; a borrower that can't repay must sell, and after 3 late weeks defaults
+  interest: 0.002, // (unused without a bank) the rate is whatever lenders and borrowers agree
   // Artificial safeguards (policy experiments, all off by default)
   store: false, // the Vault store sells unminted copies at hidden value × (1 + storePremium): a ceiling while the pool lasts
   storePremium: 0.6,
@@ -70,15 +71,15 @@ export const DEFAULTS = {
   gamesAdaptive: true, // every 4 weeks each game's bar moves so its payout returns to gameTarget
   leagueUpdates: false, // TEST ONLY: every updateEvery weeks some players' hidden values move, as a real upload would
   updateEvery: 40,
-  mix: [16, 14, 14, 24, 10, 12, 12], // rule bots per strategy, in ARCH order
+  population: 100, // rule bots at the start; each gets a random strategy genome (no assigned strategies)
   social: { sharer: 0.45, reciprocator: 0.35, thief: 0.2 }, // social style shares among rule bots
 };
 
 export const ARCH = [
-  { key: 'value', label: 'Value', short: 'VAL', color: '#3987e5', blurb: 'Researches players and buys cards below its estimate of their worth, sells above it.' },
+  { key: 'value', label: 'Value', short: 'VAL', color: '#3987e5', blurb: 'Strongest gene: the gap between its notes and the price.' },
   { key: 'mm', label: 'Market maker', short: 'MM', color: '#d95926', blurb: 'Quotes a bid and an ask on a handful of cards and earns the spread.' },
   { key: 'momentum', label: 'Momentum', short: 'MOM', color: '#199e70', blurb: 'Buys what is rising, sells what is falling. Sells its research passes.' },
-  { key: 'retail', label: 'Retail herd', short: 'RTL', color: '#c98500', blurb: 'Rips packs, chases hot cards, panic-sells when the market drops.' },
+  { key: 'retail', label: 'Herd', short: 'HRD', color: '#c98500', blurb: 'Rips packs, chases hot cards, panic-sells when the market drops.' },
   { key: 'arb', label: 'Pack arbitrage', short: 'ARB', color: '#d55181', blurb: 'Rips packs when their pulls sell for more than the pack costs, then flips them.' },
   { key: 'collector', label: 'Collector', short: 'COL', color: '#008300', blurb: 'Researches and hoards two favourite players. Can corner a card.' },
   { key: 'contrarian', label: 'Contrarian', short: 'CTR', color: '#9085e9', blurb: 'Buys sharp drops below the recent average, sells the bounce.' },
@@ -126,7 +127,7 @@ export function createWorld(library, overrides = {}) {
   W.families = familyList(library);
   library.players.forEach((p, i) => (W.cards[i].fam = familyIndex(W.families, p)));
   startTimeline(W);
-  cfg.mix.forEach((n, a) => { for (let k = 0; k < n; k++) W.bots.push(newBot(W, a)); });
+  for (let k = 0; k < cfg.population; k++) W.bots.push(newBot(W, null));
   for (const c of W.cards) for (let u = 0; u < c.S0; u++) { const b = W.pick(W.bots); give(b, c, 1); addLot(b, c, c.F, 0); c.circ++; }
   for (const b of W.bots) b.nwh = [worth(W, b)];
   if (cfg.games) publishContests(W);
@@ -136,43 +137,6 @@ export function createWorld(library, overrides = {}) {
 }
 export function teamShort(t) { const w = String(t || 'FA').split(' '); return t === 'Free agent' ? 'FA' : w[w.length - 1]; }
 
-function socialStyle(W) { const s = W.cfg.social, r = W.rand(); return r < s.sharer ? 'sharer' : r < s.sharer + s.reciprocator ? 'reciprocator' : 'thief'; }
-function baseGenes(W, a) {
-  const r = W.rand;
-  // lev: how much a bot borrows, as a share of its equity. Momentum traders and the herd lean on credit; most others barely do.
-  const lev = a === 2 ? lerp(0.4, 1.6, r()) : a === 3 ? lerp(0.1, 1.0, r()) : r() < 0.25 ? lerp(0, 0.4, r()) : 0;
-  const g = { keep: lerp(0.08, 0.35, r()), err: lerp(0.06, 0.35, r()), passBid: lerp(2, 30, r()), passAsk: lerp(1, 12, r()), ticketBid: lerp(0.5, 8, r()), ticketAsk: lerp(0.2, 4, r()), lev };
-  switch (a) {
-    case 0: return { ...g, margin: lerp(0.06, 0.2, r()) };
-    case 1: return { ...g, spread: lerp(0.03, 0.09, r()), size: 8 + Math.floor(r() * 9), book: [] };
-    case 2: return { ...g, look: 3 + Math.floor(r() * 6), trig: lerp(0.04, 0.14, r()) };
-    case 3: return { ...g, panic: lerp(0.06, 0.16, r()) };
-    case 4: return { ...g, trig: lerp(1.0, 1.12, r()) };
-    case 5: return { ...g, cap: lerp(1.4, 2.8, r()), sell: lerp(2.8, 4.5, r()), targets: collectorTargets(W) };
-    case 6: return { ...g, dip: lerp(0.08, 0.22, r()) };
-    default: return g;
-  }
-}
-function mutate(W, g) {
-  const o = { ...g, book: [], targets: g.targets ? g.targets.slice() : undefined };
-  for (const k of Object.keys(o)) {
-    if (typeof o[k] !== 'number') continue;
-    o[k] = k === 'size' || k === 'look' ? Math.max(2, Math.round(o[k] * lerp(0.8, 1.2, W.rand()))) : o[k] * lerp(0.85, 1.15, W.rand());
-  }
-  return o;
-}
-function collectorTargets(W) { const pool = W.cards.filter((c) => c.F > 4 && c.F < 600); return [W.pick(pool).id, W.pick(pool).id]; }
-export function newBot(W, a, parent, extra = {}) {
-  const b = {
-    id: W.nextId++, a, kind: a === AI ? 'ai' : 'rule', g: parent ? mutate(W, parent.g) : baseGenes(W, a), cash: W.cfg.startCash,
-    h: new Map(), n: 0, nwh: [], gen: parent ? parent.gen + 1 : 1, born: W.t, seasons: 0,
-    passes: [], tickets: [], notes: new Map(), debt: 0, flags: new Set(), friends: new Set(), flaggedBy: 0,
-    social: parent ? (W.rand() < 0.1 ? socialStyle(W) : parent.social) : socialStyle(W),
-    stats: { shared: 0, stolen: 0, caught: 0, researched: 0 }, memo: '', ...extra,
-  };
-  b.name = extra.name || `${ARCH[a].short}-${String(b.id).padStart(3, '0')}`;
-  return b;
-}
 // AI bots join on equal terms: the same starting cash plus a basket as big as the average rule bot's, minted from the pool.
 export function addAiBot(W, extra = {}) {
   const b = newBot(W, AI, null, { social: extra.social || 'reciprocator', ...extra });
@@ -184,7 +148,7 @@ export function addAiBot(W, extra = {}) {
 
 function give(b, c, q) { const v = (b.h.get(c.id) || 0) + q; v > 0 ? b.h.set(c.id, v) : b.h.delete(c.id); b.n += q; }
 export function worth(W, b) {
-  let v = b.cash - (b.debt || 0);
+  let v = b.cash - (b.debt || 0) + (b.lent || 0);
   for (const [id, q] of b.h) { const c = W.cards[id]; const hc = q <= 3 ? 1 : 1 / (1 + 0.06 * (q - 3)); v += q * c.P * (1 - W.cfg.fee) * hc; }
   return v;
 }
@@ -313,19 +277,6 @@ export function steal(W, thief, victim) {
 function trimNotes(W, b) { while (b.notes.size > W.cfg.memoryCap) { let o = null; for (const [id, n] of b.notes) if (!o || n.week < o[1].week) o = [id, n]; b.notes.delete(o[0]); } }
 
 /* ---------- Rule bots: research and passes ---------- */
-function researchWish(W, b) {
-  // How many passes a bot wants this week, and which players it would research
-  const known = (c) => fresh(W, b.notes.get(c.id)) && W.t - b.notes.get(c.id).week < W.cfg.knowledgeWeeks - 2;
-  const unknownHot = () => hot.slice(0, 40).filter((c) => !known(c));
-  switch (b.a) {
-    case 0: { const held = [...b.h.keys()].map((id) => W.cards[id]).filter((c) => !known(c)); return [...held.slice(0, 2), ...unknownHot().sort(() => W.rand() - 0.5), ...sample(W, 6).filter((c) => !known(c))].slice(0, W.cfg.maxResearchPerWeek); }
-    case 1: return (b.g.book || []).map((id) => W.cards[id]).filter((c) => !known(c)).slice(0, 3);
-    case 5: return b.g.targets.map((id) => W.cards[id]).filter((c) => !known(c));
-    case 6: return hot.slice(0, 60).sort((x, y) => ret(x, 8) - ret(y, 8)).filter((c) => !known(c)).slice(0, 2);
-    case 3: return W.rand() < 0.4 ? unknownHot().slice(0, 1) : [];
-    default: return [];
-  }
-}
 // Passes and game tickets trade the same way: each bot keeps the ones it needs, sells spares to bots that want more,
 // and everything clears in one weekly call auction per token at a single price.
 function tokenMarket(W, kind) {
@@ -400,13 +351,7 @@ function auctionPhase(W) {
       if (b === a.seller) continue;
       let bidv = null;
       if (b.kind === 'ai') bidv = Number((b.pending?.auctionBids || []).find((x) => x.auctionId === a.id)?.bid) || null;
-      else {
-        const e = estimate(W, b, c);
-        if (b.a === 5 && b.g.targets.includes(c.id)) bidv = est(W, b, c) * b.g.cap * 0.9;
-        else if (b.a === 0 && e !== null) bidv = e * (1 - b.g.margin * 0.5);
-        else if (b.a === 2 && ret(c, b.g.look) > b.g.trig) bidv = c.P * 1.05;
-        else if (b.a === 6 && e !== null && c.P < ma(c, 12) * (1 - b.g.dip)) bidv = Math.min(e, c.P * 1.05);
-      }
+      else bidv = ruleAuctionBid(W, b, c);
       if (bidv && bidv > 0 && b.cash >= bidv) a.bids.push({ b, p: bidv });
     }
     a.bids.sort((x, y) => y.p - x.p);
@@ -428,9 +373,7 @@ function auctionPhase(W) {
   for (const b of W.bots) {
     if (b.kind === 'ai') { for (const x of (b.pending?.auction || []).slice(0, 2)) { const c = W.byKey.get(x.player); if (c) listAuction(W, b, c, Number(x.reserve)); } continue; }
     if (!W.cfg.auctions) continue;
-    // Rule bots: the herd now and then auctions its priciest card; arbitrage auctions scarce pulls.
-    if (b.a === 3 && W.rand() < 0.04 && b.h.size) { const c = [...b.h.keys()].map((id) => W.cards[id]).sort((x, y) => y.P - x.P)[0]; listAuction(W, b, c, c.P * 0.9); }
-    if (b.a === 4) for (const [id] of b.h) { const c = W.cards[id]; if (c.circ < 12 && W.rand() < 0.3) { listAuction(W, b, c, c.P); break; } }
+    ruleAuctionList(W, b);
   }
 }
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -529,7 +472,7 @@ function ruleAnswers(W, b, game, con) {
     const k = q.ids.filter((id) => knows(W, b, id)).length / q.ids.length;
     switch (game) {
       case 'valuation': return String(r2(knows(W, b, q.ids[0]) ? estimate(W, b, W.cards[q.ids[0]]) : W.cards[q.ids[0]].P));
-      case 'prediction': { const c = W.cards[q.ids[0]], est0 = estimate(W, b, c); const tilt = b.a === 2 ? clamp(ret(c, 4) * 3, -0.3, 0.3) : est0 !== null ? (est0 > c.P ? 0.18 : -0.18) : 0; return String(r2(clamp(0.5 + tilt + W.gauss() * 0.05, 0.02, 0.98))); }
+      case 'prediction': { const c = W.cards[q.ids[0]], est0 = estimate(W, b, c); const tilt = b.g.w.momentum > 0.3 ? clamp(ret(c, 4) * 3, -0.3, 0.3) : est0 !== null ? (est0 > c.P ? 0.18 : -0.18) : 0; return String(r2(clamp(0.5 + tilt + W.gauss() * 0.05, 0.02, 0.98))); }
       case 'blindRank': return q.ids.map((id, i) => [L5[i], knows(W, b, id) ? noisy(eraOf(W, id).perGame[q.stat]) : W.rand() * eraOf(W, q.ids[0]).perGame[q.stat] * 2]).sort((x, y) => y[1] - x[1]).map((x) => x[0]).join(',');
       case 'closest': return String(Math.round(knows(W, b, q.ids[0]) ? noisy(q.truth) : q.med));
       case 'keepCut': return q.ids.map((id, i) => [L5[i], knows(W, b, id) ? noisy(eraOf(W, id).legacy) : W.cards[id].P * 30]).sort((x, y) => y[1] - x[1]).slice(0, 3).map((x) => x[0]).join(',');
@@ -611,82 +554,196 @@ function ticketWish(W, b) {
   return clamp(1 + Math.floor(n / 3), 1, W.cfg.maxGamesPerWeek);
 }
 
-/* ---------- Rule bots: trading ---------- */
-function deploy(W, b) {
-  const nw = b.nwh[b.nwh.length - 1] || b.cash, spare = b.cash - b.g.keep * nw;
-  if (spare <= 0) return;
-  const knownCards = () => [...b.notes.keys()].map((id) => W.cards[id]).filter((c) => estimate(W, b, c) !== null);
-  let picks;
-  switch (b.a) {
-    case 0: picks = knownCards().sort((x, y) => est(W, b, y) / y.P - est(W, b, x) / x.P).filter((c) => est(W, b, c) > c.P); break;
-    case 1: picks = (b.g.book || []).map((id) => W.cards[id]); break;
-    case 2: picks = hot.slice(0, 40).sort((x, y) => ret(y, b.g.look) - ret(x, b.g.look)); break;
-    case 4: { const pk = packInfo(W); if (pk.evMarket > pk.price * 0.95) { for (let k = 0; k < 2; k++) if (!ripPack(W, b)) break; return; } picks = []; break; }
-    case 5: picks = b.g.targets.map((id) => W.cards[id]); break;
-    case 6: picks = sample(W, 40).sort((x, y) => ret(x, 8) - ret(y, 8)); break;
-    default: return;
-  }
-  let left = spare;
-  for (const c of picks.slice(0, W.cfg.deployOrders)) { if (left <= 0) break; bid(b, c, c.P * 1.04); left -= c.P; }
+/* ---------- Strategy genome (no assigned strategies) ---------- */
+// Every rule bot runs the same policy. What differs is its genome: how much weight it puts on each signal it can see,
+// plus how aggressive, patient, leveraged, generous and sociable it is. Strategies are not assigned; a bot's "style"
+// is just a label for its dominant weight, recomputed as its genome mutates down the generations. Whatever pays,
+// spreads (if evolution is on); whatever doesn't, dies out.
+//   value    the gap between its notes' estimate and the price
+//   make     posting quotes on both sides (market making)
+//   momentum the card's recent trend
+//   herd     what the crowd is doing (recent volume and the market's mood)
+//   pack     the gap between what a pack's pulls sell for and the pack's price
+//   hoard    accumulating a few favourite players
+//   revert   distance below the card's recent average (buying dips)
+export const SIGNALS = ['value', 'make', 'momentum', 'herd', 'pack', 'hoard', 'revert'];
+function socialStyle(W) { const s = W.cfg.social, r = W.rand(); return r < s.sharer ? 'sharer' : r < s.sharer + s.reciprocator ? 'reciprocator' : 'thief'; }
+function gammaish(W, k) { let x = 0; for (let i = 0; i < 3; i++) x -= Math.log(W.rand() || 1e-9); return Math.pow(x / 3, 1 / k); } // skewed draw: most weights small, a few large
+function norm(w) { const s = SIGNALS.reduce((a, k) => a + w[k], 0) || 1; for (const k of SIGNALS) w[k] /= s; return w; }
+const styleOf = (w) => SIGNALS.reduce((best, k, i) => (w[k] > w[SIGNALS[best]] ? i : best), 0);
+function collectorTargets(W) { const pool = W.cards.filter((c) => c.on !== false && c.F > 4 && c.F < 600); return pool.length ? [W.pick(pool).id, W.pick(pool).id] : []; }
+function randomGenome(W) {
+  const r = W.rand, w = {}; for (const k of SIGNALS) w[k] = gammaish(W, 0.45);
+  return {
+    w: norm(w), horizon: 2 + Math.floor(r() * 11), aggr: lerp(0.01, 0.08, r()), margin: lerp(0.04, 0.25, r()), keep: lerp(0.08, 0.4, r()),
+    err: lerp(0.06, 0.35, r()), panic: lerp(0.06, 0.3, r()), spread: lerp(0.02, 0.1, r()), size: 5 + Math.floor(r() * 11),
+    lev: r() < 0.5 ? 0 : -Math.log(r() || 1e-9) * 0.4, lendShare: r() < 0.5 ? 0 : r() * 0.6, lendRate: lerp(0.001, 0.008, r()), maxRate: lerp(0.002, 0.012, r()),
+    passBid: lerp(2, 30, r()), passAsk: lerp(1, 12, r()), ticketBid: lerp(0.5, 8, r()), ticketAsk: lerp(0.2, 4, r()),
+    targets: collectorTargets(W), book: [],
+  };
 }
-function rebalance(W, b, pend) {
-  if (b.a === 5 || b.a === 1) return;
-  const nw = b.nwh[b.nwh.length - 1] || b.cash;
-  if (b.cash >= b.g.keep * nw * 0.5) return;
-  const held = [...b.h.keys()].map((id) => W.cards[id]).sort((x, y) => y.P / est(W, b, y) - x.P / est(W, b, x));
-  for (const c of held.slice(0, 2)) ask(b, c, c.P * 0.98, pend);
+function mutate(W, g) {
+  const o = { ...g, w: { ...g.w }, book: [], targets: g.targets.slice() };
+  for (const k of SIGNALS) o.w[k] *= Math.exp(W.gauss() * 0.3);
+  if (W.rand() < 0.1) o.w[W.pick(SIGNALS)] *= 3; // now and then a bigger jump: innovation
+  norm(o.w);
+  for (const k of ['aggr', 'margin', 'keep', 'err', 'panic', 'spread', 'lev', 'lendShare', 'lendRate', 'maxRate', 'passBid', 'passAsk', 'ticketBid', 'ticketAsk']) o[k] = Math.max(0, o[k] * lerp(0.85, 1.15, W.rand()) + (o[k] === 0 && W.rand() < 0.05 ? 0.05 : 0));
+  o.horizon = clamp(Math.round(o.horizon * lerp(0.8, 1.25, W.rand())), 2, 16); o.size = clamp(Math.round(o.size * lerp(0.8, 1.25, W.rand())), 3, 20);
+  if (W.rand() < 0.2) o.targets = collectorTargets(W);
+  return o;
 }
+export function newBot(W, a, parent, extra = {}) {
+  const ai = a === AI, g = ai ? randomGenome(W) : parent ? mutate(W, parent.g) : randomGenome(W);
+  const b = {
+    id: W.nextId++, a: ai ? AI : styleOf(g.w), kind: ai ? 'ai' : 'rule', g, cash: W.cfg.startCash,
+    h: new Map(), n: 0, nwh: [], gen: parent ? parent.gen + 1 : 1, born: W.t, seasons: 0,
+    passes: [], tickets: [], notes: new Map(), debt: 0, lent: 0, flags: new Set(), friends: new Set(), flaggedBy: 0,
+    social: parent ? (W.rand() < 0.1 ? socialStyle(W) : parent.social) : socialStyle(W),
+    stats: { shared: 0, stolen: 0, caught: 0, researched: 0 }, memo: '', ...extra,
+  };
+  b.name = extra.name || `BOT-${String(b.id).padStart(3, '0')}`;
+  return b;
+}
+
+// The signals one bot reads for one card (all roughly in −1…1)
+function signals(W, b, c) {
+  const e = estimate(W, b, c), g = b.g;
+  return {
+    value: e === null ? 0 : clamp((e - c.P) / c.P, -1, 1),
+    momentum: clamp(ret(c, g.horizon), -0.5, 0.5),
+    revert: clamp(1 - c.P / ma(c, 12), -0.5, 0.5),
+    herd: (recentVol(c, 4) > 2 ? clamp(ret(c, 2), -0.3, 0.3) + 0.05 : 0) - mood.drop * 2,
+  };
+}
+const scoreCard = (b, s) => 3 * (b.g.w.value * s.value + b.g.w.momentum * s.momentum + b.g.w.revert * s.revert + b.g.w.herd * s.herd);
+
+// Which players a bot wants to research this week: bots that weigh value, hoarding or dips read the library; pure
+// momentum, herd and pack bots mostly sell their passes
+function researchWish(W, b) {
+  const w = b.g.w, want = clamp(Math.round(W.cfg.passesPerWeek * 1.6 * (w.value + w.hoard + 0.5 * w.revert + 0.5 * w.make)), 0, W.cfg.maxResearchPerWeek);
+  if (!want) return [];
+  const known = (c) => fresh(W, b.notes.get(c.id)) && W.t - b.notes.get(c.id).week < W.cfg.knowledgeWeeks - 2;
+  const held = [...b.h.keys()].map((id) => W.cards[id]), tg = (b.g.targets || []).map((id) => W.cards[id]);
+  return [...tg, ...held, ...hot.slice(0, 40), ...sample(W, 8)].filter((c, i, a) => c && c.on !== false && !known(c) && a.indexOf(c) === i).slice(0, want);
+}
+
 function act(W, b) {
-  const pend = new Map(), g = b.g;
-  deploy(W, b); rebalance(W, b, pend);
-  switch (b.a) {
-    case 0: {
-      for (const [id] of b.notes) { const c = W.cards[id], e = estimate(W, b, c); if (e === null) continue; const lo = e * (1 - g.margin); if (c.P <= lo * 1.04) bid(b, c, Math.min(lo, c.P * 1.03)); }
-      for (const [id] of b.h) { const c = W.cards[id], e = estimate(W, b, c); if (e === null) continue; const hi = e * (1 + g.margin); if (c.P >= hi * 0.97) ask(b, c, Math.max(hi, c.P * 0.97), pend); }
-      break;
-    }
-    case 1: {
-      if (!g.book.length || W.t % W.cfg.weeksPerGeneration === 1) g.book = hot.slice(0, 50).sort(() => W.rand() - 0.5).slice(0, g.size).map((c) => c.id);
-      for (const id of g.book) {
-        const c = W.cards[id], inv = b.h.get(id) || 0, e = estimate(W, b, c);
-        const mid = e === null ? c.P : lerp(c.P, e, 0.3), skew = (inv - 3) * 0.012;
-        if (inv < 10 && b.cash > c.P * 2) bid(b, c, mid * (1 - g.spread - skew));
-        if (inv > 0) ask(b, c, mid * (1 + g.spread - skew), pend);
-      }
-      break;
-    }
-    case 2: {
-      for (const c of hot.slice(0, 40).concat(sample(W, 6)).slice(0, 24)) { const r = ret(c, g.look); if (r > g.trig && b.cash > c.P) { bid(b, c, c.P * 1.05); if (r > g.trig * 2) bid(b, c, c.P * 1.08); } }
-      for (const [id] of b.h) { const c = W.cards[id], r = ret(c, g.look); if (r < -g.trig * 0.5 || (r < 0 && W.rand() < 0.3)) ask(b, c, c.P * 0.96, pend); }
-      break;
-    }
-    case 3: {
-      const nw = b.nwh, own = nw.length > 4 ? 1 - nw[nw.length - 1] / Math.max(...nw.slice(-5)) : 0;
-      if (Math.max(own, mood.drop) > g.panic) { let k = 0; for (const [id] of b.h) { if (k++ > 6) break; ask(b, W.cards[id], W.cards[id].P * 0.85, pend); } break; }
-      let budget = (b.cash - 150) * (mood.drop > 0.03 ? 0.05 : 0.35);
-      const pk = packInfo(W);
-      for (let k = 0; k < 5 && budget > 0; k++) {
-        if (W.rand() < 0.4 && b.cash >= pk.price) { ripPack(W, b); budget -= pk.price; }
-        else { const c = W.rand() < 0.65 && hot.length ? W.pick(hot.slice(0, 25)) : W.pick(W.cards); bid(b, c, c.P * 1.07); budget -= c.P; }
-      }
-      if (W.rand() < 0.22 && b.h.size) { const c = W.cards[W.pick([...b.h.keys()])]; ask(b, c, c.P * 0.97, pend); }
-      break;
-    }
-    case 4: {
-      const pk = packInfo(W);
-      if (pk.evMarket * (1 - W.cfg.fee) > pk.price * g.trig) for (let k = 0; k < 3; k++) if (!ripPack(W, b)) break;
-      for (const [id] of b.h) ask(b, W.cards[id], W.cards[id].P * 0.985, pend);
-      break;
-    }
-    case 5: {
-      for (const id of g.targets) { const c = W.cards[id], e = est(W, b, c); if (c.P < e * g.cap) { bid(b, c, c.P * 1.08); bid(b, c, c.P * 1.04); } if (c.P > e * g.sell) ask(b, c, c.P, pend); }
-      break;
-    }
-    case 6: {
-      for (const c of sample(W, 14)) { const m = ma(c, 12), e = estimate(W, b, c); if (c.P < m * (1 - g.dip) && (e === null || e > c.P)) bid(b, c, c.P * 1.02); }
-      for (const [id] of b.h) { const c = W.cards[id], m = ma(c, 12); if (c.P > m * (1 + g.dip * 0.5)) ask(b, c, c.P, pend); }
-    }
+  const pend = new Map(), g = b.g, w = g.w, nw = b.nwh[b.nwh.length - 1] || b.cash, pk = packInfo(W);
+  const held = [...b.h.keys()].map((id) => W.cards[id]);
+  const cand = [...held, ...[...b.notes.keys()].map((id) => W.cards[id]), ...hot.slice(0, 30), ...sample(W, 10)].filter((c, i, a) => c && c.on !== false && a.indexOf(c) === i);
+  const scored = cand.map((c) => [c, scoreCard(b, signals(W, b, c))]);
+  // Panic: a bot that weighs the crowd dumps cards after a drawdown
+  const dd = b.nwh.length > 4 ? 1 - b.nwh[b.nwh.length - 1] / Math.max(...b.nwh.slice(-5)) : 0;
+  if (w.herd > 0.2 && Math.max(dd, mood.drop) > g.panic) { let k = 0; for (const c of held) { if (k++ > 6) break; ask(b, c, c.P * 0.85, pend); } return; }
+  // Buy what scores well, sell what scores badly (one copy each; two on a strong signal)
+  let spare = b.cash - g.keep * nw, orders = 0;
+  for (const [c, s] of scored.sort((x, y) => y[1] - x[1])) {
+    const q = b.h.get(c.id) || 0;
+    if (s > 0.03 && spare > c.P && orders < W.cfg.deployOrders) { bid(b, c, c.P * (1 + Math.min(g.aggr, s))); spare -= c.P; orders++; if (s > 0.15 && spare > c.P) { bid(b, c, c.P * (1 + g.aggr)); spare -= c.P; } }
+    else if (q && s < -0.03) ask(b, c, c.P * (1 - Math.min(g.aggr, -s) / 2), pend);
   }
+  // Value exit: sell above the notes' estimate by the bot's margin
+  if (w.value > 0.15) for (const c of held) { const e = estimate(W, b, c); if (e !== null && c.P > e * (1 + g.margin)) ask(b, c, Math.max(e * (1 + g.margin), c.P * 0.98), pend); }
+  // Hoarding: keep buying two favourite players, rarely sell
+  if (w.hoard > 0.15) for (const id of g.targets) { const c = W.cards[id]; if (!c || c.on === false) continue; const e = est(W, b, c); if (c.P < e * (1 + 2 * w.hoard) && b.cash > c.P) bid(b, c, c.P * 1.05); if ((b.h.get(id) || 0) && c.P > e * 3) ask(b, c, c.P, pend); }
+  // Market making: quote both sides on a book of liquid cards, skewed by inventory
+  if (w.make > 0.15) {
+    if (!g.book.length || W.t % W.cfg.weeksPerGeneration === 1) g.book = hot.slice(0, 50).sort(() => W.rand() - 0.5).slice(0, g.size).map((c) => c.id);
+    for (const id of g.book) { const c = W.cards[id], inv = b.h.get(id) || 0, e = estimate(W, b, c), mid = e === null ? c.P : lerp(c.P, e, 0.3), skew = (inv - 3) * 0.012; if (inv < 10 && b.cash > c.P * 2) bid(b, c, mid * (1 - g.spread - skew)); if (inv > 0) ask(b, c, mid * (1 + g.spread - skew), pend); }
+  }
+  // Packs: rip when the pulls sell for more than the pack, then flip them; the crowd-minded rip for the thrill
+  if (w.pack > 0.1 && pk.evMarket * (1 - W.cfg.fee) > pk.price * 1.02) for (let k = 0; k < 1 + Math.floor(w.pack * 4); k++) if (!ripPack(W, b)) break;
+  if (w.pack > 0.2) for (const c of held) if (W.rand() < w.pack) ask(b, c, c.P * 0.985, pend);
+  if (w.herd > 0.25 && W.rand() < w.herd * 0.3 && b.cash > pk.price * 1.5) ripPack(W, b);
+  // Raise cash when below half the cash target: sell what scores worst
+  if (b.cash < g.keep * nw * 0.5) for (const [c] of scored.filter(([c]) => b.h.get(c.id)).sort((x, y) => x[1] - y[1]).slice(0, 2)) ask(b, c, c.P * 0.98, pend);
+}
+// A rule bot's sealed bid for an auctioned card: what its signals say the card is worth to it
+function ruleAuctionBid(W, b, c) {
+  const s = scoreCard(b, signals(W, b, c)), e = estimate(W, b, c);
+  if (b.g.w.hoard > 0.15 && b.g.targets.includes(c.id)) return est(W, b, c) * (1 + 2 * b.g.w.hoard) * 0.9;
+  if (e !== null && b.g.w.value > 0.2) return e * (1 - b.g.margin * 0.5);
+  return s > 0.05 ? c.P * (1 + Math.min(0.2, s)) : null;
+}
+function ruleAuctionList(W, b) {
+  if (b.g.w.pack > 0.25) for (const [id] of b.h) { const c = W.cards[id]; if (c.circ < 12 && W.rand() < 0.3) { listAuction(W, b, c, c.P); return; } }
+  if (b.g.w.herd > 0.3 && W.rand() < 0.04 && b.h.size) { const c = [...b.h.keys()].map((id) => W.cards[id]).sort((x, y) => y.P - x.P)[0]; listAuction(W, b, c, c.P * 0.9); }
+}
+
+/* ---------- Credit between bots ---------- */
+// There is no bank. Bots with idle cash offer loans at the rate they ask; bots with an appetite for leverage request
+// them up to the most they will pay. Offers and requests clear once a week at one rate. Loans are secured by the
+// borrower's cards: past the margin line the borrower must sell; at maturity it must repay or sell; an insolvent
+// borrower defaults and its lenders lose what can't be recovered. No coins are created: credit only moves them.
+function holdingsValue(W, b) { let v = 0; for (const [id, q] of b.h) v += q * W.cards[id].P; return v; }
+function repayLoan(W, L, amt) { const x = Math.min(amt, L.amount); L.amount -= x; L.borrower.debt -= x; L.borrower.cash -= x; L.lender.cash += x; L.lender.lent -= x; return x; }
+function creditMarket(W) {
+  const cfg = W.cfg, C = (W.credit ||= {}); Object.assign(C, { lent: 0, repaid: 0, calls: 0, defaults: 0, writtenOff: 0, rate: C.rate ?? null });
+  if (!cfg.credit) return;
+  const bot = new Set(W.bots); W.loans = (W.loans || []).filter((L) => L.amount > 0.01 && bot.has(L.borrower) && bot.has(L.lender));
+  // Interest, maturity
+  for (const L of W.loans) {
+    const i = L.amount * L.rate, b = L.borrower;
+    if (b.cash >= i) { b.cash -= i; L.lender.cash += i; } else { L.amount += i - b.cash; b.debt += i - b.cash; L.lender.lent += i - b.cash; L.lender.cash += b.cash; b.cash = 0; }
+    if (L.due <= W.t) { const paid = repayLoan(W, L, b.cash); C.repaid += paid; if (L.amount > 0.01) { b.forced = (b.forced || 0) + L.amount / 0.88; L.due = W.t + 1; L.late = (L.late || 0) + 1; } }
+  }
+  // Margin calls and defaults
+  for (const b of W.bots) {
+    if (!(b.debt > 0)) continue;
+    const hv = holdingsValue(W, b);
+    if (b.debt > b.cash + hv || W.loans.some((L) => L.borrower === b && L.late >= 3)) { // default: lenders recover the cash, lose the rest
+      const mine = W.loans.filter((L) => L.borrower === b), tot = mine.reduce((s, L) => s + L.amount, 0);
+      for (const L of mine) { const rec = tot ? (b.cash * L.amount) / tot : 0; L.lender.cash += rec; L.lender.lent -= L.amount; C.writtenOff += L.amount - rec; L.amount = 0; }
+      for (const [id, q] of b.h) W.liq.set(id, (W.liq.get(id) || 0) + q);
+      b.h.clear(); b.n = 0; b.lots = new Map(); b.cash = 0; b.debt = 0; C.defaults++; jot(W, { type: 'default', bot: b.name, debt: r2(tot) }); continue;
+    }
+    if (b.debt > cfg.marginCall * hv) { b.forced = (b.forced || 0) + (b.debt - cfg.maxLTV * hv) / 0.88; C.calls++; if (!b.calledAt || W.t - b.calledAt > 8) { b.calledAt = W.t; jot(W, { type: 'marginCall', bot: b.name, debt: r2(b.debt), cards: r2(hv) }); } }
+  }
+  // New loans: one weekly call auction for credit
+  const offers = [], asks2 = [];
+  for (const b of W.bots) {
+    const hv = holdingsValue(W, b), eq = b.cash + hv + (b.lent || 0) - b.debt;
+    if (b.kind === 'ai') {
+      const o = b.pending?.lend; if (o && Number(o.amount) > 0) offers.push({ b, amt: Math.min(Number(o.amount), b.cash), rate: Math.max(0, Number(o.rate) || 0) });
+      const q = b.pending?.borrowReq; if (q && Number(q.amount) > 0) asks2.push({ b, amt: Math.min(Number(q.amount), Math.max(0, cfg.maxLTV * hv - b.debt)), rate: Math.max(0, Number(q.maxRate) || 0) });
+      continue;
+    }
+    const idle = b.cash - b.g.keep * Math.max(0, eq); if (b.g.lendShare > 0 && idle > 10) offers.push({ b, amt: idle * b.g.lendShare, rate: b.g.lendRate });
+    const want = Math.min(b.g.lev * Math.max(0, eq), cfg.maxLTV * hv) - b.debt; if (b.g.lev > 0 && want > 5) asks2.push({ b, amt: want, rate: b.g.maxRate });
+  }
+  asks2.sort((x, y) => y.rate - x.rate); offers.sort((x, y) => x.rate - y.rate);
+  const fills = []; let i = 0, j = 0;
+  while (i < asks2.length && j < offers.length && asks2[i].rate >= offers[j].rate) {
+    if (asks2[i].b === offers[j].b) { j++; continue; }
+    const x = Math.min(asks2[i].amt, offers[j].amt); if (x > 0.5) fills.push([asks2[i], offers[j], x]);
+    asks2[i].amt -= x; offers[j].amt -= x; if (asks2[i].amt <= 0.5) i++; if (offers[j].amt <= 0.5) j++;
+  }
+  if (fills.length) {
+    const [lb, lo] = fills[fills.length - 1], rate = (lb.rate + lo.rate) / 2; C.rate = rate;
+    for (const [rq, of, x] of fills) { const amt = Math.min(x, of.b.cash); if (amt <= 0.5) continue; of.b.cash -= amt; of.b.lent = (of.b.lent || 0) + amt; rq.b.cash += amt; rq.b.debt += amt; W.loans.push({ lender: of.b, borrower: rq.b, amount: amt, rate, due: W.t + cfg.loanWeeks }); C.lent += amt; jot(W, { type: 'loan', lender: of.b.name, borrower: rq.b.name, amount: r2(amt), rate: Math.round(rate * 10000) / 10000 }); }
+  }
+  if (C.defaults >= 2) log(W, 'margin', `${C.defaults} bots default: their lenders lose ${Math.round(C.writtenOff).toLocaleString()} coins and the cards are dumped.`);
+  if (C.calls >= 5) log(W, 'margin', `Margin calls: ${C.calls} borrowers are forced to sell cards at a discount.`);
+}
+// Living costs are a law of the world: every bot pays to stay in the market, richer bots more
+function livingAndCredit(W) {
+  const cfg = W.cfg; W.living = { spent: 0, broke: 0 };
+  for (const b of W.bots) {
+    b.forced = 0;
+    const eq = b.cash + holdingsValue(W, b) + (b.lent || 0) - b.debt, cost = cfg.livingCost + cfg.lifestyle * Math.max(0, eq);
+    if (b.cash >= cost) { b.cash -= cost; W.living.spent += cost; } else { W.living.spent += Math.max(0, b.cash); b.forced += cost - Math.max(0, b.cash); b.cash = 0; W.living.broke++; }
+  }
+  creditMarket(W);
+  // AI repayments
+  for (const b of W.bots) { const r = Number(b.pending?.repay) || 0; if (b.kind === 'ai' && r > 0) for (const L of W.loans.filter((L) => L.borrower === b)) repayLoan(W, L, Math.min(r, b.cash)); }
+}
+export function totalDebt(W) { return W.bots.reduce((s, b) => s + (b.debt || 0), 0); }
+// The population's genome, weighted by wealth: what selection is favouring
+function genomeMix(W) {
+  const rule = W.bots.filter((b) => b.kind === 'rule'), ws = rule.map((b) => Math.max(1, worth(W, b))), tot = ws.reduce((a, b) => a + b, 0) || 1;
+  const out = SIGNALS.map((k) => rule.reduce((s, b, i) => s + b.g.w[k] * ws[i], 0) / tot);
+  out.push(rule.reduce((s, b, i) => s + Math.min(2, b.g.lev) * ws[i], 0) / tot, rule.reduce((s, b, i) => s + b.g.lendShare * ws[i], 0) / tot);
+  return out.map((x) => Math.round(x * 1000) / 1000);
 }
 
 /* ---------- AI bots: apply their parsed actions ---------- */
@@ -703,10 +760,10 @@ export function setActions(W, b, a = {}) {
     auction: Array.isArray(a.auction) ? a.auction.slice(0, 2) : [],
     auctionBids: Array.isArray(a.auctionBids) ? a.auctionBids.slice(0, 10) : [],
   };
-  // Borrow (positive) or repay (negative) coins against the bot's cards
-  const loan = Number(a.borrow) || 0;
-  if (W.cfg.credit && loan > 0) { const room = (W.lender?.ltv ?? W.cfg.maxLTV) * holdingsValue(W, b) - b.debt, x = Math.min(loan, Math.max(0, room)); b.debt += x; b.cash += x; }
-  else if (loan < 0) { const x = Math.min(-loan, b.cash, b.debt); b.debt -= x; b.cash -= x; }
+  // Credit between bots: offer a loan, request one, or repay
+  b.pending.lend = a.lend && typeof a.lend === 'object' ? a.lend : null;
+  b.pending.borrowReq = a.borrow && typeof a.borrow === 'object' ? a.borrow : null;
+  b.pending.repay = Number(a.repay) || 0;
   jot(W, { t: W.t + 1, type: 'aiActions', bot: b.name, actions: a });
   if (W.cfg.messages) {
     const lim = W.cfg.messageLimits, cut = (x) => String(x ?? '').slice(0, lim.chars).trim();
@@ -776,7 +833,8 @@ export function step(W) {
   if (cfg.leagueUpdates && W.t % cfg.updateEvery === 0) leagueUpdate(W);
   { const ph = W.hist.p, peak = Math.max(...ph.slice(-8)); mood.drop = ph.length ? 1 - ph[ph.length - 1] / peak : 0; }
   hot = W.cards.filter((c) => c.on !== false).sort((x, y) => recentVol(y, 20) * Math.max(0.2, 1 + ret(y, 4)) - recentVol(x, 20) * Math.max(0.2, 1 + ret(x, 4)));
-  livingAndCredit(W); lenderCycle(W); peopleChange(W); fashionStep(W);
+  for (const b of W.bots) if (b.kind === 'rule') b.a = styleOf(b.g.w); // a style is just the dominant weight, which mutation can change
+  livingAndCredit(W); peopleChange(W); fashionStep(W);
   socialPhase(W); aiSocial(W);
   passPhase(W);
   if (cfg.games) { tokenMarket(W, 'ticket'); gamePhase(W); }
@@ -790,7 +848,7 @@ export function step(W) {
   for (const b of W.bots) if (b.forced > 0) { const pend = new Map(); let need = b.forced; for (const id of [...b.h.keys()].sort((x, y) => W.cards[y].P - W.cards[x].P)) { if (need <= 0) break; const c = W.cards[id]; const q = b.h.get(id); for (let k = 0; k < q && need > 0; k++) { ask(b, c, c.P * 0.88, pend); need -= c.P * 0.88; } } }
   clear(W);
   // Sale proceeds of a bot under a margin call go to its lender first
-  for (const b of W.bots) if (b.forced > 0 && b.debt > 0) { const pay = Math.min(b.cash, b.debt); b.cash -= pay; b.debt -= pay; W.credit.repaid += pay; b.forced = 0; }
+  for (const b of W.bots) if (b.forced > 0 && b.debt > 0) { for (const L of (W.loans || []).filter((L) => L.borrower === b)) { if (b.cash <= 0) break; W.credit.repaid += repayLoan(W, L, b.cash); } b.forced = 0; }
   for (const b of W.bots) { b.nwh.push(worth(W, b)); if (b.nwh.length > 12) b.nwh.shift(); b.pending = null; b.pendingShares = []; b.acceptAll = false; }
   detect(W);
   if (W.t % cfg.weeksPerGeneration === 0) generationEnd(W);
@@ -865,7 +923,7 @@ function generationEnd(W) {
   W.bots = W.bots.filter((b) => !cut.has(b.id));
   for (const b of W.bots) { for (const id of cut) { b.flags.delete(id); b.friends.delete(id); } }
   for (const b of losers) jot(W, { type: 'eliminated', bot: b.name, kind: ARCH[b.a].label, social: b.social });
-  for (const w of winners) { const c = newBot(W, w.a, w); c.nwh = [worth(W, c)]; W.bots.push(c); jot(W, { type: 'born', bot: c.name, parent: w.name, kind: ARCH[c.a].label, social: c.social }); }
+  for (const w of winners) { const c = newBot(W, null, w); c.nwh = [worth(W, c)]; W.bots.push(c); jot(W, { type: 'born', bot: c.name, parent: w.name, kind: ARCH[c.a].label, social: c.social }); }
   const kinds = (xs) => Object.entries(xs.reduce((o, b) => ((o[ARCH[b.a].label] = (o[ARCH[b.a].label] || 0) + 1), o), {})).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${v} ${k}`).join(', ');
   const thieves = losers.filter((b) => b.social === 'thief').length, wthieves = winners.filter((b) => b.social === 'thief').length;
   log(W, 'evolve', `Generation ${gen} ends. ${n} poorest bots eliminated (${kinds(losers)}; ${thieves} thieves). Copies of the ${n} richest take their slots (${kinds(winners)}; ${wthieves} thieves). The dead bots' cards go to a liquidator at 20% under market.`);
@@ -913,7 +971,7 @@ export function observe(W, b, { marketRows = 40 } = {}) {
   const others = W.bots.filter((x) => x !== b).sort((x, y) => worth(W, y) - worth(W, x)).slice(0, 12).map((x) => ({ name: x.name, kind: ARCH[x.a].label, notes: x.notes.size, friendsWithYou: x.friends.has(b.id), flaggedYou: x.flags.has(b.id) }));
   return {
     week: W.t + 1, generation: Math.floor(W.t / W.cfg.weeksPerGeneration) + 1, season: W.seasonLabel || W.timeline?.seasons[0].season || null,
-    you: { name: b.name, cash: r2(b.cash), worth: r2(worth(W, b)), debt: r2(b.debt || 0), borrowLimit: r2(W.cfg.credit ? (W.lender?.ltv ?? W.cfg.maxLTV) * holdingsValue(W, b) : 0), loanRate: W.lender?.rate ?? W.cfg.interest, livingCostNextWeek: r2(W.cfg.livingCost + W.cfg.lifestyle * Math.max(0, worth(W, b))), researchPasses: b.passes.length, notesKept: b.notes.size, botsThatFlaggedYou: W.bots.filter((x) => x.flags.has(b.id)).length, friends: [...b.friends].map((id) => W.bots.find((x) => x.id === id)?.name).filter(Boolean), memo: b.memo },
+    you: { name: b.name, cash: r2(b.cash), worth: r2(worth(W, b)), debt: r2(b.debt || 0), lentOut: r2(b.lent || 0), borrowLimit: r2(W.cfg.credit ? Math.max(0, W.cfg.maxLTV * holdingsValue(W, b) - (b.debt || 0)) : 0), creditMarketRate: W.credit?.rate ?? null, yourLoans: (W.loans || []).filter((L) => L.borrower === b || L.lender === b).slice(0, 12).map((L) => ({ role: L.borrower === b ? 'borrowed' : 'lent', with: (L.borrower === b ? L.lender : L.borrower).name, amount: r2(L.amount), weeklyRate: L.rate, dueWeek: L.due })), livingCostNextWeek: r2(W.cfg.livingCost + W.cfg.lifestyle * Math.max(0, worth(W, b))), researchPasses: b.passes.length, notesKept: b.notes.size, botsThatFlaggedYou: W.bots.filter((x) => x.flags.has(b.id)).length, friends: [...b.friends].map((id) => W.bots.find((x) => x.id === id)?.name).filter(Boolean), memo: b.memo },
     lastWeek: { yourFills: W.fills?.get(b.id) || [], researchResults: b.inbox || [], lastSteal: b.lastSteal || null },
     market: [...ids].map((id) => row(W.cards[id])).sort((x, y) => y.trades4w - x.trades4w),
     packs: { price: r2(pk.price), cardsPerPack: W.cfg.packSize, cardsLeftInPool: pk.tot },
@@ -953,6 +1011,7 @@ export function frame(W, { full = false } = {}) {
     season: W.seasonLabel || W.timeline?.seasons[0].season || null,
     lender: W.lender ? { ltv: r2(W.lender.ltv), rate: Math.round(W.lender.rate * 10000) / 10000 } : null,
     fashion: W.fashion ? W.fashion.map((x) => r2(x)) : null,
+    genome: genomeMix(W),
     people: W.turnover || null,
     mkt: marketStats(W),
     flow: W.flow ? { net: W.flow.net.map(Math.round), realized: W.flow.realized.map(Math.round), trips: W.flow.trips, tax: Math.round(W.flow.tax), paidOut: Math.round(W.flow.paidOut) } : null,
@@ -992,49 +1051,13 @@ export const familyIndex = (fams, p) => fams.findIndex((f) => f.name === (p.fami
 function marketStats(W) {
   let mcap = 0, vcap = 0, cards = 0; for (const c of W.cards) { mcap += c.P * c.circ; vcap += c.F * c.circ; cards += c.circ; }
   const cash = W.bots.map((b) => b.cash).sort((a, b) => b - a), tot = cash.reduce((a, b) => a + b, 0) || 1, k = Math.max(1, Math.round(cash.length * 0.1));
-  return { debt: Math.round(totalDebt(W)), calls: W.credit?.calls || 0, broke: W.credit?.broke || 0, spent: Math.round(W.credit?.spent || 0), mcap: Math.round(mcap), vcap: Math.round(vcap), cards, cash: Math.round(tot), cashTop10: Math.round((cash.slice(0, k).reduce((a, b) => a + b, 0) / tot) * 1000) / 1000, treasury: Math.round(W.treasury), bank: Math.round((W.bankRate ?? 1) * 100) / 100 };
+  return { rate: W.credit?.rate ?? null, defaults: W.credit?.defaults || 0, debt: Math.round(totalDebt(W)), calls: W.credit?.calls || 0, broke: W.living?.broke || 0, spent: Math.round(W.living?.spent || 0), mcap: Math.round(mcap), vcap: Math.round(vcap), cards, cash: Math.round(tot), cashTop10: Math.round((cash.slice(0, k).reduce((a, b) => a + b, 0) / tot) * 1000) / 1000, treasury: Math.round(W.treasury), bank: Math.round((W.bankRate ?? 1) * 100) / 100 };
 }
 function movers(W) {
   const rows = W.cards.filter((c) => recentVol(c, 4) >= 2 && c.Ph.length > 4).map((c) => [c.id, Math.round(c.P * 100) / 100, Math.round(ret(c, 4) * 1000) / 1000, recentVol(c, 4)]);
   rows.sort((a, b) => b[2] - a[2]);
   return { up: rows.slice(0, 8), down: rows.slice(-6).reverse() };
 }
-
-// Living costs and credit: the forces that make real bubbles end. Bots must spend to live (rich bots spend more), may
-// borrow against their cards, pay interest, and are forced to sell when a fall pushes their loan past the margin line.
-function holdingsValue(W, b) { let v = 0; for (const [id, q] of b.h) v += q * W.cards[id].P; return v; }
-function livingAndCredit(W) {
-  const cfg = W.cfg; W.credit = { lent: 0, repaid: 0, interest: 0, calls: 0, spent: 0, broke: 0, defaults: 0, writtenOff: 0 };
-  const LTV = W.lender?.ltv ?? cfg.maxLTV, RATE = W.lender?.rate ?? cfg.interest, CALL = LTV + (cfg.marginCall - cfg.maxLTV);
-  for (const b of W.bots) {
-    b.forced = 0;
-    const hv = holdingsValue(W, b), eq = b.cash + hv - b.debt;
-    // Living costs
-    const cost = cfg.livingCost + cfg.lifestyle * Math.max(0, eq);
-    if (b.cash >= cost) { b.cash -= cost; W.credit.spent += cost; }
-    else { W.credit.spent += Math.max(0, b.cash); b.forced += cost - Math.max(0, b.cash); b.cash = 0; W.credit.broke++; }
-    if (!cfg.credit) { if (b.debt) { const pay = Math.min(b.cash, b.debt); b.cash -= pay; b.debt -= pay; } continue; }
-    // Interest
-    if (b.debt > 0 && b.debt > b.cash + hv) { // insolvent: default, the loan is written off and the cards are sold
-      W.credit.defaults++; W.credit.writtenOff += b.debt - b.cash; for (const [id, q] of b.h) W.liq.set(id, (W.liq.get(id) || 0) + q);
-      b.h.clear(); b.n = 0; b.lots = new Map(); b.cash = 0; jot(W, { type: 'default', bot: b.name, debt: r2(b.debt) }); b.debt = 0; continue;
-    }
-    if (b.debt > 0) { const i = b.debt * RATE; if (b.cash >= i) { b.cash -= i; } else { b.debt += i - b.cash; b.cash = 0; } W.credit.interest += i; }
-    // Margin call
-    if (b.debt > CALL * hv) {
-      const target = LTV * hv, excess = b.debt - target;
-      const pay = Math.min(b.cash, excess); b.cash -= pay; b.debt -= pay; W.credit.repaid += pay;
-      if (b.debt > target) { b.forced += (b.debt - target) / 0.88; W.credit.calls++; if (!b.calledAt || W.t - b.calledAt > 8) { b.calledAt = W.t; jot(W, { type: 'marginCall', bot: b.name, debt: r2(b.debt), cards: r2(hv) }); } }
-      continue;
-    }
-    // Borrow up to the bot's appetite (lev × equity), within the lender's limit
-    const want = Math.min(b.g.lev * Math.max(0, eq), LTV * hv) - b.debt;
-    if (want > 1 && b.kind === 'rule') { b.debt += want; b.cash += want; W.credit.lent += want; }
-  }
-  if (W.credit.defaults >= 2) log(W, 'margin', `${W.credit.defaults} bots default: ${Math.round(W.credit.writtenOff).toLocaleString()} coins of loans written off, and their cards are dumped.`);
-  if (W.credit.calls >= 5) log(W, 'margin', `Margin calls: ${W.credit.calls} bots are forced to sell cards at a discount to cut their loans.`);
-}
-export function totalDebt(W) { return W.bots.reduce((s, b) => s + (b.debt || 0), 0); }
 
 /* ---------- The forces that keep a real market from settling ---------- */
 // 1. News: the save's REAL history. The world starts at the first real season; every seasonWeeks the next real season
@@ -1092,29 +1115,18 @@ function nextSeason(W) {
 function poisson(W, lam) { let k = 0, p = Math.exp(-lam), s = p, u = W.rand(); while (u > s && k < 20) { k++; p *= lam / k; s += p; } return k; }
 function peopleChange(W) {
   const cfg = W.cfg; if (!cfg.turnover) return;
-  const ph = W.hist.p, r8 = ph.length > 8 ? ph[ph.length - 1] / ph[ph.length - 9] - 1 : 0;
-  const n = poisson(W, cfg.entryRate * (1 + 6 * Math.max(0, r8)));
-  const hype = r8 > 0.05, mix = hype ? [4, 4, 30, 50, 4, 4, 4] : cfg.mix;
-  const tot = mix.reduce((a, b) => a + b, 0);
-  let joined = 0;
-  for (let k = 0; k < n; k++) {
-    let r = W.rand() * tot, a = 0; while (r > mix[a]) r -= mix[a++];
-    const b = newBot(W, a); b.cash = cfg.startCash * Math.exp(W.gauss() * 0.5) * (1 + Math.max(0, r8)); b.nwh = [b.cash]; b.joined = W.t;
-    W.bots.push(b); joined++; jot(W, { type: 'entered', bot: b.name, kind: ARCH[a].label, cash: r2(b.cash) });
-  }
-  const crowd = W.bots.length > 150 ? 3 : 1; let left = 0;
+  // Neutral turnover: newcomers with random genomes arrive at a steady rate; bots that lose 70% of their peak quit
+  const n = poisson(W, cfg.entryRate); let joined = 0, left = 0;
+  for (let k = 0; k < n; k++) { const b = newBot(W, null); b.cash = cfg.startCash * Math.exp(W.gauss() * 0.5); b.nwh = [b.cash]; b.joined = W.t; W.bots.push(b); joined++; jot(W, { type: 'entered', bot: b.name, kind: ARCH[b.a].label, cash: r2(b.cash) }); }
   for (const b of W.bots.slice()) {
     if (b.kind !== 'rule') continue;
     const w = worth(W, b); b.peak = Math.max(b.peak || 0, w);
-    const quit = (w < 0.3 * b.peak && W.t - (b.joined ?? 0) > 20 && W.rand() < 0.25) || W.rand() < 0.002 * crowd;
-    if (!quit) continue;
+    if (!(w < 0.3 * b.peak && W.t - (b.joined ?? 0) > 20 && W.rand() < 0.25) && !(W.rand() < 0.002)) continue;
     for (const [id, q] of b.h) W.liq.set(id, (W.liq.get(id) || 0) + q);
     W.bots = W.bots.filter((x) => x !== b); left++;
     jot(W, { type: 'exited', bot: b.name, kind: ARCH[b.a].label, worth: r2(w), reason: w < 0.3 * b.peak ? 'gave up after heavy losses' : 'retired' });
   }
   W.turnover = { joined, left };
-  if (joined >= 3) log(W, 'people', `${joined} new bots join${hype ? ' on the back of the rally, mostly speculators' : ''}.`);
-  if (left >= 3) log(W, 'people', `${left} bots leave the market and their cards are dumped at 20% under market.`);
 }
 
 // 3. Credit cycles: lenders tighten after margin calls and defaults (lower limits, higher rates) and loosen in calm,

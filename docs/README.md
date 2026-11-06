@@ -580,3 +580,56 @@ pack arbitrage and collectors pay in.
 over time, and every strategy's entries, win rate and net coins. Every contest entry is in the journal with its
 score and payout. The season, lender terms, bot turnover and collector demand per family (in the family heatmap's
 tooltip) are on the market panel.
+
+---
+
+## 20. Laws, not plot (prototype 2)
+
+The world used to dictate the story: scripted fashion swings, hype-driven newcomers, lenders that tightened on cue,
+outside buyers at value, and seven hand-written strategies. Now **the world sets only facts and laws, and the bots
+create the story.**
+
+**The world (facts and laws):**
+- real cards, with the save's real seasons replayed as news;
+- the exchange (call auction, sealed-bid auctions, packs from the pool);
+- the library, passes, notes and contests;
+- an allowance, living costs and royalties.
+
+Nothing in the world reacts to the market on purpose.
+
+**Removed or off by default:** fashion, hype-driven newcomers, the lender cycle, outside buyers, and every policy
+safeguard. All remain available as switches.
+
+**Strategy genome (no assigned strategies).** Every rule bot runs the same policy with its own genome:
+- **Signal weights:** value gap (notes vs price), market making, momentum, herd (volume and mood), pack arbitrage,
+  hoarding and dip buying.
+- **Other genes:** momentum horizon, aggressiveness, value margin, cash target, research error, panic level, spread,
+  borrowing appetite, lending share and rates, and pass and ticket prices.
+
+A bot's lane on the floor is just its strongest weight. Mutation explores and selection keeps what pays, so
+strategies emerge or die out.
+
+**Credit between bots.** There's no bank:
+- bots offer idle cash at their own rate and request loans up to their limit, clearing once a week at one rate;
+- loans are secured by the borrower's cards, fall due after 8 weeks, and pay interest to the lender;
+- margin calls and missed maturities force sales, and an insolvent or 3-weeks-late borrower defaults, so its lenders
+  take the loss;
+- no coins are created.
+
+**What emerged (600 weeks, rule bots only):**
+- **Seed 88:** evolution favoured market making (wealth-weighted weight 0.14 → 0.32) and turned against leverage
+  (borrowing appetite 0.21 → 0.06) after a deleveraging crash to 0.1× value. Prices later recovered to about 1.1×.
+- **Seed 7:** momentum took over late (0.16 → 0.31) and prices ground down to about 0.1× as trend-followers sold
+  into each other.
+- **Allowance 25:** prices held above value (1.2–1.4×) and herd behaviour spread.
+- **Credit:** 1.4–2.5 million coins lent per run at a market rate of about 0.3–0.4% a week. 490–2,000 margin calls,
+  6–18 defaults.
+
+**Page:**
+- a "What evolution selects" heatmap (the population's wealth-weighted genes against where they started);
+- genome bars in every bot's account;
+- the emergent loan rate as a KPI;
+- a credit filter in the feed;
+- presets that change only the laws.
+
+**AI bots** can lend, borrow and repay through the same credit market.

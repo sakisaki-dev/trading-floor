@@ -2,17 +2,18 @@
    Everything draws from FRAMES (one compact record per week, engine frame()): live mode appends one per tick, replay
    mode loads them from a run file written by sandbox/run.mjs. */
 
+// Presets change the laws of the world only. Strategies are never assigned: every bot starts with a random genome.
 const PRESETS = {
-  balanced: { label: 'Balanced', set: {}, hyp: '<b>Balanced.</b> Every strategy and social style. Watch pass and ticket prices settle and thieves get flagged.' },
-  mania: { label: 'Momentum mania', set: { mix: [6, 8, 34, 34, 6, 8, 6] }, hyp: '<b>Momentum mania.</b> Trend chasers and a herd that never research, so passes flood the market.' },
-  smart: { label: 'Smart money', set: { mix: [30, 10, 4, 50, 4, 4, 4] }, hyp: '<b>Smart money.</b> Researching value bots against a big herd. Does knowing pay?' },
-  thieves: { label: "Thieves' den", set: { social: { sharer: 0.2, reciprocator: 0.2, thief: 0.6 } }, hyp: "<b>Thieves' den.</b> 60% steal notes. Flags pile up and swaps dry up." },
-  honest: { label: 'Sharing circle', set: { social: { sharer: 0.7, reciprocator: 0.3, thief: 0 }, stealing: false }, hyp: '<b>Sharing circle.</b> No thieves. Knowledge spreads fast, so research is worth less.' },
-  nogames: { label: 'No games', set: { games: false }, hyp: '<b>No games.</b> No free packs. Compare wealth and the price of research.' },
-  nopass: { label: 'No pass market', set: { passesTradable: false }, hyp: '<b>No pass market.</b> Three passes each, untradable. Nobody can buy an edge.' },
-  credit: { label: 'Speculators on credit', set: { mix: [6, 8, 34, 34, 6, 8, 6], outsideCollectors: false, allowance: 25 }, hyp: '<b>Speculators on credit.</b> Trend chasers and a herd borrowing against their cards, no outside collectors. Watch a credit boom build, then margin calls cascade into a crash.' },
-  policy: { label: 'Policy: all safeguards', set: { store: true, priceLimit: 0.15, centralBank: true, wealthTax: 0.002, positionLimit: 0.25 }, hyp: '<b>Policy: all safeguards.</b> Store ceiling, price limits, a central bank, a wealth tax and position caps, for comparison with the free market.' },
-  noanchor: { label: 'Anchors off', set: { allowance: 0, outsideCollectors: false, royalties: false }, hyp: '<b>Anchors off.</b> No allowance, collectors or royalties. Only research ties prices to value.' },
+  laws: { label: 'Default laws', set: {}, hyp: '<b>Default laws.</b> Random genomes, real seasons as news, credit between bots, no outside buyers. Watch which strategies selection favours, and whether bubbles form.' },
+  loose: { label: 'Loose money', set: { allowance: 25 }, hyp: '<b>Loose money.</b> A 25-coin weekly allowance. More coins chasing the same cards.' },
+  tight: { label: 'Tight money', set: { allowance: 0 }, hyp: '<b>Tight money.</b> No allowance: only trading, games and lending earn coins.' },
+  nocredit: { label: 'No credit', set: { credit: false }, hyp: '<b>No credit.</b> Bots cannot lend or borrow. Compare the size of booms and busts.' },
+  nopass: { label: 'No pass market', set: { passesTradable: false }, hyp: '<b>No pass market.</b> Three passes each, untradable. Nobody can buy an information edge.' },
+  nogames: { label: 'No games', set: { games: false }, hyp: '<b>No games.</b> No contests: knowledge only pays through trading.' },
+  thieves: { label: "Thieves' den", set: { social: { sharer: 0.2, reciprocator: 0.2, thief: 0.6 } }, hyp: "<b>Thieves' den.</b> 60% of bots start as thieves." },
+  honest: { label: 'Sharing circle', set: { social: { sharer: 0.7, reciprocator: 0.3, thief: 0 }, stealing: false }, hyp: '<b>Sharing circle.</b> No theft. Knowledge spreads freely.' },
+  noevolve: { label: 'No selection', set: { evolve: false }, hyp: '<b>No selection.</b> Genomes never change: the starting mix plays out.' },
+  policy: { label: 'Policy: all safeguards', set: { store: true, priceLimit: 0.15, centralBank: true, wealthTax: 0.002, positionLimit: 0.25 }, hyp: '<b>Policy: all safeguards.</b> Store ceiling, price limits, central bank, wealth tax and position caps, for comparison.' },
 };
 const SOC = ['Sharer', 'Reciprocator', 'Thief'];
 const TAGS = { season: 'Season', people: 'People', credit: 'Credit', fashion: 'Fashion', margin: 'Margin', start: 'Open', gen: 'Gen', evolve: 'Evolution', crash: 'Crash', bubble: 'Bubble', corner: 'Corner', flag: 'Flagged', pool: 'Pool', update: 'Update', auction: 'Auction', games: 'Games' };
@@ -28,7 +29,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<
 const FAMS = familyList(LIBRARY);
 
 /* ---------- State ---------- */
-let opts = { seed: 88 }, presetKey = 'balanced';
+let opts = { seed: 88 }, presetKey = 'laws';
 let WORLD = null, FRAMES = [], H = null, mode = 'live', RUN = null, cursor = 0;
 let playing = !matchMedia('(prefers-reduced-motion: reduce)').matches, speed = 1, acc = 0, lastT = 0, panelT = 0, chartT = 0;
 const KEYS = ['p', 'f', 'bub', 'gini', 'share', 'trades', 'pass', 'informed', 'flags', 'shares', 'thefts', 'gamePacks'];
@@ -128,7 +129,7 @@ function floorPointer(e) {
   let extra = '';
   if (mode === 'live') {
     const b = WORLD.bots.find((x) => x.id === id);
-    if (b) extra = `<br><span class="k">Swaps ${b.stats.shared} · thefts ${b.stats.stolen} (caught ${b.stats.caught}) · researched ${b.stats.researched}</span>`;
+    if (b) extra = (b.g?.w ? `<br><span class="k">Genome: ${SIGNALS.map((k) => [k, b.g.w[k]]).sort((x, y) => y[1] - x[1]).slice(0, 3).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(' · ')} · borrow ${b.g.lev.toFixed(2)} · lend ${b.g.lendShare.toFixed(2)}</span>` : '') + `<br><span class="k">Swaps ${b.stats.shared} · thefts ${b.stats.stolen} (caught ${b.stats.caught}) · researched ${b.stats.researched}</span>`;
   } else if (isAi && RUN.memos?.[name]) {
     const m = Object.entries(RUN.memos[name]).filter(([t]) => +t <= cur().t).pop()?.[1];
     if (m) extra = `<br><span class="k">Memo:</span> ${esc(m).slice(0, 240)}`;
@@ -237,14 +238,21 @@ function hmHover(id) {
   const move = (e) => { const h = hm[id]; if (!h) return; const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top; const i = Math.floor((my - h.top) / h.rh), j = Math.floor((mx - h.LW) / h.cw); if (i < 0 || i >= h.rows.length || j < 0 || j >= h.cols) { t.hidden = true; return; } t.innerHTML = h.tip(i, j); placeTip(t, cv, mx, my); };
   cv.addEventListener('pointermove', move); cv.addEventListener('pointerdown', move); cv.addEventListener('pointerleave', () => (t.hidden = true));
 }
-['hmFam', 'hmHold', 'hmRet', 'hmBots'].forEach(hmHover);
+['hmGene', 'hmFam', 'hmHold', 'hmRet', 'hmBots'].forEach(hmHover);
 function buckets(n, width) { const cols = Math.max(1, Math.min(n, Math.floor(width / 7))); return { cols, range: (j) => { const a = Math.floor((j * n) / cols); return [a, Math.max(a, Math.floor(((j + 1) * n) / cols) - 1)]; } }; }
 const avg = (xs) => { const v = xs.filter((y) => y != null && isFinite(y)); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
 function archWorth(f) { if (f._aw) return f._aw; const s = ARCH.map(() => [0, 0]); for (const b of f.bots) { s[b[1]][0] += b[3]; s[b[1]][1]++; } return (f._aw = s.map(([w, k]) => (k ? w / k : null))); }
 function botMap(f) { if (f._bm) return f._bm; const ws = f.bots.map((b) => b[3]).sort((a, b) => a - b); f._med = ws[Math.floor(ws.length / 2)] || 1; return (f._bm = new Map(f.bots.map((b) => [b[0], b[3]]))); }
 const hmWidth = (id) => $(id).getBoundingClientRect().width - 132;
+const GENES = ['Value', 'Market making', 'Momentum', 'Herd', 'Pack arbitrage', 'Hoarding', 'Dip buying', 'Borrowing', 'Lending'];
 function drawHeatmaps() {
   const n = nNow(), f = cur(), ln = lanes();
+  { // What evolution selects: the wealth-weighted genome of the population over time
+    const { cols, range } = buckets(n, hmWidth('hmGene')), rows = GENES.map((g, i) => ({ label: g, color: i < 7 ? ARCH[i].color : i === 7 ? '#e66767' : '#4fd18b' }));
+    const base = FRAMES.find((x) => x.genome)?.genome;
+    const val = (i, j) => { const [a, b] = range(j); const xs = []; for (let k = a; k <= b; k++) if (FRAMES[k].genome) xs.push(FRAMES[k].genome[i]); const v = avg(xs); return v == null || !base ? null : v / Math.max(0.01, base[i]); };
+    heatmap('hmGene', rows, cols, val, (v) => divergeInv(Math.log(v) / Math.log(2.5)), (i, j) => { const [a, b] = range(j); const xs = []; for (let k = a; k <= b; k++) if (FRAMES[k].genome) xs.push(FRAMES[k].genome[i]); const v = avg(xs); return `<b>${GENES[i]}</b><br>Weeks ${FRAMES[a].t}–${FRAMES[b].t}<br>Average weight <span class="mono">${v == null ? '–' : v.toFixed(3)}</span> · ${val(i, j)?.toFixed(2) ?? '–'}× the start<br><span class="k">Weighted by wealth: what is paying</span>`; }, (j) => `W${FRAMES[range(j)[0]].t}`);
+  }
   { // Families: price ÷ hidden value over time
     const { cols, range } = buckets(n, hmWidth('hmFam')), rows = FAMS.map((fm) => ({ label: `${fm.pos} ${fm.name}` }));
     const val = (i, j) => { const [a, b] = range(j); const xs = []; for (let k = a; k <= b; k++) xs.push(FRAMES[k].fam?.[i]); return avg(xs); };
@@ -270,6 +278,7 @@ function drawHeatmaps() {
   }
 }
 scale('scaleFam', 'cheap', 'rich', (t) => diverge(t * 2 - 1));
+scale('scaleGene', 'fading', 'spreading', (t) => divergeInv(t * 2 - 1));
 scale('scaleHold', '0%', '50%+', (t) => seq(t));
 scale('scaleRet', '−12%', '+12%', (t) => divergeInv(t * 2 - 1));
 scale('scaleBots', '¼×', '4× median', (t) => divergeInv(t * 2 - 1));
@@ -298,7 +307,7 @@ function drawPanels() {
   $('kTicket').textContent = f.tickets == null ? '–' : f.tickets.toFixed(2); $('kTicketS').textContent = f.games ? `${f.games.packsWeek} game packs this wk` : 'games off';
   $('kWin').textContent = g4.skill[1] ? (g4.skill[0] / g4.skill[1]).toFixed(2) : '–'; $('kWinS').textContent = games ? `${games.toLocaleString()} entries · ${fmt(pots)} coins in pots` : 'no games';
   const ranked = f.bots.slice().sort((a, b) => b[3] - a[3]);
-  $('kBank').textContent = f.mkt?.mcap ? pct(f.mkt.debt / f.mkt.mcap) : '–'; $('kBankS').textContent = `${f.mkt?.calls ?? 0} margin calls · ${f.mkt?.broke ?? 0} short of bills`;
+  $('kBank').textContent = f.mkt?.rate == null ? '–' : (f.mkt.rate * 100).toFixed(2) + '%'; $('kBankS').textContent = `per week · loans ${f.mkt?.mcap ? pct(f.mkt.debt / f.mkt.mcap) : '–'} of market · ${f.mkt?.defaults ?? 0} defaults`;
   $('lb').tBodies[0].innerHTML = ranked.slice(0, 12).map((b) => `<tr data-bot="${b[0]}"><td><span class="sw" style="background:${ARCH[b[1]].color}"></span>${esc(b[2])}</td><td class="num">${fmt(b[3])}</td><td class="num">${pct(b[7] / Math.max(1, b[3]))}</td><td class="num">${b[8]}</td><td>${SOC[b[5]]}${b[6] >= 5 ? ' <span class="pill pill--hot">flagged</span>' : ''}</td></tr>`).join('');
   { const rows = Object.entries(GAMES).map(([g, d]) => [g, d, g4.game[g] || [0, 0, 0, 0]]).sort((a, b) => (b[2][3] ? b[2][2] / b[2][3] : -1) - (a[2][3] ? a[2][2] / a[2][3] : -1));
     $('gTopic').tBodies[0].innerHTML = rows.map(([g, d, [e, pot, sk, kn]]) => { const r = kn ? sk / kn : null; return `<tr title="${esc(d.skill)}"><td>${esc(d.label)}</td><td class="k">${esc(f.topics?.[g] || '')}</td><td class="num">${e.toLocaleString()}</td><td class="num">${fmt(pot)}</td><td class="num">${r == null ? '–' : r.toFixed(2)}</td><td class="bar"><span class="${r != null && r < 0 ? 'neg' : ''}" style="width:${r == null ? 0 : Math.min(100, Math.abs(r) * 100)}%"></span></td></tr>`; }).join(''); }
@@ -351,11 +360,12 @@ const ACT = {
   post: (j) => ['Board', `<b>${esc(j.from)}</b>: ${esc(j.text)}`],
   message: (j) => ['DM', `<b>${esc(j.from)}</b> → ${esc(j.to)}: ${esc(j.text)}`],
   aiActions: (j) => ['AI', `<b>${esc(j.bot)}</b> ${esc(Object.entries(j.actions || {}).filter(([, v]) => (Array.isArray(v) ? v.length : v)).map(([k, v]) => `${k}${Array.isArray(v) ? ` ×${v.length}` : ''}`).join(', ') || 'did nothing')}`],
+  loan: (j) => ['Loan', `<b>${esc(j.lender)}</b> lent ${fmt(j.amount)} to ${esc(j.borrower)} at ${(j.rate * 100).toFixed(2)}%/wk`],
   marginCall: (j) => ['Margin', `<b>${esc(j.bot)}</b> margin call · loan ${fmt(j.debt)} against ${fmt(j.cards)} of cards`],
   eliminated: (j) => ['Evolution', `<b>${esc(j.bot)}</b> eliminated (${esc(j.kind)}, ${esc(j.social)})`],
   born: (j) => ['Evolution', `<b>${esc(j.bot)}</b> born from ${esc(j.parent)}`],
 };
-const GROUP = { people: ['entered', 'exited', 'default'], trade: ['trade', 'passTrade', 'ticketTrade'], auction: ['auctionList', 'auctionResult'], research: ['research'], notes: ['share', 'steal'], game: ['game'], pack: ['pack'], talk: ['post', 'message'], ai: ['aiActions'] };
+const GROUP = { credit: ['loan', 'marginCall', 'default'], people: ['entered', 'exited', 'default'], trade: ['trade', 'passTrade', 'ticketTrade'], auction: ['auctionList', 'auctionResult'], research: ['research'], notes: ['share', 'steal'], game: ['game'], pack: ['pack'], talk: ['post', 'message'], ai: ['aiActions'] };
 function drawFeed() {
   const n = nNow(), rows = [];
   if (feedF === 'news') {
@@ -548,7 +558,7 @@ function drawAcct() {
     const bot = WORLD.bots.find((x) => x.id === id);
     realized = bot.stats.realized || 0; debt = bot.debt || 0;
     positions = [...bot.h].map(([cid, q]) => { const c = WORLD.cards[cid], ac = avgCost(bot, cid); return { cid, q, ac, P: c.P, pnl: ac == null ? null : (c.P - ac) * q }; });
-    extra = `<div class="note">Swaps ${bot.stats.shared} · thefts ${bot.stats.stolen} (caught ${bot.stats.caught}) · researched ${bot.stats.researched} · ${bot.passes.length} passes · ${bot.tickets.length} tickets${bot.memo ? `<br>Memo: ${esc(bot.memo).slice(0, 200)}` : ''}</div>`;
+    const gw = bot.g?.w; extra = (gw ? `<div class="genome">${SIGNALS.map((k, i) => `<span title="${k}"><i style="width:${Math.round(gw[k] * 100)}%;background:${ARCH[i].color}"></i>${k} ${Math.round(gw[k] * 100)}</span>`).join('')}<span><i style="width:${Math.min(100, Math.round(bot.g.lev * 60))}%;background:#e66767"></i>borrow ${bot.g.lev.toFixed(2)}</span><span><i style="width:${Math.round(bot.g.lendShare * 160)}%;background:#4fd18b"></i>lend ${bot.g.lendShare.toFixed(2)}</span></div>` : '') + `<div class="note">Lent ${fmt(bot.lent || 0)} · Swaps ${bot.stats.shared} · thefts ${bot.stats.stolen} (caught ${bot.stats.caught}) · researched ${bot.stats.researched} · ${bot.passes.length} passes · ${bot.tickets.length} tickets${bot.memo ? `<br>Memo: ${esc(bot.memo).slice(0, 200)}` : ''}</div>`;
   } else if (isAi && f.aiDetail?.[name]) {
     const d = f.aiDetail[name]; realized = d.realized; debt = d.debt ?? null;
     positions = d.positions.map(([cid, q, ac]) => { const P = f.prices?.[cid] ?? 0; return { cid, q, ac, P, pnl: (P - ac) * q }; });

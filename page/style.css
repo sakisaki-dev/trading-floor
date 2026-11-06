@@ -183,4 +183,7 @@
   td.bar span.neg { background: #e66767; }
   @media (max-width: 1240px) { .desk { grid-template-columns: 230px minmax(0, 1fr); } .acct { grid-column: 1 / -1; max-height: none; } }
   @media (max-width: 820px) { .desk { grid-template-columns: minmax(0, 1fr); } .watch { max-height: 380px; } .watch__list { max-height: 280px; } .detail { grid-template-columns: minmax(0, 1fr); } #chart { height: 300px; } }
+  .genome { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 8px; font: 500 10.5px/1.2 var(--mono); color: var(--muted); }
+  .genome span { display: grid; gap: 2px; }
+  .genome i { display: block; height: 4px; border-radius: 2px; min-width: 1px; max-width: 100%; }
 </style>
