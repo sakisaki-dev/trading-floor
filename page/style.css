@@ -407,4 +407,11 @@
   .lay__ps { display: flex; flex-wrap: wrap; gap: 4px 12px; } .lay__p { display: inline-flex; gap: 5px; align-items: center; } .lay__p.off label { color: var(--faint); text-decoration: line-through; }
   .lay__p button { font: 600 10px/1 var(--mono); padding: 3px 6px; border-radius: 5px; } .lay__p button[aria-pressed="true"] { color: var(--gold); }
   .mech { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); } .mech select { font: 500 12.5px/1 var(--body); color: var(--chalk); background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 6px 8px; }
+  .mvc button b, .mvc button small, .mvc button > span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* one line each: a longer card name never changes the strip's height */
+  .grid.one { grid-template-columns: minmax(0, 1fr); }
+  .lnews { display: grid; align-content: start; min-height: calc(14 * 27px); }
+  .ln { display: grid; grid-template-columns: 50px 82px minmax(0, 1fr); gap: 8px; align-items: center; height: 27px; border-top: 1px solid var(--line); font-size: 12.5px; white-space: nowrap; overflow: hidden; }
+  .ln:first-child { border-top: 0; } .ln time { font: 600 10.5px/1 var(--mono); color: var(--faint); } .ln > div { overflow: hidden; text-overflow: ellipsis; }
+  .ln .tag { font: 700 9.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .05em; color: var(--k, var(--muted)); display: inline-flex; gap: 5px; align-items: center; } .ln .tag::before { content: ''; width: 6px; height: 6px; border-radius: 2px; background: var(--k, var(--muted)); }
+  .pill--out { background: color-mix(in srgb, #e66767 22%, transparent); color: #ff9a9a; }
 </style>

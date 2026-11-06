@@ -665,3 +665,31 @@ strategies emerge or die out.
 **Caveat:** hoarding wins the late game partly because of the remaining artifact. After the real history, hidden
 values still random-walk without bound, which rewards buy-and-hold. Bounded careers (retirements and new rookie
 classes) would remove that bias.
+
+
+## The simulated league (hidden value, default)
+
+After the save's last real season (Y88) a simulated league plays on and sets every card's hidden value
+(`valueModel: 'league'`; spec: [league-sim-spec.md](league-sim-spec.md)).
+
+- **Rates are measured, not chosen.** `sandbox/measure_league.mjs` reads the save's real seasons (`sandbox/data/timeline.json`)
+  and writes `sandbox/data/league_rates.json`: full season (17 games), games missed, season-to-season form changes, award
+  counts and positions, retirement, Career Legacy growth, the real NFL players in the OVR pool, and the pressure effect (after
+  a big rise in card value the next season tends to fall off; after a fall, rebound). Where the save is too thin (age),
+  `sandbox/measure_nfl_age.mjs` measures real NFL weekly rosters and careers (nflverse) into `sandbox/data/nfl_age.json`:
+  injury risk by age, the chance a career ends at each age, and rookie ages. The league keeps the save's overall injury and
+  retirement rates; only who is hurt or retires follows age.
+- **Each week** every active, healthy player plays one game (stats drawn around his per-game rates). **Each season's end:**
+  a Super Bowl (rings to the champion's players), MVP / OPOY / DPOY / Super Bowl MVP in the save's numbers, retirements by age
+  (each replaced by a rookie at the same position and club, with new card markets and a print run, his first season copied
+  from a real early-career season, his name mixed from real NFL and college rosters: `sandbox/data/rookie_names.json`), the
+  Hall of Fame (Career Legacy 7,500), and each player's form change plus the measured pressure shift.
+- **Value** is the site's own formula, checked against the real Y88 values (OVR 203/203 exact, value 203/203 within 1 coin).
+  Active players are rated on League Score per game over their last `formSeasons` × 17 games (games missed injured count as
+  zero), retired players and the real NFL players on career per game; the market opens at the site's real values and moves
+  to the per-game rating over the first two seasons. Hidden value never reads a price.
+- **News** is public: the card network sees weeks out injured, form against career pace, a reigning award, retired and
+  rookie; the League news panel lists injuries, returns, the champion, awards, the Hall of Fame, retirements and rookies.
+  Outside collectors' budget follows Career Legacy × current form (`outsideNews`, an assumption).
+- **Settings** (Rules ▸ Values and prices): rate players on form or career, form window, pressure, injury risk after a rise
+  (`hypeInjury`, the owner's setting, not measured), injuries, injuries by age, retirement, retirement by age, rookies, awards.

@@ -36,7 +36,11 @@
       <div class="rgrp__t"><label class="toggle"><input type="checkbox" id="closedEconomy"> Closed economy</label><label class="toggle"><input type="checkbox" id="centralBank"> Central bank</label></div>
     </div></section>
     <section class="rgrp" aria-label="Values and prices"><h3>Values and prices<span>what a card is worth and what it trades at</span></h3><div class="rgrp__c">
-      <label class="mech" title="Player data × supply: the site value from his real data, times how scarce his copies are. The old walk rose 55% of weeks."><span>Hidden value</span><select id="valueModel"><option value="factors">Player data × supply</option><option value="ovrWalk">Old: scripted walk</option><option value="formula">Old: formula with pull</option></select></label>
+      <label class="mech" title="Player data × supply: the site value from his real data, times how scarce his copies are. The old walk rose 55% of weeks."><span>Hidden value</span><select id="valueModel"><option value="league">Simulated league</option><option value="factors">Player data × supply</option><option value="ovrWalk">Old: scripted walk</option><option value="formula">Old: formula with pull</option></select></label>
+      <label class="mech" data-when="valueModel=league" title="Form: an active player is ranked on his career League Score × his production per game over his last 34 games ÷ his career pace. Career: everyone on career OVR, exactly as the site."><span>Rate players on</span><select id="valueBasis"><option value="form">Recent form (34 games)</option><option value="career">Career, as the site</option></select></label>
+      <div class="slider" data-when="valueModel=league" title="How many seasons of games an active player's form is measured over: shorter reacts faster to hot streaks, slumps and injuries"><label for="formSeasons">Form window <b id="formSeasonsV"></b></label><input id="formSeasons" type="range" min="1" max="3" step="1" value="1"></div>
+      <div class="slider" data-when="valueModel=league" title="Your setting, not measured (the save shows no link): an extra chance of an injury next season, growing with how much his card rose this season"><label for="hypeInjury">Injury risk after a rise <b id="hypeInjuryV"></b></label><input id="hypeInjury" type="range" min="0" max="300" step="10" value="0"></div>
+      <div class="rgrp__t" data-when="valueModel=league"><label class="toggle" title="Measured in the save: after a big rise the next season tends to fall off; after a fall, rebound"><input type="checkbox" id="pressure" checked> Pressure after rises</label><label class="toggle"><input type="checkbox" id="injuries" checked> Injuries</label><label class="toggle"><input type="checkbox" id="retirement" checked> Retirement</label><label class="toggle" title="Careers end at the save's overall rate, shaped by age as in real NFL careers (nobody plays past 40)"><input type="checkbox" id="retirementByAge" checked> Retirement by age</label><label class="toggle" title="Injury chance follows the real NFL's risk by age, at the save's overall rate"><input type="checkbox" id="injuryByAge" checked> Injuries by age</label><label class="toggle"><input type="checkbox" id="rookies" checked> Rookies</label><label class="toggle"><input type="checkbox" id="awards" checked> Awards</label></div>
       <label class="mech" data-when="valueModel=factors" title="After the last real season there is no player data. Hold: the player factor stays put and only supply moves values. Draw: each season replays a random real season-to-season change from his position (it compounds about ×1.21 a season)."><span>Past the save</span><select id="pastSave"><option value="hold">Hold player values</option><option value="draw">Draw real season changes</option></select></label>
       <div class="slider" data-when="valueModel=factors" title="How strongly the number of copies out moves value: value × (copies now ÷ copies at the start)^−weight, each counted with the print run"><label for="scarcity">Scarcity weight <b id="scarcityV"></b></label><input id="scarcity" type="range" min="0" max="150" step="5" value="50"></div>
       <div class="slider" data-when="valueModel=ovrWalk"><label for="walkVolLow">Low-OVR swing / wk <b id="walkVolLowV"></b></label><input id="walkVolLow" type="range" min="1" max="25" step="0.5" value="10"></div>
@@ -58,7 +62,7 @@
       <label class="mech" title="Auction: seized copies go to the sealed auction with no minimum price, a set number a week."><span>Liquidator</span><select id="liquidation"><option value="auction">Auction, no minimum</option><option value="cutWhenUnsold">Old: cut 5% when unsold</option><option value="chase">Old: 80% of price</option></select></label>
       <div class="slider" data-when="liquidation=auction" title="Seized copies and one-of-a-kind cards the liquidator puts up for auction each week"><label for="liqListings">Liquidator listings / wk <b id="liqListingsV"></b></label><input id="liqListings" type="range" min="0" max="120" step="5" value="30"></div>
       <label class="mech" title="A margin-called or broke bot sells into the best bids until its debt is covered; the rest goes to auction with no minimum."><span>Forced sellers</span><select id="forcedSale"><option value="book">Into the best bids, then auction</option><option value="discount">Old: 88% asks, 70% item reserve</option></select></label>
-      <div class="rgrp__t"><label class="toggle"><input type="checkbox" id="store"> Vault store</label></div>
+      <div class="rgrp__t"><label class="toggle" data-when="outsideCollectors" title="An assumption, not measured: outside money goes to each player by Career Legacy × current form, so hot streaks draw more and slumps or injuries less"><input type="checkbox" id="outsideNews" checked> Outside buyers follow the news</label><label class="toggle"><input type="checkbox" id="store"> Vault store</label></div>
     </div></section>
     <section class="rgrp" aria-label="Credit and shorts"><h3>Credit and shorts<span>borrowing coins and borrowing cards</span></h3><div class="rgrp__c">
       <label class="toggle"><input type="checkbox" id="credit" checked> Credit</label>
@@ -83,7 +87,7 @@
       <div class="slider" title="How many heirs an estate passes to when a bot dies (each carries a mutated copy of its networks)"><label for="heirs">Heirs per death <b id="heirsV"></b></label><input id="heirs" type="range" min="1" max="3" step="1" value="1"></div>
       <div class="slider"><label for="nnMutation">Mutation per weight <b id="nnMutationV"></b></label><input id="nnMutation" type="range" min="0" max="50" step="1" value="15"></div>
       <div class="slider"><label for="nnReset">Weights redrawn <b id="nnResetV"></b></label><input id="nnReset" type="range" min="0" max="10" step="0.5" value="1"></div>
-      <label class="toggle" title="Old rule: each generation the worst 10% copy a top bot's networks"><input type="checkbox" id="evolve"> Old: worst copy the best</label>
+      <label class="toggle" title="Each generation the worst 10% copy a top bot's networks, mutated"><input type="checkbox" id="evolve" checked> Worst copy the best</label>
       <div class="slider" data-when="evolve"><label for="evolveShare">Share who copy <b id="evolveShareV"></b></label><input id="evolveShare" type="range" min="0" max="40" step="1" value="10"></div>
       <label class="toggle" title="Old rule: heirs beyond 1.15× the starting population push the poorest bots out"><input type="checkbox" id="capPoorest"> Old: poorest pushed out</label>
     </div></section>
@@ -148,6 +152,17 @@
   </div>
 
   <div class="grid main">
+    <section class="panel" aria-labelledby="ln-h">
+      <div class="head"><h2 id="ln-h">League news</h2><span class="note">injuries, returns, the Super Bowl, awards, the Hall of Fame, retirements and rookies: what every bot can see</span></div>
+      <div id="lnews" class="lnews"></div>
+    </section>
+    <section class="panel" aria-labelledby="cal-h">
+      <div class="head"><h2 id="cal-h">Calendar</h2><span class="note">what the rules have scheduled</span></div>
+      <div id="cal" class="cal"></div>
+    </section>
+  </div>
+
+  <div class="grid one">
     <section class="panel" aria-labelledby="sec-h">
       <div class="head"><h2 id="sec-h">Sectors</h2><span class="note">the eight positions, each weighted by the cards it has out</span></div>
       <div class="tablewrap"><table id="sectors"><thead><tr><th>Sector</th><th class="num">Players</th><th class="num">1W</th><th class="num">4W</th><th class="num">12W</th><th class="num">Price ÷ value</th><th class="num">Share of market</th><th class="num">Trades</th><th class="num">Up / down</th></tr></thead><tbody></tbody></table></div>
@@ -155,10 +170,7 @@
       <canvas id="hmSec" class="hm hm--short grow" aria-label="Heatmap of each position's 4-week return over time"></canvas>
       <div class="tip" id="hmSecTip" hidden></div>
     </section>
-    <section class="panel" aria-labelledby="cal-h">
-      <div class="head"><h2 id="cal-h">Calendar</h2><span class="note">what the rules have scheduled</span></div>
-      <div id="cal" class="cal"></div>
-    </section>
+    
   </div>
 
   <div class="grid main">

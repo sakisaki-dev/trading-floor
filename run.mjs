@@ -160,6 +160,7 @@ function mockPolicy(o) {
 const lib = JSON.parse(fs.readFileSync(path.join(here, 'data/library.json'), 'utf8'));
 lib.timeline = JSON.parse(fs.readFileSync(path.join(here, 'data/timeline.json'), 'utf8'));
 for (const k of ['history', 'kits', 'names']) { const f = path.join(here, `data/${k}.json`); if (fs.existsSync(f)) lib[k] = JSON.parse(fs.readFileSync(f, 'utf8')); }
+for (const [k, f] of [['leagueRates', 'league_rates'], ['rookieNames', 'rookie_names'], ['nflAge', 'nfl_age']]) { const fp = path.join(here, `data/${f}.json`); if (fs.existsSync(fp)) lib[k] = JSON.parse(fs.readFileSync(fp, 'utf8')); }
 const W = E.createWorld(lib, worldCfg);
 const seats = new Map();
 // Seats are keyed by name: when a bot's life ends, its heir sits in the same seat (same model) and carries on

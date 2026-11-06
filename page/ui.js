@@ -17,7 +17,7 @@ const PRESETS = {
   policy: { label: 'Policy: all safeguards', set: { store: true, priceLimit: 0.15, centralBank: true, wealthTax: 0.002, positionLimit: 0.25 }, hyp: '<b>Policy: all safeguards.</b> Store ceiling, price limits, central bank, wealth tax and position caps, for comparison.' },
 };
 const SOC = ['Sharer', 'Reciprocator', 'Thief'];
-const TAGS = { season: 'Season', people: 'People', credit: 'Credit', fashion: 'Fashion', margin: 'Margin', start: 'Open', gen: 'Gen', evolve: 'Evolution', crash: 'Crash', bubble: 'Bubble', corner: 'Corner', flag: 'Flagged', pool: 'Pool', update: 'Update', auction: 'Auction', games: 'Games' };
+const TAGS = { return: 'Back', champion: 'Champion', award: 'Award', hof: 'Hall of Fame', retire: 'Retired', rookie: 'Rookie', injury: 'Injury', season: 'Season', people: 'People', credit: 'Credit', fashion: 'Fashion', margin: 'Margin', start: 'Open', gen: 'Gen', evolve: 'Evolution', crash: 'Crash', bubble: 'Bubble', corner: 'Corner', flag: 'Flagged', pool: 'Pool', update: 'Update', auction: 'Auction', games: 'Games' };
 
 const $ = (id) => document.getElementById(id);
 // el.html = '...' rewrites an element only when its content actually changed (no needless re-layout)
@@ -101,6 +101,7 @@ function thin(i) {
   for (const k of THIN) delete f[k]; f._thin = true;
 }
 function pushFrame(f) {
+  for (const lp of f.newPlayers || []) if (!LIBRARY.players.some((x) => x.key === lp.key)) LIBRARY.players.push(lp); // rookies the league created
   FRAMES.push(f); if (mode === 'live' && FRAMES.length > FULL_WEEKS) thin(FRAMES.length - 1 - FULL_WEEKS);
   for (const k of KEYS) H[k].push(f.h[k]);
   H.ticket.push(f.tickets ?? null);
@@ -406,8 +407,14 @@ function drawPanels() {
   const soc = [0, 1, 2].map((s) => { const xs = f.bots.filter((b) => b[5] === s); return [s, xs.length, avg(xs.map((b) => b[3])), avg(xs.map((b) => b[6]))]; });
   $('social').tBodies[0].html = soc.map(([s, k, w, fl]) => `<tr><td>${SOC[s]}</td><td class="num">${k}</td><td class="num">${fmt(w)}</td><td class="num">${fl == null ? '–' : fl.toFixed(1)}</td></tr>`).join('');
   $('researched').textContent = f.researched.length ? 'Most researched: ' + f.researched.map(([id, k]) => `${LIBRARY.players[id].name} (${k})`).join(', ') : '';
-  drawTape(); drawAcct(); drawCons(); drawDetail();
+  drawTape(); drawAcct(); drawCons(); drawDetail(); drawLeagueNews();
   drawSectors(); drawMap(); drawCalendar(); drawHeatmaps();
+}
+const LEAGUE_KINDS = new Set(['injury', 'return', 'champion', 'award', 'hof', 'retire', 'rookie']);
+function drawLeagueNews() {
+  const host = $('lnews'); if (!host) return; const rows = [];
+  for (let i = nNow() - 1; i >= 0 && rows.length < 14; i--) for (const e of FRAMES[i].events || []) { if (!LEAGUE_KINDS.has(e.kind)) continue; rows.push(`<div class="ln"><time>W${e.t}</time><span class="tag k-${NEWSKIND[e.kind]}">${TAGS[e.kind]}</span><div title="${esc(e.text)}">${esc(e.text)}</div></div>`); if (rows.length >= 14) break; }
+  host.html = rows.join('') || `<p class="note">${cfgNow()?.valueModel === 'league' ? 'The simulated league starts after the last real season; its news appears here as it happens.' : 'League news comes with the simulated league (Rules ▸ Hidden value).'}</p>`;
 }
 function drawMvc(f) {
   { // The most valuable card in circulation this week, and the next two
@@ -458,9 +465,9 @@ const GROUP = { credit: ['loan', 'marginCall', 'default'], shorts: ['short', 'co
 
 /* ---------- Controls ---------- */
 $('preset').innerHTML = Object.entries(PRESETS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
-const SLIDERS = { entryRate: [0.01, (v) => (v / 100).toFixed(2)], heirs: [1, (v) => String(v)], scarcity: [0.01, (v) => (v / 100).toFixed(2)], packsPerWeek: [1, (v) => String(v)], liqListings: [1, (v) => String(v)], outsideBudget: [1, (v) => v.toLocaleString()], outsideResale: [0.01, (v) => v + '%'], prizeShare: [0.01, (v) => v + '% of takings'], livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'], walkUp: [0.01, (v) => v + '%'], walkVolLow: [0.01, (v) => '±' + v + '%'], walkVolHigh: [0.01, (v) => '±' + v + '%'], riskPerDoubling: [1, (v) => '+' + v + ' pts'], flagWeeks: [1, (v) => (v ? v + ' wk clean' : 'forever')], cardLendFee: [0.0001, (v) => (v / 100).toFixed(2) + '%/wk'], shortMargin: [0.01, (v) => v + '%'], cardLoanWeeks: [1, (v) => v + ' wk'], nnMutation: [0.01, (v) => '±' + (v / 100).toFixed(2)], nnReset: [0.01, (v) => v.toFixed(1) + '%'], evolveShare: [0.01, (v) => v + '%'] };
-const SELECTS = ['pastSave', 'valueModel', 'priceRule', 'outsideMode', 'liquidation', 'forcedSale', 'packSale'];
-const TOGGLES = ['capPoorest', 'turnover', 'twoSidedQuotes', 'shorting', 'credit', 'passesTradable', 'games', 'sharing', 'stealing', 'gossip', 'outsideCollectors', 'royalties', 'evolve', 'leagueUpdates', 'centralBank', 'store', 'closedEconomy'];
+const SLIDERS = { formSeasons: [1, (v) => v + (v > 1 ? ' seasons' : ' season') + ` (${v * 17} games)`], hypeInjury: [0.01, (v) => (v ? '×' + (v / 100).toFixed(1) : 'off')], entryRate: [0.01, (v) => (v / 100).toFixed(2)], heirs: [1, (v) => String(v)], scarcity: [0.01, (v) => (v / 100).toFixed(2)], packsPerWeek: [1, (v) => String(v)], liqListings: [1, (v) => String(v)], outsideBudget: [1, (v) => v.toLocaleString()], outsideResale: [0.01, (v) => v + '%'], prizeShare: [0.01, (v) => v + '% of takings'], livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'], walkUp: [0.01, (v) => v + '%'], walkVolLow: [0.01, (v) => '±' + v + '%'], walkVolHigh: [0.01, (v) => '±' + v + '%'], riskPerDoubling: [1, (v) => '+' + v + ' pts'], flagWeeks: [1, (v) => (v ? v + ' wk clean' : 'forever')], cardLendFee: [0.0001, (v) => (v / 100).toFixed(2) + '%/wk'], shortMargin: [0.01, (v) => v + '%'], cardLoanWeeks: [1, (v) => v + ' wk'], nnMutation: [0.01, (v) => '±' + (v / 100).toFixed(2)], nnReset: [0.01, (v) => v.toFixed(1) + '%'], evolveShare: [0.01, (v) => v + '%'] };
+const SELECTS = ['valueBasis', 'pastSave', 'valueModel', 'priceRule', 'outsideMode', 'liquidation', 'forcedSale', 'packSale'];
+const TOGGLES = ['outsideNews', 'retirementByAge', 'injuryByAge', 'pressure', 'injuries', 'retirement', 'rookies', 'awards', 'capPoorest', 'turnover', 'twoSidedQuotes', 'shorting', 'credit', 'passesTradable', 'games', 'sharing', 'stealing', 'gossip', 'outsideCollectors', 'royalties', 'evolve', 'leagueUpdates', 'centralBank', 'store', 'closedEconomy'];
 function syncControls() {
   const c = cfgNow(); if (!c) return;
   for (const [k, [s, f]] of Object.entries(SLIDERS)) { $(k).value = Math.round((c[k] / s) * 100) / 100; $(k + 'V').textContent = f(+$(k).value); }
@@ -573,7 +580,7 @@ function drawWatch() {
   $('watchMore').textContent = watchAll ? 'Show fewer' : `Show all ${rows.length} players`;
   const list = $('watch'); list.classList.toggle('all', watchAll);
   const rowH = list.firstElementChild?.offsetHeight || 43, fitN = Math.max(8, Math.floor((list.clientHeight || rowH * 14) / rowH));
-  patchRows(list, (watchAll ? rows : rows.slice(0, fitN)).map((r) => ({ key: r.id, val: r.P, html: `<button type="button" class="wrow" role="option" data-card="${r.id}" aria-selected="${SEL.type === 'card' && SEL.id === r.id}"><b>${r.p.pos} ${esc(r.p.name)}</b><span class="px">${fmt(r.P)}</span><small>${esc(teamShort(r.p.team))} · OVR ${ovrOf(r.id)}${riskNow(r.id) != null ? ` · risk ${Math.round(riskNow(r.id))}` : ''} · ${r.vol4} trades · ${(r.P / r.F).toFixed(2)}×</small><span class="chg">${chgSpan(r.chg)}</span></button>` })));
+  patchRows(list, (watchAll ? rows : rows.slice(0, fitN)).map((r) => ({ key: r.id, val: r.P, html: `<button type="button" class="wrow" role="option" data-card="${r.id}" aria-selected="${SEL.type === 'card' && SEL.id === r.id}"><b>${r.p.pos} ${esc(r.p.name)}${cur()?.inj?.includes(r.id) ? ' <span class="pill pill--out">OUT</span>' : ''}</b><span class="px">${fmt(r.P)}</span><small>${esc(teamShort(r.p.team))} · OVR ${ovrOf(r.id)}${riskNow(r.id) != null ? ` · risk ${Math.round(riskNow(r.id))}` : ''} · ${r.vol4} trades · ${(r.P / r.F).toFixed(2)}×</small><span class="chg">${chgSpan(r.chg)}</span></button>` })));
 }
 
 // Bars for the main chart: [{t, o, h, l, c, v, val}]
@@ -1036,7 +1043,7 @@ function botLogFor(name) {
 /* ---------- Account ---------- */
 // Every log entry has a kind, and each kind one colour, the same in the account and the feed
 const KIND = { trade: 'trade', passTrade: 'trade', ticketTrade: 'trade', auctionList: 'auction', auctionResult: 'auction', pack: 'pack', game: 'game', short: 'short', cover: 'short', shortCall: 'short', forcedCover: 'short', share: 'notes', steal: 'notes', flagLift: 'notes', loan: 'credit', marginCall: 'credit', default: 'credit', research: 'research', adopted: 'evo', died: 'evo', eliminated: 'evo', born: 'evo', entered: 'evo', exited: 'evo', post: 'talk', message: 'talk', aiActions: 'talk' };
-const NEWSKIND = { crash: 'credit', margin: 'credit', credit: 'credit', bubble: 'pack', season: 'trade', gen: 'evo', evolve: 'evo', people: 'evo', flag: 'notes', fashion: 'notes', auction: 'auction', corner: 'short', pool: 'research', start: 'research', update: 'trade', games: 'game' };
+const NEWSKIND = { return: 'evo', champion: 'pack', award: 'pack', hof: 'auction', retire: 'research', rookie: 'trade', injury: 'credit', crash: 'credit', margin: 'credit', credit: 'credit', bubble: 'pack', season: 'trade', gen: 'evo', evolve: 'evo', people: 'evo', flag: 'notes', fashion: 'notes', auction: 'auction', corner: 'short', pool: 'research', start: 'research', update: 'trade', games: 'game' };
 const ACCT_UI = { open: new Set(), allPos: false, packs: 3, weeks: 8, shorts: 3 };
 // A pull: "RB:Name|Design|Finish" for a market copy, or a one-of-a-kind label (kit, parallel, autograph)
 function pullChip(k) {

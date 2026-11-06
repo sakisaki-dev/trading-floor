@@ -31,7 +31,7 @@ export const DEFAULTS = {
   outsideCollectors: true, // buyers from outside the bots bid around hidden value (the market's anchor)
   royalties: true, // each generation, holders get 3% of hidden value per card held
   royaltyRate: 0.03,
-  evolve: false, // OLD RULE (off): each generation the worst 10% by recent return adopt a mutated copy of a top 10% bot's networks. Off: strategies spread only through heirs
+  evolve: true, // each generation the worst 10% by recent return adopt a mutated copy of a top 10% bot's networks (so strategies that trade well on the news can spread); off: strategies spread only through heirs
   evolveShare: 0.1,
   mortality: true, // bots live 6–14 generations; on death the estate is split between heirs that carry a mutated copy of the genome
   lifespan: [6, 14],
@@ -51,7 +51,20 @@ export const DEFAULTS = {
   // his position, which compounds about ×1.21 a season). The supply factor is
   // (copies out now + print run) ÷ (copies out at the start + print run), raised to −scarcity: packs opened add copies and
   // lower it, collectors taking cards out raise it. Nothing here says which way a value goes.
-  valueModel: 'factors', scarcity: 0.5, pastSave: 'hold',
+  valueModel: 'league', scarcity: 0.5, pastSave: 'hold',
+  // 'league' (default): after the last real season a simulated league plays on (rates measured from the save:
+  // sandbox/data/league_rates.json) and the site's own value formula reprices every player weekly from its stats.
+  // valueBasis 'form': an active player is ranked (in the site's one OVR pool) on his career League Score × his form, the
+  // production per game over his last formSeasons × 17 games (games missed injured count as zero: injuryCountsInForm)
+  // ÷ his career per game. The window starts at his career pace, so the market opens at the site's real values.
+  // Retired players keep career OVR. 'career': everyone on career OVR, exactly as the site.
+  formSeasons: 1, injuryCountsInForm: true, injuryByAge: true, retirementByAge: true, // injuryByAge: injury chance follows the real NFL's risk by age (sandbox/data/nfl_age.json)
+  // pressure: next season's form change is shifted by how much his card value moved this season (measured in the save: a
+  // big rise tends to be followed by a falloff, a fall by a rebound). hypeInjury (0 = off, the owner's setting, NOT measured:
+  // the save shows no link): extra chance of an injury spell next season, × the log rise of his value this season.
+  pressure: true, pressureStrength: 1, hypeInjury: 0, // pressureStrength 1 = the measured shift; above 1 is the owner's setting
+  // gameNoise: the spread of a game's yards around the player's per-game rate (only season totals are known).
+  valueBasis: 'form', injuries: true, retirement: true, rookies: true, awards: true, gameNoise: 0.4,
   walkUp: 0.55, walkVolLow: 0.15, walkVolHigh: 0.03, riskLo: 60, riskHi: 95, riskPerDoubling: 10,
   startSeason: 'latest', // 'latest' opens the market at the present (site prices and price history imported); 'first' replays from Y79
   priceOnly: false, // a card is worth only what someone pays: no hidden value anywhere in the world (no royalties, packs priced
@@ -101,7 +114,7 @@ export const DEFAULTS = {
   quotePull: 0.25, // how far unfilled orders pull the quoted price toward them each week (priceRule 'quotes' only)
   priceRule: 'lastTrade', // 'lastTrade': a card's price is the last price it traded at; best bid and ask are shown, never move it. 'quotes': the old pull
   outsideMode: 'budget', // 'budget': outsideBudget coins a week buy the lowest asks, spread by real popularity (Career Legacy), and outsideResale of what collectors hold is sold back into the best bids. 'band': the old 5% chance of a bid at 0.85–1.08× value
-  outsideBudget: 52000, outsideResale: 0.02,
+  outsideBudget: 52000, outsideResale: 0.02, outsideNews: true, // outsideNews: each player's share is his Career Legacy × his current form (the public news: a hot streak draws more, a slump or an injury less)
   forcedSale: 'book', // 'book': a margin-called or broke bot sells into the best bids, then lists the rest at auction with no minimum. 'discount': the old 88% ask and 70% item reserve
   packSale: 'auction', // 'auction': packsPerWeek are released and sold by uniform-price auction (everyone pays the lowest winning bid). 'markup': the old expected value + packEdge
   packsPerWeek: 33, packMix: { standard: 0.75, premium: 0.21, elite: 0.025, holo: 0.015 }, // the mix bots bought under the old price
@@ -916,7 +929,7 @@ function ruleAuctionList(W, b) {
 // over their last 3 generations) copy the networks of the top 10% with small random changes.
 // Games per topic this week and next (what the contest board shows everyone), counted once a week
 function topicCount(W) { if (W._tcT === W.t) return W._tc; const n = {}; for (const cs of [W.contests, W.contestsAhead]) for (const c of Object.values(cs || {})) if (c?.topic) n[c.topic] = (n[c.topic] || 0) + 1; W._tcT = W.t; return (W._tc = n); }
-export const CARD_IN = ['bias', 'price (log)', 'rarity premium (log)', 'design', 'finish', 'change 1w', 'change 4w', 'change 12w', 'below 12w average', 'trades 4w', 'copies out', 'pool left', 'has a note', 'note vs price', 'note age', 'OVR (from research)', 'copies held', 'gain on cost', 'share of worth', 'cash share', 'debt share', 'market drawdown', 'market 4w', 'season phase', 'one of a kind', 'its premium', 'risk rating (from research)', 'royalty yield (from note)', 'my weeks of life left', 'copies I am short', 'copies lendable', 'card lending fee', 'royalty paid last gen ÷ price', 'games on its position (this + next wk)', 'best bid ÷ price', 'best ask ÷ price'];
+export const CARD_IN = ['bias', 'price (log)', 'rarity premium (log)', 'design', 'finish', 'change 1w', 'change 4w', 'change 12w', 'below 12w average', 'trades 4w', 'copies out', 'pool left', 'has a note', 'note vs price', 'note age', 'OVR (from research)', 'copies held', 'gain on cost', 'share of worth', 'cash share', 'debt share', 'market drawdown', 'market 4w', 'season phase', 'one of a kind', 'its premium', 'risk rating (from research)', 'royalty yield (from note)', 'my weeks of life left', 'copies I am short', 'copies lendable', 'card lending fee', 'royalty paid last gen ÷ price', 'games on its position (this + next wk)', 'best bid ÷ price', 'best ask ÷ price', 'weeks out injured', 'form vs career pace', 'reigning award winner', 'retired', 'rookie'];
 export const CARD_OUT = ['buy', 'sell', 'price offset', 'size', 'research', 'auction', 'short'];
 export const BOT_IN = ['bias', 'cash share', 'debt share', 'lent share', 'worth vs median', 'own 4w return', 'age', 'credit rate', 'weeks to my loan due', 'weeks to a loan I made is due', 'pass price', 'ticket price', 'prize pool', 'notes held', 'fresh notes', 'flags on me', 'friends', 'market drawdown', 'market 4w', 'season phase', 'pack value vs price', 'last week games', 'royalty rate', 'living cost share', 'weeks of life left', 'allowance share', 'trade fee', 'pack markup', 'card lending fee', 'short margin', 'my short exposure', 'my cards lent', ...TOPICS.map((t) => `games on ${t} (this + next wk)`)];
 export const BOT_OUT = ['cash target', 'lend share', 'lend rate', 'borrow share', 'max borrow rate', 'pass bid', 'pass ask', 'ticket bid', 'ticket ask', 'research count', 'Standard packs', 'Premium packs', 'Elite packs', 'Holo packs', 'share notes', 'steal notes', 'accept swaps', ...GKEYS.map((g) => `enter ${g}`), 'lend cards share', ...TOPICS.map((t) => `research aim ${t}`), ...Object.keys(PACK_TYPES).map((t) => `pack bid ${t}`)];
@@ -940,7 +953,7 @@ const bufs = (sh) => sh.slice(1).map((m) => new Float64Array(m));
 // The card network's forward pass with its shape fixed (it runs about 350,000 times a week)
 // Inputs 0 and 19–23 are the same for every card a bot looks at in a week, so their share of the first layer is folded
 // into a bias once per bot and week (`fold`); inputs that are zero are skipped. The result is the same.
-const VARY = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 24, 25, 26, 27, 29, 30, 32, 33, 34, 35], FIXED = [0, 19, 20, 21, 22, 23, 28, 31];
+const VARY = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 24, 25, 26, 27, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40], FIXED = [0, 19, 20, 21, 22, 23, 28, 31];
 const FOLD = new Float64Array(16), FOLD_X = new Float64Array(16); let foldKey = null, foldT = -1;
 function foldFor(w, x, t) {
   if (foldKey === w && foldT === t) { let same = true; for (let k = 0; k < FIXED.length; k++) if (x[FIXED[k]] !== FOLD_X[k]) { same = false; break; } if (same) return; }
@@ -992,7 +1005,12 @@ function cardInputs(W, b, c, nw, ctx, it) {
   x[28] = b._life ?? 1; x[29] = Math.log1p(b.owed?.get(c.id) || 0); x[30] = Math.log1p(W.lendable?.get(c.id) || 0) / 3; x[31] = W.cfg.shorting ? W.cfg.cardLendFee * 100 : 0;
   { const roy = it ? it.lastRoy : c.lastRoy; x[32] = roy ? clamp((roy / price) * 5, 0, 3) : 0; }
   x[33] = (topicCount(W)[c.pos] || 0) / 4; // games whose topic is this card's position, this week and next
-  x[34] = c.bb > 0 ? clamp(Math.log(c.bb / P), -1, 1) : -1.5; x[35] = c.ba > 0 ? clamp(Math.log(c.ba / P), -1, 1) : 1.5; // last week's best unfilled bid and ask (none = off the scale) // what one copy paid holders at the last generation's end, against its price now
+  x[34] = c.bb > 0 ? clamp(Math.log(c.bb / P), -1, 1) : -1.5; x[35] = c.ba > 0 ? clamp(Math.log(c.ba / P), -1, 1) : 1.5; // last week's best unfilled bid and ask (none = off the scale)
+  { // the league's public news about this player (everyone sees it; hidden value itself stays hidden)
+    const pl = W.players[c.pid], lg = pl?.lg, L = W.L;
+    if (lg && L) { const out = lg.out && L.week >= lg.out[0] && L.week <= lg.out[1] ? lg.out[1] - L.week + 1 : 0;
+      x[36] = out / L.full; x[37] = lg.active ? clamp(Math.log(Math.max(0.05, lg.formRatio ?? 1)), -1.5, 1.5) : 0; x[38] = lg.awardSeason != null && lg.awardSeason === L.season ? 1 : 0; x[39] = lg.active ? 0 : 1; x[40] = pl.rookie && lg.seasons <= 1 ? 1 : 0; }
+    else { x[36] = 0; x[37] = 0; x[38] = 0; x[39] = 0; x[40] = 0; } } // what one copy paid holders at the last generation's end, against its price now
   return x;
 }
 const cardNet = (W, b, c, nw, ctx, it) => forward(CARD_SHAPE, b.g.card, cardInputs(W, b, c, nw, ctx, it), CB);
@@ -1217,7 +1235,10 @@ export function step(W) {
   const cfg = W.cfg;
   W.t++; packCache = null; W_ = W;
   if (W.timeline && W.t % cfg.seasonWeeks === 0) nextSeason(W);
-  if (cfg.valueModel === 'ovrWalk') ovrWalk(W); else if (cfg.valueModel === 'factors') factorValues(W);
+  if (cfg.valueModel === 'league') { // the simulated league takes over after the last real season
+    if (!W.L && W.timeline && W.seasonIx >= W.timeline.seasons.length - 1) leagueStart(W);
+    if (W.L) { if (W.t % cfg.seasonWeeks === 0 && W.seasonIx >= W.timeline.seasons.length) leagueSeasonEnd(W); leagueWeek(W); leagueValues(W); }
+  } else if (cfg.valueModel === 'ovrWalk') ovrWalk(W); else if (cfg.valueModel === 'factors') factorValues(W);
   W.flow = { net: GROUPS.map(() => 0), realized: GROUPS.map(() => 0), trips: GROUPS.map(() => 0), tax: 0, paidOut: 0 };
   assignGroups(W);
   W.week = { shares: 0, thefts: 0, caught: 0, researched: new Map() };
@@ -1293,7 +1314,8 @@ const leftAsks = (c) => (asks[c.id] || []).filter((o) => !o.used).sort((x, y) =>
 // 1. Outside collectors: a budget of coins, spread by real popularity, buys the lowest asks; a share of what they hold
 // goes back into the best bids. They never name a price.
 function outsideFlow(W) {
-  const cfg = W.cfg, out = (W.outside ||= new Map()), pops = W.players.filter((p) => p.on !== false).map((p) => [p, Math.max(0, W.era?.[p.id]?.legacy ?? W.library.players[p.id].careerLegacy ?? 0)]);
+  const cfg = W.cfg, out = (W.outside ||= new Map()), news = cfg.outsideNews !== false; // outsideNews: budget follows the public news too (an assumption, not measured)
+  const pops = W.players.filter((p) => p.on !== false).map((p) => [p, Math.max(0, W.era?.[p.id]?.legacy ?? W.library.players[p.id].careerLegacy ?? 0) * (news && p.lg?.active ? Math.max(0, p.lg.formRatio ?? 1) : 1)]);
   const tot = pops.reduce((a, x) => a + x[1], 0) || 1; let spent = 0;
   for (const [p, w] of pops) {
     const share = (cfg.outsideBudget * w) / tot, save = (W.outsideSave ||= new Map()); let coins = Math.min(4 * share, (save.get(p.id) || 0) + share); if (coins <= 0) continue; // unspent money waits, up to 4 weeks' worth
@@ -1555,6 +1577,9 @@ export function frame(W, { full = false } = {}) {
     bandHold: bandHoldings(W),
     sens: W.t % 4 === 0 ? (W.nnSens = nnSensitivity(W)) : null,
     house: { fees: Math.round(W.house.fees), packs: W.house.packs, gamePacks: W.house.gamePacks || 0 },
+    newPlayers: W.newPlayers?.length ? W.newPlayers.splice(0) : undefined,
+    inj: W.L ? W.players.filter((p) => W.era[p.id]?.injured).map((p) => p.id) : undefined,
+    league: W.L ? { week: W.L.week, season: W.L.season, champion: W.L.champions[W.L.champions.length - 1] || null, active: W.players.filter((p) => p.lg?.active).length, injured: W.players.filter((p) => W.era[p.id]?.injured).length } : null,
   };
   if (full) {
     f.vol = W.players.map((c) => c.volH[c.volH.length - 1] || 0);
@@ -1596,6 +1621,194 @@ function movers(W) {
   const rows = W.players.filter((c) => recentVol(c, 4) >= 2 && c.Ph.length > 4).map((c) => [c.id, Math.round(c.P * 100) / 100, Math.round(ret(c, 4) * 1000) / 1000, recentVol(c, 4)]);
   rows.sort((a, b) => b[2] - a[2]);
   return { up: rows.slice(0, 8), down: rows.slice(-6).reverse() };
+}
+
+/* ---------- The league (valueModel 'league'): simulated football after the last real season drives hidden value ----------
+   Every rate comes from sandbox/data/league_rates.json, measured from the save's real seasons (sandbox/measure_league.mjs).
+   Each week every active, healthy player plays one game (weeks 1–17 of each 20-week season); at season's end come awards,
+   a Super Bowl, retirements (each replaced by a rookie at the same position and club), and changes in form. Value is the
+   site's own formula (OVR percentile within position over the game's pool, skill, Career Legacy, Hall of Fame, tier)
+   recomputed every week from the simulated totals. It never reads a price or a bot. */
+const LSTATS = { QB: ['yds', 'td', 'int', 'ryds', 'rtd'], RB: ['ryds', 'rtd', 'recyds', 'rectd', 'fum', 'rec'], WR: ['rec', 'yds', 'td', 'fum'], TE: ['rec', 'yds', 'td', 'fum'], OL: ['blk'], LB: ['tkl', 'int', 'sck', 'ff'], DB: ['tkl', 'int', 'sck', 'ff'], DL: ['tkl', 'int', 'sck', 'ff'] };
+const LYARDS = new Set(['yds', 'ryds', 'recyds']), LAWARDS = ['rings', 'mvp', 'opoy', 'dpoy', 'sbmvp', 'roty'];
+const LDEF = new Set(['LB', 'DB', 'DL']);
+const pyRound = (x) => { const f = Math.floor(x), d = x - f; return d === 0.5 ? (f % 2 === 0 ? f : f + 1) : Math.round(x); };
+// League Score (data/y80/formula/ovr.py, src/config/ovr.ts): production by position plus award points
+function lgProduction(pos, t) {
+  const g = (k) => t[k] || 0;
+  if (pos === 'QB') return g('yds') / 80 + 0.9 * g('td') + 0.9 * g('rtd') - 0.6 * g('int');
+  if (pos === 'RB') return g('ryds') / 18 + 2.2 * g('rtd') + g('recyds') / 30 + 2.2 * g('rectd') - 0.8 * g('fum');
+  if (pos === 'WR' || pos === 'TE') { const td = t.td != null ? t.td : g('yds') / 95; return pos === 'WR' ? g('yds') / 14 + 2.5 * td - g('fum') : g('yds') / 8 + 3 * td - g('fum'); }
+  if (pos === 'OL') return 5 * g('blk') + 2 * g('g');
+  return 0.7 * g('tkl') + 12 * g('int') + 14 * g('sck') + 14 * g('ff');
+}
+const lgAwards = (pos, t) => 40 * (t.rings || 0) + 90 * (t.mvp || 0) + (LDEF.has(pos) ? 90 : 45) * ((t.opoy || 0) + (t.dpoy || 0)) + 40 * (t.sbmvp || 0) + 10 * (t.roty || 0);
+const lgScore = (pos, t) => lgProduction(pos, t) + lgAwards(pos, t);
+// The site's library stat names → the timeline's keys
+function libTotals(p) {
+  const t = {}, M = { Games: 'g', 'Pass Yds': 'yds', 'Pass TD': 'td', 'Rush Yds': 'ryds', 'Rush TD': 'rtd', Fum: 'fum', Fumbles: 'fum', Blocks: 'blk', Tackles: 'tkl', FF: 'ff', Rings: 'rings', MVP: 'mvp', OPOY: 'opoy', DPOY: 'dpoy', SBMVP: 'sbmvp', ROTY: 'roty', Rec: 'rec', INT: 'int', 'Rec TD': 'rectd', TDs: 'td' };
+  for (const [k, v] of Object.entries(p.stats || {})) { let key = M[k]; if (k === 'Rec Yds') key = p.pos === 'RB' ? 'recyds' : 'yds'; if (k === 'Sacks') key = p.pos === 'QB' ? null : 'sck'; if (key && typeof v === 'number') t[key] = v; }
+  return t;
+}
+const LIB_NAMES = { g: 'Games', yds: (pos) => (pos === 'QB' ? 'Pass Yds' : 'Rec Yds'), td: (pos) => (pos === 'QB' ? 'Pass TD' : 'TDs'), int: 'INT', ryds: 'Rush Yds', rtd: 'Rush TD', recyds: 'Rec Yds', rectd: 'Rec TD', fum: (pos) => (pos === 'RB' ? 'Fum' : 'Fumbles'), rec: 'Rec', blk: 'Blocks', tkl: 'Tackles', sck: 'Sacks', ff: 'FF', rings: 'Rings', mvp: 'MVP', opoy: 'OPOY', dpoy: 'DPOY', sbmvp: 'SBMVP', roty: 'ROTY' };
+const libStats = (pos, t) => Object.fromEntries(Object.entries(t).map(([k, v]) => { const n = LIB_NAMES[k]; return [typeof n === 'function' ? n(pos) : n || k, Math.round(v)]; }));
+const lgStage = (seasons) => (seasons <= 1 ? '1-2' : seasons <= 4 ? '3-5' : seasons <= 7 ? '6-8' : '9+');
+function poisson1(W, lam) { if (!(lam > 0)) return 0; if (lam > 30) return Math.max(0, Math.round(lam + Math.sqrt(lam) * W.gauss())); let k = 0, p = Math.exp(-lam), s = p; const u = W.rand(); while (u > s && k < 200) { k++; p *= lam / k; s += p; } return k; }
+
+function leagueStart(W) {
+  const R = W.library.leagueRates; if (!R || W.L) return;
+  const T = W.timeline, last = T?.seasons[T.seasons.length - 1].players || {}, prev = T?.seasons[T.seasons.length - 2]?.players || {}, ci = 5;
+  W.L = { t0: W.t - 1, full: R.fullSeason.all, week: 0, season: 0, champions: [], news: [], hofed: new Set(), names: (W.library.rookieNames?.names || []).slice(), nameIx: 0 };
+  for (const p of W.players) {
+    const lp = W.library.players[p.id], tot = libTotals(lp), row = last[p.key], pr = prev[p.key];
+    const lastG = row && pr ? (row[ci].g || 0) - (pr[ci].g || 0) : row && !pr ? row[ci].g || 0 : 0;
+    const line = {}; if (row && pr && lastG >= 4) for (const k of LSTATS[p.pos]) line[k] = Math.max(0, (row[ci][k] || 0) - (pr[ci][k] || 0));
+    const rates = {}; for (const k of LSTATS[p.pos]) rates[k] = line[k] != null && k !== 'fum' && pr ? line[k] / lastG : (tot[k] || 0) / Math.max(1, tot.g || 1);
+    const cpg = (tot.g || 0) > 0 ? lgProduction(p.pos, tot) / tot.g : 0, N = (W.cfg.formSeasons ?? 2) * W.L.full;
+    p.lg = { tot, season: { g: 0 }, last: row && pr && lastG >= 1 ? { ...line, g: lastG } : null, win: Array(N).fill(cpg), rates, active: p.on !== false && lastG > 0, seasons: Math.round((tot.g || 0) / W.L.full), legacy: lp.careerLegacy || 0, skill: lp.skill ?? null, inducted: !!lp.hallOfFame, out: null };
+  }
+  const A = W.library.nflAge; for (const p of W.players) if (p.lg) p.lg.age0 = A?.rookieAge?.draws?.length ? W.pick(A.rookieAge.draws) : 23; // his age when he entered (real NFL entry ages)
+  leagueInjuries(W); leagueValues(W); for (const p of W.players) if (p.lg) p.lg.v0 = p.F;
+}
+// Injuries: each active player's games missed this season, drawn from the real active seasons at his position and stage;
+// a miss comes as one spell starting at a random week (an assumption: only season totals are known)
+function leagueInjuries(W) {
+  const R = W.library.leagueRates, pool = R.activeMissedAll, full = W.L.full, A = W.library.nflAge?.relativeRiskByAge;
+  // How often a season has an injury is the save's (only 16 injured seasons, too few to split); how that chance changes with
+  // age is the real NFL's (nflverse weekly rosters: share of weeks on reserve by age), scaled so the league's average is the save's
+  const hurt = pool.filter((x) => x[2] > 0), base = hurt.length / Math.max(1, pool.length);
+  const ages = Object.keys(A || {}).map(Number).sort((a, b) => a - b), rrAt = (age) => (!ages.length ? 1 : A[Math.min(ages[ages.length - 1], Math.max(ages[0], Math.round(age)))] ?? 1);
+  const act = W.players.filter((p) => p.lg?.active), mean = act.reduce((a, p) => a + rrAt(lgAge(p)), 0) / Math.max(1, act.length);
+  for (const p of act) { const L = p.lg; L.out = null; if (W.cfg.injuries === false) continue;
+    let chance = base * (W.cfg.injuryByAge !== false ? rrAt(lgAge(p)) / mean : 1);
+    const hi = W.cfg.hypeInjury || 0; if (hi > 0 && (L.hype || 0) > 0) chance += base * hi * L.hype; // the owner's setting, not measured
+    if (!(W.rand() < Math.min(1, chance))) continue;
+    let xs = hurt.filter((x) => x[0] === p.pos); if (xs.length < 3) xs = hurt; // the spell: a real injured season's games missed
+    const miss = Math.min(full, W.pick(xs)[2]); const from = 1 + Math.floor(W.rand() * (full - miss + 1)); L.out = [from, from + miss - 1]; }
+}
+const lgAge = (p) => (p.lg.age0 ?? 23) + (p.lg.seasons || 0);
+// One week of football
+function leagueWeek(W) {
+  const L = W.L, wk = ((W.t - 1) % W.cfg.seasonWeeks) + 1; L.week = wk; if (wk > L.full) return;
+  const noise = W.cfg.gameNoise ?? 0.4;
+  const N = Math.max(1, (W.cfg.formSeasons ?? 1) * L.full); // the form window follows the setting, even mid-run
+  for (const p of W.players) { const w = p.lg?.win; if (!w || w.length === N) continue; if (w.length > N) w.splice(0, w.length - N); else { const m = w.reduce((a, b) => a + b, 0) / Math.max(1, w.length); while (w.length < N) w.unshift(m); } }
+  for (const p of W.players) {
+    const s = p.lg; if (!s?.active) continue;
+    if (s.out && wk >= s.out[0] && wk <= s.out[1]) { if (W.cfg.injuryCountsInForm !== false) { s.win.push(0); s.win.shift(); } if (wk === s.out[0]) { const n = s.out[1] - s.out[0] + 1; jot(W, { type: 'injury', player: p.key, name: `${p.pos} ${p.name}`, games: n }); if (n >= 2) log(W, 'injury', `${p.pos} ${p.name} is out for ${n >= L.full ? 'the season' : `${n} games`}.`); } continue; }
+    if (s.out && wk === s.out[1] + 1) { jot(W, { type: 'return', player: p.key, name: `${p.pos} ${p.name}` }); if (s.out[1] - s.out[0] >= 3) log(W, 'return', `${p.pos} ${p.name} is back after ${s.out[1] - s.out[0] + 1} games out.`); }
+    const game = { g: 1 };
+    for (const k of LSTATS[p.pos]) { const r = s.rates[k] || 0; game[k] = LYARDS.has(k) ? Math.max(0, Math.round(r * Math.exp(noise * W.gauss() - (noise * noise) / 2))) : poisson1(W, r); }
+    for (const [k, v] of Object.entries(game)) { s.season[k] = (s.season[k] || 0) + v; s.tot[k] = (s.tot[k] || 0) + v; }
+    const G = W.library.leagueRates.legacyGrowth[p.pos]; if (G) s.legacy += G.perScore * lgProduction(p.pos, game) + G.perGame;
+    p._game = game; s.win.push(lgProduction(p.pos, game)); s.win.shift();
+  }
+}
+// The season ends: awards, the Super Bowl, retirements and rookies, then each player's form changes
+function leagueSeasonEnd(W) {
+  const L = W.L, R = W.library.leagueRates, cfg = W.cfg; L.season++;
+  const act = W.players.filter((p) => p.lg?.active && (p.lg.season.g || 0) > 0), prod = (p) => lgProduction(p.pos, p.lg.season);
+  const give = (p, a, n = 1) => { if (a !== 'rings') p.lg.awardSeason = L.season; p.lg.tot[a] = (p.lg.tot[a] || 0) + n; p.lg.season[a] = (p.lg.season[a] || 0) + n; const G = R.legacyGrowth[p.pos]; if (G) p.lg.legacy += G.perScore * (lgAwards(p.pos, { [a]: n })); };
+  const won = [];
+  if (cfg.awards !== false) {
+    // Super Bowl: the champion club, weighted by the season production of its players (an assumption); every active player on it gets a ring
+    const clubs = new Map(); for (const p of act) clubs.set(p.team, (clubs.get(p.team) || 0) + Math.max(0, prod(p)));
+    const tot = [...clubs.values()].reduce((a, b) => a + b, 0); let r = W.rand() * tot, champ = null; for (const [c, v] of clubs) { r -= v; if (r <= 0) { champ = c; break; } }
+    if (champ) { const roster = act.filter((p) => p.team === champ); for (const p of roster) give(p, 'rings'); L.champions.push([W.seasonLabel, champ]); log(W, 'champion', `${champ} win the Super Bowl: ${roster.length} card players get rings.`);
+      if (W.rand() < (R.awards.sbmvp.meanPerSeason || 0)) { const best = roster.slice().sort((a, b) => prod(b) - prod(a))[0]; if (best) { give(best, 'sbmvp'); won.push(['Super Bowl MVP', best]); } } }
+    // MVP, OPOY, DPOY: as many a season as the save had, at the positions they went to, to that position's top producer this season
+    for (const [a, label] of [['mvp', 'MVP'], ['opoy', 'Offensive Player of the Year'], ['dpoy', 'Defensive Player of the Year']]) {
+      const A = R.awards[a]; if (!A || !(W.rand() < Math.min(1, A.meanPerSeason))) continue;
+      const pos = Object.entries(A.positions); if (!pos.length) continue; const t = pos.reduce((x, [, n]) => x + n, 0); let rr = W.rand() * t, at = pos[0][0]; for (const [ps, n] of pos) { rr -= n; if (rr <= 0) { at = ps; break; } }
+      const best = act.filter((p) => p.pos === at).sort((x, y) => prod(y) - prod(x))[0]; if (best) { give(best, a); won.push([label, best]); }
+    }
+    for (const [label, p] of won) log(W, 'award', `${label}: ${p.pos} ${p.name}.`);
+  }
+  // Retirement at the measured rate for his career stage and where his season ranked at his position; a rookie takes his place
+  const retired = [];
+  if (cfg.retirement !== false) {
+    // retirementByAge: how often careers end is the save's (11% of active players a season); how that changes with age is the
+    // real NFL's (nflverse: the chance a career ends at each age, 19% at 22–29 rising to 30–42% by 32–38). Past the oldest age
+    // the NFL data covers (40), every career ends. Off: the save's rate by seasons played and production third.
+    const E = W.library.nflAge?.careerEndByAge, eAges = Object.keys(E || {}).map(Number).sort((a, b) => a - b);
+    const all = Object.values(R.retirement.rates), saveRate = all.reduce((a, c) => a + c.retired, 0) / Math.max(1, all.reduce((a, c) => a + c.n, 0));
+    const endAt = (age) => (!eAges.length ? 0 : age > eAges[eAges.length - 1] ? null : E[Math.max(eAges[0], Math.round(age))] ?? 0);
+    const actP = W.players.filter((p) => p.lg?.active), meanEnd = actP.reduce((a, p) => a + (endAt(lgAge(p)) ?? 0), 0) / Math.max(1, actP.length);
+    const byAge = W.cfg.retirementByAge !== false && eAges.length && meanEnd > 0;
+    const rank = new Map(); for (const pos of Object.keys(LSTATS)) { const xs = act.filter((p) => p.pos === pos).sort((a, b) => prod(a) / a.lg.season.g - prod(b) / b.lg.season.g); xs.forEach((p, i) => rank.set(p, xs.length > 1 ? i / (xs.length - 1) : 1)); }
+    for (const p of W.players) { const s = p.lg; if (!s?.active) continue; const st = lgStage(s.seasons), r = rank.get(p) ?? 0, third = r < 1 / 3 ? 'bottom third' : r < 2 / 3 ? 'middle third' : 'top third';
+      let cell = R.retirement.rates[`${st}|${third}`]; if (!cell || cell.n < 20) { const all = ['bottom third', 'middle third', 'top third'].map((t) => R.retirement.rates[`${st}|${t}`]); const n = all.reduce((a, c) => a + c.n, 0), k = all.reduce((a, c) => a + c.retired, 0); cell = { rate: n ? k / n : 0 }; }
+      const e = byAge ? endAt(lgAge(p) + 1) : null; // next season's age
+      const chance = byAge ? (e == null ? 1 : Math.min(1, (saveRate * e) / meanEnd)) : cell.rate;
+      if (W.rand() < chance) { s.active = false; retired.push(p); jot(W, { type: 'retired', player: p.key, name: `${p.pos} ${p.name}`, seasons: s.seasons }); log(W, 'retire', `${p.pos} ${p.name} retires at ${Math.round(lgAge(p))} after ${s.seasons + ((s.season.g || 0) > 0 ? 1 : 0)} seasons (${Math.round(s.legacy).toLocaleString()} Career Legacy).`); } }
+    if (cfg.rookies !== false) for (const p of retired) addRookie(W, p);
+  }
+  // Hall of Fame: Career Legacy 7,500
+  for (const p of W.players) { const s = p.lg; if (s && s.legacy >= 7500 && !s.inducted) { s.inducted = true; log(W, 'hof', `${p.pos} ${p.name} enters the Hall of Fame (${Math.round(s.legacy).toLocaleString()} Career Legacy).`); jot(W, { type: 'hof', player: p.key, name: `${p.pos} ${p.name}` }); } }
+  // Form: each active player's per-game rates move by one real season-to-season change at his position and stage
+  for (const p of W.players) { const s = p.lg; if (!s?.active) continue;
+    if ((s.season.g || 0) > 0) { s.last = { ...s.season }; s.seasons++; }
+    if (!s.rookieNew) { const cell = R.formSwings.cells[`${p.pos}|${lgStage(s.seasons)}`]; let sw = W.pick(cell?.draws?.length ? cell.draws : [0]);
+      const P = R.pressure, dv = s.v0 > 0 ? Math.log(p.F / s.v0) : 0; // pressure: how his card moved this season shifts next season's form, as measured in the save
+      if (P && W.cfg.pressure !== false) sw += (W.cfg.pressureStrength ?? 1) * P.shift[dv < P.cuts[0] ? 0 : dv < P.cuts[1] ? 1 : 2];
+      s.hype = dv; for (const st of Object.keys(s.rates)) s.rates[st] *= Math.exp(sw); }
+    s.rookieNew = false; s.season = { g: 0 }; s.v0 = p.F; }
+  leagueInjuries(W);
+}
+// A rookie replaces a retiree: same position and club, a new name, his first-season rates from a real early-career season
+// at that position, and new card markets with a print run
+function addRookie(W, old) {
+  const R = W.library.leagueRates, L = W.L, id = W.players.length;
+  let name; do { name = L.names[L.nameIx++ % Math.max(1, L.names.length)] || `Rookie ${id}`; } while (W.byKey.has(`${old.pos}:${name}`) && L.nameIx < L.names.length * 2);
+  const key = `${old.pos}:${name}`, tpl = W.pick(R.earlySeasons.filter((x) => x.pos === old.pos).length ? R.earlySeasons.filter((x) => x.pos === old.pos) : R.earlySeasons);
+  const rates = {}; for (const k of LSTATS[old.pos]) rates[k] = (tpl.d[k] || 0) / tpl.g;
+  if (!rates.fum && LSTATS[old.pos].includes('fum')) { const lp = W.library.players[old.id], t = libTotals(lp); rates.fum = (t.fum || 0) / Math.max(1, t.g || 1); }
+  const src = W.library.players[W.byKey.get(tpl.key)?.id ?? old.id];
+  const lib = { key, name, pos: old.pos, team: W.library.players[old.id].team, nickname: null, hallOfFame: false, ovr: 62, skill: src?.skill ?? null, grade: src?.grade ?? null, careerLegacy: 0, stats: { Games: 0 }, rates: {}, hidden: { value: 0 }, playsLike: [], family: W.library.players[old.id].family, rookie: true };
+  W.library.players.push(lib);
+  const pool = W.players.filter((p) => p.pos === old.pos && p.S0).map((p) => p.S0).sort((a, b) => a - b), S0 = pool[Math.floor(pool.length / 2)] || 20;
+  const p = { id, key, name, pos: old.pos, team: old.team, F: 1, F0: 1, P: 1, P0: 1, S0, circ: 0, pool: S0 * W.cfg.poolMultiplier, Ph: [1], volH: [], isPlayer: true, fam: old.fam, rookie: true };
+  const tplPg = lgProduction(old.pos, Object.fromEntries(Object.entries(rates).map(([k, v]) => [k, v]))), N = (W.cfg.formSeasons ?? 2) * W.L.full;
+  const A = W.library.nflAge;
+  p.lg = { age0: A?.rookieAge?.draws?.length ? W.pick(A.rookieAge.draws) : 23, tot: { g: 0 }, season: { g: 0 }, last: null, win: Array(N).fill(tplPg), rates, active: true, seasons: 0, legacy: 0, skill: lib.skill, inducted: false, out: null, rookieNew: true };
+  W.players.push(p); W.byKey.set(key, p); W.era[id] = { on: true, ovr: 62, skill: lib.skill, grade: lib.grade, legacy: 0, totals: { g: 0 }, perGame: {} };
+  for (let d = 0; d < 4; d++) for (let f = 0; f < 4; f++) { const m = makeMarket(W, p, d, f); W.cards.push(m); W.mktByKey.set(m.key, m); }
+  (W.newPlayers ||= []).push(lib); packCache = null; packCacheT = null;
+  jot(W, { type: 'rookie', player: key, name: `${old.pos} ${name}`, replaces: `${old.pos} ${old.name}`, club: old.team });
+  log(W, 'rookie', `Rookie ${old.pos} ${name} joins ${old.team}, taking ${old.name}'s place.`);
+}
+// Hidden value, every week: the site's formula on the simulated totals
+function leagueValues(W) {
+  const cfg = W.cfg, form = (cfg.valueBasis ?? 'form') === 'form', on = W.players.filter((p) => p.on !== false && p.lg);
+  // 'form': everyone is ranked within his position on League Score PER GAME: career per game for retired players and the real
+  // NFL players in the pool, the last formSeasons × 17 games for active players (games missed injured count as zero). Career
+  // totals only grow, so ranking on them makes every active player climb just by playing; per game, a breakout lifts a card
+  // and a slump, an injury or the falloff after a rise pulls it back. Career Legacy still builds (it is a career measure).
+  // At the open each card moves from the site's own OVR (career totals) to this one over the first 2 seasons, so the market
+  // opens at the real values. 'career': the site's OVR throughout.
+  const blend = form ? Math.max(0, 1 - (W.t - (W.L.t0 ?? 0)) / (2 * W.cfg.seasonWeeks)) : 1;
+  const careerPg = (p) => { const g = p.lg.tot.g || 0; return g ? lgScore(p.pos, p.lg.tot) / g : 0; };
+  const formPg = (p) => { const w = p.lg.win, g = p.lg.tot.g || 0, aw = g ? lgAwards(p.pos, p.lg.tot) / g : 0; return w?.length ? w.reduce((a, b) => a + b, 0) / w.length + aw : careerPg(p); };
+  const rank = (rows) => { rows.sort((a, b) => a[1] - b[1]); const m = new Map(); rows.forEach(([p], i) => { if (p) m.set(p, 62 + 37 * (rows.length > 1 ? i / (rows.length - 1) : 1) ** 0.85); }); return m; };
+  const ovr = new Map();
+  for (const pos of Object.keys(LSTATS)) {
+    const mine = on.filter((p) => p.pos === pos), legends = (W.library.leagueRates?.legendScores || []).filter((x) => x[0] === pos);
+    const site = blend > 0 ? rank([...mine.map((p) => [p, lgScore(pos, p.lg.tot)]), ...legends.map((x) => [null, x[1]])]) : null;
+    const pg = form ? rank([...mine.map((p) => [p, p.lg.active ? formPg(p) : careerPg(p)]), ...legends.map((x) => [null, x[2] ? x[1] / x[2] : 0])]) : null;
+    for (const p of mine) { const c = careerPg(p); p.lg.formRatio = p.lg.active && c > 0 ? formPg(p) / c : 1; }
+    for (const p of mine) ovr.set(p, pyRound(!form ? site.get(p) : p.rookie || !site ? pg.get(p) : blend * site.get(p) + (1 - blend) * pg.get(p)));
+  }
+  const isHof = (s) => s.legacy >= 7500 || (s.inducted && s.legacy >= 7300);
+  const tierOfP = (p) => { const s = p.lg, o = ovr.get(p); return s.legacy >= 10000 ? 'legendary' : isHof(s) || o >= 90 ? 'epic' : o >= 80 ? 'rare' : 'common'; };
+  const tiers = new Map(on.map((p) => [p, tierOfP(p)])), counts = {}; for (const t of tiers.values()) counts[t] = (counts[t] || 0) + 1;
+  const TM = { common: 1, rare: 1.25, epic: 1.6, legendary: 2 };
+  for (const p of on) {
+    const s = p.lg, o = ovr.get(p), c = clamp((o - 60) / 39, 0, 1), skillM = s.skill == null ? 1 : 0.8 + 0.4 * clamp((s.skill - 62) / 37, 0, 1), legacy = Math.round(s.legacy);
+    const v = Math.max(1, Math.round((25 + 2400 * c ** 3) * skillM * ((1 + clamp(legacy, 0, 15000) / 10000) / 1.5) ** 3 * (legacy >= 7000 ? 1.25 : 1) * TM[tiers.get(p)] * clamp(Math.sqrt(on.length / 4 / Math.max(1, counts[tiers.get(p)])), 0.8, 1.5)));
+    p.F = Math.max(0.05 * cfg.coinScale, v / cfg.valueDivisor); if (p.rookie && p.P === 1 && p.F0 === 1) { p.F0 = p.F; p.P = p.P0 = p.F; p.Ph = [p.F]; resetMarkets(W, p); }
+    const e = (W.era[p.id] ||= { on: true }); e.ovr = o; e.legacy = legacy; e.skill = s.skill; e.totals = s.tot; e.value = v; e.active = s.active; e.age = lgAge(p); e.injured = !!(s.out && W.L.week >= s.out[0] && W.L.week <= s.out[1]);
+  }
+  packCache = null; packCacheT = null;
 }
 
 /* ---------- The forces that keep a real market from settling ---------- */
@@ -1649,6 +1862,7 @@ function nextSeason(W) {
     } else {
       if (c.on === false) continue;
       if (W.cfg.priceOnly || walk) continue; // nothing to draw: price-only has no value, the OVR walk moves weekly
+      if (W.cfg.valueModel === 'league') continue; // the league simulation moves values (leagueSeasonEnd)
       if (fac && W.cfg.pastSave !== 'draw') continue; // no real data past the save, so no change: the player factor holds and only supply moves the value
       if (fac) { c.B = Math.max(0.05 * W.cfg.coinScale, (c.B ?? c.F) * Math.exp(W.pick(W.rawRatios?.[c.pos] || [0]))); moves.push([c, c.B / before]); continue; } // 'draw': one real season's change from his position's history
       // Mean-reverting in log terms around the last real value, aimed sd²/2 low so the average value stays put
@@ -1660,7 +1874,7 @@ function nextSeason(W) {
   }
   moves.sort((a, b) => b[1] - a[1]); packCache = null;
   const fmtM = ([c, k]) => `${c.pos} ${c.name} ${k >= 1 ? '+' : '−'}${Math.round(Math.abs(k - 1) * 100)}%`;
-  if (!real && W.cfg.valueModel === 'factors' && W.cfg.pastSave !== 'draw') log(W, 'season', `${label} arrives: no real data past the save, so player values hold; only the supply of copies moves them.`); else
+  if (!real && W.cfg.valueModel === 'league') log(W, 'season', `${label} kicks off: the simulated league plays on from the last real season.`); else if (!real && W.cfg.valueModel === 'factors' && W.cfg.pastSave !== 'draw') log(W, 'season', `${label} arrives: no real data past the save, so player values hold; only the supply of copies moves them.`); else
   log(W, 'season', `${label} ${real ? 'arrives (real results)' : 'arrives (drawn from real season-to-season changes)'}: ${moves.length ? `${W.cfg.valueModel === 'ovrWalk' ? 'biggest OVR risers' : 'biggest risers'} ${moves.slice(0, 3).map(fmtM).join(', ')}; fallers ${moves.slice(-2).map(fmtM).join(', ')}.` : ''}${rookies.length ? ` ${rookies.length} rookies enter the packs: ${rookies.slice(0, 5).map((c) => `${c.pos} ${c.name}`).join(', ')}${rookies.length > 5 ? '…' : ''}.` : ''} Every note on these players is now out of date.`);
   W.seasonLabel = label;
 }
