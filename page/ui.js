@@ -53,6 +53,7 @@ function startWorker() {
     if (m.type === 'reset') { if (mode !== 'live') return; FRAMES = []; newHist(); arcs = []; pos.clear(); }
     if (m.type === 'frame' || m.type === 'reset') { if (mode !== 'live') return; for (const f of m.frames || []) { pushFrame(f); for (const [s2, b2] of f.arcs || []) arcs.push({ s: s2, b: b2, age: 0 }); } if (m.type === 'reset') { syncControls(); redrawAll(); } dirty = true; }
     if (m.type === 'detail' && mode === 'live') { drawDetail(); drawAcct(); }
+    if (m.type === 'log' && logWait) { logWait(m.log); logWait = null; }
   };
   worker.onmessage = onmsg;
   worker.postMessage({ cmd: 'init', lib: LIBRARY });
@@ -66,12 +67,13 @@ function inlineWorker() {
 }
 const tell = (m) => { if (worker) worker.postMessage(m); };
 // Every rule you change while it runs, with the week, so a saved run can be read (or re-run) exactly
-let CHANGES = [];
+let CHANGES = [], logWait = null;
 const logChange = (k, v) => CHANGES.push({ week: FRAMES[FRAMES.length - 1]?.t ?? 0, rule: k, value: v });
-function saveRun() {
+async function saveRun() {
+  const log = mode === 'live' ? await new Promise((res) => { logWait = res; tell({ cmd: 'log' }); setTimeout(() => res(null), 8000); }) : null;
   const clean = (f) => Object.fromEntries(Object.entries(f).filter(([k]) => !k.startsWith('_')));
   const t = FRAMES[FRAMES.length - 1]?.t ?? 0, src = mode === 'replay' ? RUN : null;
-  const run = src ? { ...src, frames: src.frames.map(clean) } : { meta: { id: `page-seed${opts.seed}-${presetKey}-w${t}`, source: 'Trading Floor page', seed: opts.seed, preset: presetKey, presetRules: PRESETS[presetKey].set, startingRules: { ...opts }, changes: CHANGES, weeks: t, savedAt: new Date().toISOString(), aiBots: [] }, config: LIVECFG, frames: FRAMES.map(clean) };
+  const run = src ? { ...src, frames: src.frames.map(clean) } : { meta: { id: `page-seed${opts.seed}-${presetKey}-w${t}`, source: 'Trading Floor page', seed: opts.seed, preset: presetKey, presetRules: PRESETS[presetKey].set, startingRules: { ...opts }, changes: CHANGES, logNote: 'log holds every trade, auction, pack, loan, theft, flag, default, death and adoption; research and game entries are summed in the frames', weeks: t, savedAt: new Date().toISOString(), aiBots: [] }, config: LIVECFG, frames: FRAMES.map(clean), ...(log ? { log } : {}) };
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(run)], { type: 'application/json' })); a.download = `${run.meta.id || 'run'}.json`; document.body.appendChild(a); a.click(); a.remove();
 }
 const sendSel = () => tell({ cmd: 'sel', p: SEL.type === 'card' ? SEL.id : null, b: ACCT });
@@ -350,11 +352,12 @@ function drawPanels() {
   $('kGini').textContent = f.h.gini.toFixed(3); $('kGiniS').textContent = `${f.h.gini >= H.gini[0] ? '▲' : '▼'} from ${H.gini[0].toFixed(3)}`;
   $('kTrades').textContent = f.h.trades.toLocaleString(); $('kTradesS').textContent = `${f.house.packs.toLocaleString()} packs bought`;
   $('kPass').textContent = f.h.pass == null ? '–' : f.h.pass.toFixed(2); $('kPassS').textContent = `coins · ${f.h.informed.toFixed(1)} notes/bot`;
-  $('kTicket').textContent = f.tickets == null ? '–' : f.tickets.toFixed(2); $('kTicketS').textContent = f.games ? `${f.games.packsWeek} game packs this wk` : 'games off';
+  $('kTicket').textContent = f.tickets == null ? '–' : f.tickets.toFixed(2); $('kTicketS').textContent = f.gs ? `${Object.values(f.gs).reduce((x, g) => x + g[0], 0).toLocaleString()} game entries this wk` : 'games off';
   $('kWin').textContent = g4.skill[1] ? (g4.skill[0] / g4.skill[1]).toFixed(2) : '–'; $('kWinS').textContent = games ? `${games.toLocaleString()} entries · ${fmt(pots)} coins in pots` : 'no games';
   const ranked = f.bots.slice().sort((a, b) => b[3] - a[3]);
   $('kBank').textContent = f.mkt?.rate == null ? '–' : (f.mkt.rate * 100).toFixed(2) + '%'; $('kBankS').textContent = `per week · loans ${f.mkt?.mcap ? pct(f.mkt.debt / f.mkt.mcap) : '–'} of market · ${f.mkt?.defaults ?? 0} defaults`;
-  $('lb').tBodies[0].innerHTML = ranked.slice(0, 12).map((b) => `<tr data-bot="${b[0]}"><td><span class="sw" style="background:${grpColor(b)}"></span>${esc(b[2])}</td><td class="num">${fmt(b[3])}</td><td class="num ${(b[13] ?? 0) >= 0 ? 'up' : 'down'}">${b[13] == null ? '–' : (b[13] >= 0 ? '+' : '') + Math.round(b[13] * 100) + '%'}</td><td class="num">gen ${b[10]}</td><td>${SOC[b[5]]}${b[6] >= 5 ? ' <span class="pill pill--hot">flagged</span>' : ''}</td></tr>`).join('');
+  const pctS = (v) => (v == null ? '–' : `<span class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${Math.round(v * 100)}%</span>`);
+  $('lb').tBodies[0].innerHTML = ranked.slice(0, 20).map((b) => `<tr data-bot="${b[0]}" title="${esc(b[2])} · ${kindOf(b)} · gen ${b[10]}${b[6] >= 5 ? ' · flagged' : ''}"><td><span class="sw" style="background:${grpColor(b)}"></span>${esc(b[2])}${b[9] ? ' <span class="pill pill--fair">AI</span>' : ''}${b[6] >= 5 ? ' <span class="pill pill--hot">flagged</span>' : ''}</td><td class="num">${fmt(b[3])}</td><td class="num">${pctS(b[16])}</td><td class="num">${pctS(b[13])}</td></tr>`).join('');
   { const rows = Object.entries(GAMES).map(([g, d]) => [g, d, g4.game[g] || [0, 0, 0, 0]]).sort((a, b) => (b[2][3] ? b[2][2] / b[2][3] : -1) - (a[2][3] ? a[2][2] / a[2][3] : -1));
     $('gTopic').tBodies[0].innerHTML = rows.map(([g, d, [e, pot, sk, kn]]) => { const r = kn ? sk / kn : null; return `<tr title="${esc(d.skill)}"><td>${esc(d.label)}</td><td class="k">${esc(f.topics?.[g] || '')}</td><td class="num">${e.toLocaleString()}</td><td class="num">${fmt(pot)}</td><td class="num">${r == null ? '–' : r.toFixed(2)}</td><td class="bar"><span class="${r != null && r < 0 ? 'neg' : ''}" style="width:${r == null ? 0 : Math.min(100, Math.abs(r) * 100)}%"></span></td></tr>`; }).join(''); }
   { const rows = GROUPS.map((g, a) => [a, g4.arch[a]]), max = Math.max(0.01, ...rows.map(([, x]) => (x[0] ? x[1] / x[0] : 0)));
@@ -370,6 +373,10 @@ function drawPanels() {
     const draw = (d, col, dash) => { x.beginPath(); let on = false; d.forEach((v, k) => { if (v == null) { on = false; return; } const px = Wd - 2 - ((d.length - 1 - k) / 59) * (Wd - 4), py = Ht - 3 - ((v - lo) / sp) * (Ht - 6); on ? x.lineTo(px, py) : x.moveTo(px, py); on = true; }); x.setLineDash(dash ? [3, 3] : []); x.strokeStyle = col; x.lineWidth = 1.5; x.stroke(); x.setLineDash([]); };
     draw(F, COL.chalk, true); draw(P, COL.gold, false);
   });
+  { // The most valuable card in circulation this week, and the next two
+    const tops = f.top || [];
+    $('mvc').innerHTML = tops.map((x, i) => `<button type="button" class="${i ? '' : 'first'}" data-card="${x.pid}" data-lib="${x.pid}"><span>${i ? `No. ${i + 1}` : 'Most valuable card'}</span><b>${esc(x.label)}</b><small><span class="mono" style="font-size:inherit;color:var(--chalk);text-transform:none;letter-spacing:0">${fmt(x.P)}</span> coins · value ${fmt(x.F)} · ${x.owner ? (x.owner.startsWith('up for') ? esc(x.owner) : `held by ${esc(x.owner)}`) : 'no holder found'}${x.n > 1 ? ` · ${x.n} copies` : ''}</small></button>`).join('');
+  }
   drawFeed(); drawTape(); drawWatch(); drawAcct(); drawCons(); drawDetail();
 }
 function drawLibrary() {
@@ -385,6 +392,7 @@ document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-lib]'); if (t) { libId = +t.dataset.lib; $('libPick').value = libId; drawLibrary(); }
   const c = e.target.closest('[data-card]'); if (c) select({ type: 'card', id: +c.dataset.card });
   const b = e.target.closest('[data-bot]'); if (b) selectBot(+b.dataset.bot);
+  const mt = e.target.closest('[data-metric]'); if (mt) select(SEL.type === 'metric' && SEL.key === mt.dataset.metric ? { type: 'market' } : { type: 'metric', key: mt.dataset.metric });
 });
 
 /* ---------- Feed ---------- */
@@ -473,10 +481,11 @@ Object.assign(COL, { chalk: css('--chalk'), muted: css('--muted'), faint: css('-
 
 
 /* ---------- Stock-market desk: selection, tape, watchlist, main chart, detail, account ---------- */
+let acctScroll = false; // scroll to the account once it has drawn the newly clicked bot
 let SEL = { type: 'market' }, ACCT = null, TF = 52, CMODE = 'line', wsortKey = 'vol', wq = '';
 const cfgNow = () => (mode === 'replay' ? RUN.config : LIVECFG || {});
 function select(s) { SEL = s; if (mode === 'live') sendSel(); $('toMarket').hidden = s.type === 'market'; if (s.type === 'card') { libId = s.id; $('libPick').value = s.id; drawLibrary(); } drawMain(); drawDetail(); drawWatch(); }
-function selectBot(id) { ACCT = id; SEL = { type: 'bot', id }; if (mode === 'live') sendSel(); $('toMarket').hidden = false; drawMain(); drawDetail(); drawAcct(); }
+function selectBot(id) { ACCT = id; SEL = { type: 'bot', id }; if (mode === 'live') sendSel(); acctScroll = true; $('toMarket').hidden = false; drawMain(); drawDetail(); drawAcct(); }
 $('toMarket').addEventListener('click', () => select({ type: 'market' }));
 document.querySelectorAll('#tf [data-tf]').forEach((b) => b.addEventListener('click', () => { TF = +b.dataset.tf; document.querySelectorAll('#tf [data-tf]').forEach((o) => o.setAttribute('aria-pressed', String(o === b))); drawMain(); }));
 document.querySelectorAll('#cmode [data-m]').forEach((b) => b.addEventListener('click', () => { CMODE = b.dataset.m; document.querySelectorAll('#cmode [data-m]').forEach((o) => o.setAttribute('aria-pressed', String(o === b))); drawMain(); }));
@@ -522,6 +531,7 @@ function barsFor(sel) {
   // The market is a fixed-basket index (every player weighted by his starting supply), like a stock index, so new
   // cards entering circulation don't look like rising prices
   if (sel.type === 'market') { for (let i = 0; i < n; i++) { const f = FRAMES[i], prev = FRAMES[i - 1]?.h.p ?? f.h.p, c = f.h.p; out.push({ t: f.t, o: prev, h: Math.max(prev, c), l: Math.min(prev, c), c, v: f.h.trades, val: f.h.f }); } return out; }
+  if (sel.type === 'metric') { const m = METRICS.find((x) => x.key === sel.key), d = metricSeries(m, n - 1); for (let i = 0; i < n; i++) { const c = d[i]; if (c == null) continue; const prev = d[i - 1] ?? c; out.push({ t: FRAMES[i].t, o: prev, h: Math.max(prev, c), l: Math.min(prev, c), c, v: 0, val: m.ref ? m.ref(FRAMES[i]) : null }); } return out; }
   if (sel.type === 'card') {
     let val = null; for (let i = 0; i < n; i++) { const f = FRAMES[i]; if (f.values) val = f.values[sel.id]; const c = f.prices?.[sel.id]; if (c == null) continue; const prev = FRAMES[i - 1]?.prices?.[sel.id] ?? c; out.push({ t: f.t, o: prev, h: Math.max(prev, c), l: Math.min(prev, c), c, v: f.vol?.[sel.id] || 0, val }); }
     return out;
@@ -537,19 +547,21 @@ function drawMain() {
   const vc = $('volc'), [vx, vW, vH] = fit(vc); vx.clearRect(0, 0, vW, vH);
   // Header
   let name = 'Vault index', sub = 'every player, fixed basket · start = 100', valLabel = 'Hidden value';
+  const met = sel.type === 'metric' ? METRICS.find((x) => x.key === sel.key) : null; if (met) { name = met.label; sub = 'market stat over time · click its tile again to go back'; valLabel = met.refLabel || ''; }
   if (sel.type === 'card') { const p = LIBRARY.players[sel.id]; name = `${p.pos} ${p.name}`; sub = `${teamShort(p.team)} · OVR ${ovrOf(sel.id)}${riskNow(sel.id) != null ? ` · ${riskText(sel.id)}` : ''} · price shown as Prizm Base`; }
   if (sel.type === 'bot') { const b = cur().bots.find((b) => b[0] === sel.id); name = b ? b[2] : 'Bot'; sub = b ? `${kindOf(b)} · ${GROUPS[b[17] ?? 2].label} · worth` : 'not in the market now'; valLabel = 'Median bot'; }
   $('ch-name').textContent = name; $('chSub').textContent = sub;
   const last = bars[bars.length - 1], first = bars[0];
-  $('chLast').textContent = last ? fmt(last.c) : '–'; $('chChg').innerHTML = last && first ? chgSpan(last.c / first.o - 1) + ` <span class="k">${TF ? TF + 'W' : 'all'}</span>` : '';
-  $('chLegend').innerHTML = `<span><i class="line" style="background:var(--gold)"></i>${sel.type === 'bot' ? 'Worth' : 'Price'}</span><span><i class="dash"></i>${valLabel}</span>`;
+  const show = met ? met.show : fmt;
+  $('chLast').textContent = last ? show(last.c) : '–'; $('chChg').innerHTML = !last || !first ? '' : met ? `<span class="k">from ${show(first.o)} · ${TF ? TF + 'W' : 'all'}</span>` : chgSpan(last.c / first.o - 1) + ` <span class="k">${TF ? TF + 'W' : 'all'}</span>`;
+  $('chLegend').innerHTML = `<span><i class="line" style="background:var(--gold)"></i>${sel.type === 'bot' ? 'Worth' : met ? met.label : 'Price'}</span>${valLabel ? `<span><i class="dash"></i>${valLabel}</span>` : ''}`;
   if (!bars.length) return;
   const pad = { l: 8, r: 58, t: 10, b: 18 }, iw = Wd - pad.l - pad.r, ih = Ht - pad.t - pad.b;
   let lo = Infinity, hi = -Infinity; for (const b of bars) { lo = Math.min(lo, b.l, b.val ?? Infinity); hi = Math.max(hi, b.h, b.val ?? -Infinity); }
-  const sp = hi - lo || hi || 1; lo -= sp * 0.06; hi += sp * 0.06; lo = Math.max(0, lo);
+  const sp = hi - lo || hi || 1; lo -= sp * 0.06; hi += sp * 0.06; if (!(met && met.zero)) lo = Math.max(0, lo);
   const X = (i) => pad.l + (iw * (i + 0.5)) / bars.length, Y = (v) => pad.t + ih * (1 - (v - lo) / (hi - lo)), bw = Math.max(1, (iw / bars.length) * 0.66);
   x.font = `500 10px ${css('--mono')}`; x.textBaseline = 'middle';
-  for (let i = 0; i <= 5; i++) { const v = lo + ((hi - lo) * i) / 5, y = Y(v); x.fillStyle = 'rgba(255,255,255,0.06)'; x.fillRect(pad.l, Math.round(y), iw, 1); x.fillStyle = COL.faint; x.fillText(fmt(v), Wd - pad.r + 6, y); }
+  for (let i = 0; i <= 5; i++) { const v = lo + ((hi - lo) * i) / 5, y = Y(v); x.fillStyle = 'rgba(255,255,255,0.06)'; x.fillRect(pad.l, Math.round(y), iw, 1); x.fillStyle = COL.faint; x.fillText(show(v), Wd - pad.r + 6, y); }
   x.textBaseline = 'alphabetic'; x.fillStyle = COL.faint;
   const step = Math.max(1, Math.ceil(bars.length / 8)); for (let i = 0; i < bars.length; i += step) x.fillText(`W${bars[i].t}`, X(i) - 8, Ht - 3);
   // Hidden value (or median) line
@@ -562,11 +574,11 @@ function drawMain() {
     x.beginPath(); bars.forEach((b, i) => (i ? x.lineTo(X(i), Y(b.c)) : x.moveTo(X(i), Y(b.c)))); x.strokeStyle = COL.gold; x.lineWidth = 2; x.stroke();
   }
   // Last price tag
-  if (last) { const y = Y(last.c); x.fillStyle = COL.gold; x.fillRect(Wd - pad.r + 2, y - 8, pad.r - 4, 16); x.fillStyle = '#1a1205'; x.font = `700 10px ${css('--mono')}`; x.textBaseline = 'middle'; x.fillText(fmt(last.c), Wd - pad.r + 6, y); }
+  if (last) { const y = Y(last.c); x.fillStyle = COL.gold; x.fillRect(Wd - pad.r + 2, y - 8, pad.r - 4, 16); x.fillStyle = '#1a1205'; x.font = `700 10px ${css('--mono')}`; x.textBaseline = 'middle'; x.fillText(show(last.c), Wd - pad.r + 6, y); }
   // Volume
   const vmax = Math.max(1, ...bars.map((b) => b.v || 0));
   bars.forEach((b, i) => { const h = ((b.v || 0) / vmax) * (vH - 4); vx.fillStyle = b.c >= b.o ? 'rgba(79,209,139,0.55)' : 'rgba(255,138,138,0.55)'; vx.fillRect(X(i) - bw / 2, vH - h, bw, h); });
-  vx.fillStyle = COL.faint; vx.font = `500 10px ${css('--mono')}`; vx.fillText(sel.type === 'bot' ? '' : `volume (max ${fmt(vmax)})`, pad.l, 10);
+  vx.fillStyle = COL.faint; vx.font = `500 10px ${css('--mono')}`; vx.fillText(sel.type === 'bot' || met ? '' : `volume (max ${fmt(vmax)})`, pad.l, 10);
   // Crosshair
   if (MAIN.hi != null && MAIN.hi < bars.length) { const i = MAIN.hi, b = bars[i]; x.fillStyle = 'rgba(238,241,250,0.35)'; x.fillRect(Math.round(X(i)), pad.t, 1, ih); x.fillRect(pad.l, Math.round(Y(b.c)), iw, 1); }
   Object.assign(MAIN, { bars, X, pad, iw });
@@ -578,11 +590,42 @@ function drawMain() {
   cv.addEventListener('pointerleave', () => { MAIN.hi = null; tip.hidden = true; drawMain(); });
 }
 const tile = (k, v) => `<div class="stat"><span>${k}</span><b>${v}</b></div>`;
+// Every market stat, as a history: each tile draws its own sparkline; clicking one shows it in the main chart
+const seasonNum = (f) => { const m = /Y(\d+)/.exec(f.season || ''); return m ? +m[1] : null; };
+const METRICS = [
+  { key: 'mcap', label: 'Market value', get: (f) => f.mkt?.mcap, ref: (f) => f.mkt?.vcap, refLabel: 'Hidden value', show: fmt },
+  { key: 'vcap', label: 'Hidden value', get: (f) => f.mkt?.vcap, show: fmt },
+  { key: 'prem', label: 'Premium', get: (f) => (f.mkt?.vcap ? f.mkt.mcap / f.mkt.vcap - 1 : null), show: (v) => (v * 100).toFixed(1) + '%', zero: true },
+  { key: 'cash', label: 'Coins held', get: (f) => f.mkt?.cash, show: fmt },
+  { key: 'debt', label: 'Loans out', get: (f) => f.mkt?.debt, show: fmt },
+  { key: 'calls', label: 'Margin calls / wk', get: (f) => f.mkt?.calls ?? 0, show: (v) => String(Math.round(v)) },
+  { key: 'rate', label: 'Loan rate / wk', get: (f) => f.mkt?.rate ?? null, show: (v) => (v * 100).toFixed(2) + '%' },
+  { key: 'season', label: 'Season', get: seasonNum, show: (v) => 'Y' + Math.round(v) },
+  { key: 'lines', label: 'Lineages', get: (f) => f.lineages?.count, show: (v) => String(Math.round(v)) },
+  { key: 'depth', label: 'Deepest generation', get: (f) => f.lineages?.depth, show: (v) => String(Math.round(v)) },
+  { key: 'family', label: 'Largest family', get: (f) => f.lineages?.topShare, show: (v) => pct(v), sub: 'of wealth' },
+  { key: 'bots', label: 'Bots', get: (f) => f.bots.length, show: (v) => String(Math.round(v)) },
+  { key: 'spent', label: 'Living costs / wk', get: (f) => f.mkt?.spent, show: fmt },
+  { key: 'cards', label: 'Cards out', get: (f) => f.mkt?.cards, show: fmt },
+  { key: 'top10', label: 'Richest 10% cash', get: (f) => f.mkt?.cashTop10, show: (v) => pct(v) },
+  { key: 'defaults', label: 'Defaults / wk', get: (f) => f.mkt?.defaults ?? 0, show: (v) => String(Math.round(v)) },
+];
+const metricSeries = (m, upto = ix()) => { const out = []; for (let i = 0; i <= upto; i++) { const v = m.get(FRAMES[i]); out.push(v == null || !isFinite(v) ? null : v); } return out; };
+function spark(cv, d, color, zero) {
+  const [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
+  const vals = d.filter((v) => v != null); if (vals.length < 2) return;
+  let lo = Math.min(...vals), hi = Math.max(...vals); if (zero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); } const sp = hi - lo || Math.abs(hi) || 1;
+  const X = (i) => 1 + (i / Math.max(1, d.length - 1)) * (Wd - 2), Y = (v) => Ht - 2 - ((v - lo) / sp) * (Ht - 4);
+  if (zero && lo < 0 && hi > 0) { x.fillStyle = 'rgba(255,255,255,0.15)'; x.fillRect(0, Math.round(Y(0)), Wd, 1); }
+  x.beginPath(); let on = false; d.forEach((v, i) => { if (v == null) { on = false; return; } on ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)); on = true; }); x.strokeStyle = color; x.lineWidth = 1.5; x.stroke();
+}
 function drawDetail() {
   const f = cur(); if (!f) return;
-  if (SEL.type === 'market') {
-    const m = f.mkt || {}, c = cfgNow();
-    $('detail').innerHTML = `<div class="stats">${tile('Market value', fmt(m.mcap))}${tile('Hidden value', fmt(m.vcap))}${tile('Premium', m.vcap ? ((m.mcap / m.vcap - 1) * 100).toFixed(1) + '%' : '–')}${tile('Coins held', fmt(m.cash))}${tile('Loans out', fmt(m.debt))}${tile('Margin calls', m.calls ?? 0)}${f.lender ? tile('Lenders', `${pct(f.lender.ltv)} · ${(f.lender.rate * 100).toFixed(2)}%/wk`) : ''}${f.season ? tile('Season', f.season) : ''}${f.lineages ? tile('Lineages', `${f.lineages.count} · deepest gen ${f.lineages.depth}`) + tile('Largest family', `${pct(f.lineages.topShare)} of wealth`) : ''}${tile('Bots', f.bots.length + (f.people ? ` (+${f.people.joined}/−${f.people.left})` : ''))}${tile('Living costs / wk', fmt(m.spent))}${tile('Cards out', fmt(m.cards))}${tile('Richest 10% cash', pct(m.cashTop10))}${tile('Safeguards', [c.store && 'store', c.priceLimit && 'limits', c.wealthTax && 'tax', c.positionLimit && 'caps', c.centralBank && 'bank', c.closedEconomy && 'closed'].filter(Boolean).join(' · ') || 'none')}</div>`;
+  if (SEL.type === 'market' || SEL.type === 'metric') {
+    const c = cfgNow(), safe = [c.store && 'store', c.priceLimit && 'limits', c.wealthTax && 'tax', c.positionLimit && 'caps', c.centralBank && 'bank', c.closedEconomy && 'closed'].filter(Boolean).join(' · ') || 'none';
+    const shown = METRICS.filter((m) => m.get(f) != null);
+    $('detail').innerHTML = `<div class="stats stats--spark">${shown.map((m) => `<button type="button" class="stat stat--btn" data-metric="${m.key}" aria-pressed="${SEL.type === 'metric' && SEL.key === m.key}" title="Show ${m.label} over time in the chart"><span>${m.label}</span><b>${m.show(m.get(f))}${m.sub ? ` <small class="k">${m.sub}</small>` : ''}</b><canvas aria-hidden="true"></canvas></button>`).join('')}${tile('Safeguards', safe)}${f.people ? tile('Joined / left', `+${f.people.joined} / −${f.people.left}`) : ''}</div><p class="note">Each line is that stat from week 0 to now. Click one to see it full size above.</p>`;
+    $('detail').querySelectorAll('[data-metric]').forEach((el) => { const m = METRICS.find((x) => x.key === el.dataset.metric); spark(el.querySelector('canvas'), metricSeries(m), SEL.type === 'metric' && SEL.key === m.key ? COL.gold : '#9cc7ff', m.zero); });
     return;
   }
   if (SEL.type === 'card') {
@@ -628,13 +671,14 @@ function drawAcct() {
   positions.sort((x, y) => y.q * y.P - x.q * x.P);
   const unreal = positions.reduce((s, p) => s + (p.pnl || 0), 0);
   const log = botLogFor(name).slice(0, 40).map((j) => { const r = ACT[j.type]?.(j); return r ? `<div><time>W${j.t}</time><span class="k">${r[0]}</span> ${r[1]}</div>` : ''; }).join('');
-  $('acct').innerHTML = `<div class="who"><b><span class="sw" style="background:${grpColor(b)}"></span>${esc(name)}</b><span class="note">${kindOf(b)}${model ? ` · ${esc(model)}` : ''} · ${GROUPS[b[17] ?? 2].label} · ${SOC[soc]} · gen ${gen} · rank ${rank}/${f.bots.length}</span></div>
+  $('acct').innerHTML = `<div><div class="who"><b><span class="sw" style="background:${grpColor(b)}"></span>${esc(name)}</b><span class="note">${kindOf(b)}${model ? ` · ${esc(model)}` : ''} · ${GROUPS[b[17] ?? 2].label} · ${SOC[soc]} · gen ${gen} · rank ${rank}/${f.bots.length}</span></div>
   <div class="stats">${tile('Worth', fmt(w))}${tile('Cash', fmt(cash))}${tile('Realized', realized == null ? '–' : `<span class="${realized >= 0 ? 'up' : 'down'}">${realized >= 0 ? '+' : ''}${fmt(realized)}</span>`)}${tile('Unrealized', positions.length ? `<span class="${unreal >= 0 ? 'up' : 'down'}">${unreal >= 0 ? '+' : ''}${fmt(unreal)}</span>` : '–')}${tile('Loan', debt == null ? '–' : fmt(debt))}${tile('Cards', n)}${tile('Notes', notes)}${tile('Cards\' avg OVR', b[15] ?? '–')}</div>
-  <canvas id="acctSpark" aria-label="${esc(name)} worth over time"></canvas>${extra}
-  <h3 style="margin:6px 0 0;font:800 13px/1 var(--display);text-transform:uppercase;letter-spacing:.04em">Positions</h3>
-  ${positions.length ? `<div class="tablewrap"><table><thead><tr><th>Card</th><th class="num">Qty</th><th class="num">Avg</th><th class="num">Last</th><th class="num">P&amp;L</th></tr></thead><tbody>${positions.slice(0, 25).map((p) => `<tr data-card="${p.pid}"><td>${esc(p.label)}</td><td class="num">${p.q}</td><td class="num">${fmt(p.ac)}</td><td class="num">${fmt(p.P)}</td><td class="num ${(p.pnl || 0) >= 0 ? 'up' : 'down'}">${p.pnl == null ? '–' : (p.pnl >= 0 ? '+' : '') + fmt(p.pnl)}</td></tr>`).join('')}</tbody></table></div>` : `<p class="note">${mode === 'replay' ? 'Replays record positions for AI bots only.' : 'No cards.'}</p>`}
+  <canvas id="acctSpark" aria-label="${esc(name)} worth over time"></canvas>${extra}</div>
+  <div><h3 style="margin:6px 0 0;font:800 13px/1 var(--display);text-transform:uppercase;letter-spacing:.04em">Positions</h3>
+  ${positions.length ? `<div class="tablewrap"><table><thead><tr><th>Card</th><th class="num">Qty</th><th class="num avgc">Avg</th><th class="num">Last</th><th class="num">P&amp;L</th></tr></thead><tbody>${positions.slice(0, 60).map((p) => `<tr data-card="${p.pid}"><td>${esc(p.label)}</td><td class="num">${p.q}</td><td class="num avgc">${fmt(p.ac)}</td><td class="num">${fmt(p.P)}</td><td class="num ${(p.pnl || 0) >= 0 ? 'up' : 'down'}">${p.pnl == null ? '–' : (p.pnl >= 0 ? '+' : '') + fmt(p.pnl)}</td></tr>`).join('')}</tbody></table></div>` : `<p class="note">${mode === 'replay' ? 'Replays record positions for AI bots only.' : 'No cards.'}</p>`}
   <h3 style="margin:6px 0 0;font:800 13px/1 var(--display);text-transform:uppercase;letter-spacing:.04em">Activity</h3>
-  <div class="log">${log || '<p class="note">Nothing recorded yet.</p>'}</div>`;
+  <div class="log">${log || '<p class="note">Nothing recorded yet.</p>'}</div></div>`;
+  if (acctScroll && (mode !== 'live' || LIVE.b?.id === id)) { acctScroll = false; requestAnimationFrame(() => $('acctPanel').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' })); }
   const ws = []; for (let i = Math.max(0, nNow() - 80); i < nNow(); i++) ws.push(botMap(FRAMES[i]).get(id) ?? null);
   const cv = $('acctSpark'), [x, Wd, Ht] = fit(cv), vals = ws.filter((v) => v != null);
   if (vals.length > 1) { const lo = Math.min(...vals), hi = Math.max(...vals), sp = hi - lo || 1; x.beginPath(); let on = false; ws.forEach((v, k) => { if (v == null) { on = false; return; } const px = (k / (ws.length - 1)) * (Wd - 4) + 2, py = Ht - 4 - ((v - lo) / sp) * (Ht - 8); on ? x.lineTo(px, py) : x.moveTo(px, py); on = true; }); x.strokeStyle = grpColor(b); x.lineWidth = 2; x.stroke(); }

@@ -213,7 +213,8 @@ export function libraryPage(W, cardId) {
   const { hidden, hallOfFame, stats, rates, ...page } = p;
   const e = W.era?.[cardId];
   if (!e) return { ...page, stats, rates };
-  return { ...page, asOf: W.seasonLabel || W.timeline.seasons[0].season, ovr: e.ovr, skill: e.skill, grade: e.grade, careerLegacy: e.legacy, careerTotals: e.totals, perGame: e.perGame };
+  const risk = W.cfg.valueModel === 'ovrWalk' ? riskRating(W, W.players[cardId]) : null;
+  return { ...page, asOf: W.seasonLabel || W.timeline.seasons[0].season, ovr: e.ovr, skill: e.skill, grade: e.grade, careerLegacy: e.legacy, careerTotals: e.totals, perGame: e.perGame, ...(risk != null ? { riskRating: Math.round(risk), weeklySwingPct: Math.round(walkVol(W, risk) * 1000) / 10 } : {}) };
 }
 function writeNote(W, b, c, estValue, from, facts) {
   b.notes.set(c.isMkt ? c.pid : c.id, { est: c.isMkt ? estValue / c.mult : estValue, week: W.t, from, ...(facts ? { facts: String(facts).slice(0, 240) } : {}) });
@@ -228,7 +229,7 @@ function research(W, b, c0) {
   jot(W, { type: 'research', bot: b.name, player: c.key });
   W.week.researched.set(c.id, (W.week.researched.get(c.id) || 0) + 1);
   // A rule bot's "analysis" is the hidden value seen through its own error. An AI bot writes its own estimate.
-  if (b.kind === 'rule') { writeNote(W, b, c, (W.cfg.priceOnly ? ma(c, 20) : c.F) * Math.exp(W.gauss() * b.g.err), 'research'); const n = b.notes.get(c.id); if (n) n.ovr = W.era?.[c.id]?.ovr ?? W.library.players[c.id].ovr; }
+  if (b.kind === 'rule') { writeNote(W, b, c, (W.cfg.priceOnly ? ma(c, 20) : c.F) * Math.exp(W.gauss() * b.g.err), 'research'); const n = b.notes.get(c.id); if (n) { n.ovr = W.era?.[c.id]?.ovr ?? W.library.players[c.id].ovr; if (W.cfg.valueModel === 'ovrWalk') n.risk = riskRating(W, c); } }
 }
 function usePass(W, b) { if (!b.passes.length) return false; b.passes.sort((x, y) => x - y); b.passes.shift(); return true; }
 
@@ -289,8 +290,8 @@ function copyMult(x) {
 }
 export function itemLabel(W, it) {
   const p = W.players[it.pid];
-  if (it.d === 4) return `${p.key} · ${FINISHES[it.f]} Autograph, ${it.auto.par} ${it.auto.ser}/${it.auto.run}, ${it.auto.ink}${it.auto.insc ? `, inscribed (${it.auto.insc})` : ''}${it.auto.tb ? ', throwback' : ''}`;
-  return `${p.key} · ${FINISHES[it.f]} ${DESIGNS[it.d]}${it.kit !== 'home' ? ` (${it.kit === 'era' ? 'throwback' : 'alternate'} kit)` : ''}${it.par ? `, Prizm ${it.par.c} ${it.par.ser}/${it.par.run}` : ''}`;
+  if (it.d === 4) return `${p.pos} ${p.name} · ${FINISHES[it.f]} Autograph, ${it.auto.par} ${it.auto.ser}/${it.auto.run}, ${it.auto.ink}${it.auto.insc ? `, inscribed (${it.auto.insc})` : ''}${it.auto.tb ? ', throwback' : ''}`;
+  return `${p.pos} ${p.name} · ${FINISHES[it.f]} ${DESIGNS[it.d]}${it.kit !== 'home' ? ` (${it.kit === 'era' ? 'throwback' : 'alternate'} kit)` : ''}${it.par ? `, Prizm ${it.par.c} ${it.par.ser}/${it.par.run}` : ''}`;
 }
 // Put a rolled copy in a bot's hands: a market copy if it is a plain card, otherwise a one-of-a-kind item
 function mintCopy(W, b, x, cost, t = W.t, fromPool = true) {
@@ -846,7 +847,7 @@ function ruleAuctionList(W, b) {
 // borrowing, what it pays for passes and tickets, packs, sharing and stealing, and which contests to enter. The
 // weights start random. Whatever earns money survives: at each generation's end the worst-returning 10% (averaged
 // over their last 3 generations) copy the networks of the top 10% with small random changes.
-export const CARD_IN = ['bias', 'price (log)', 'rarity premium (log)', 'design', 'finish', 'change 1w', 'change 4w', 'change 12w', 'below 12w average', 'trades 4w', 'copies out', 'pool left', 'has a note', 'note vs price', 'note age', 'OVR (from research)', 'copies held', 'gain on cost', 'share of worth', 'cash share', 'debt share', 'market drawdown', 'market 4w', 'season phase', 'one of a kind', 'its premium'];
+export const CARD_IN = ['bias', 'price (log)', 'rarity premium (log)', 'design', 'finish', 'change 1w', 'change 4w', 'change 12w', 'below 12w average', 'trades 4w', 'copies out', 'pool left', 'has a note', 'note vs price', 'note age', 'OVR (from research)', 'copies held', 'gain on cost', 'share of worth', 'cash share', 'debt share', 'market drawdown', 'market 4w', 'season phase', 'one of a kind', 'its premium', 'risk rating (from research)'];
 export const CARD_OUT = ['buy', 'sell', 'price offset', 'size', 'research', 'auction'];
 export const BOT_IN = ['bias', 'cash share', 'debt share', 'lent share', 'worth vs median', 'own 4w return', 'age', 'credit rate', 'weeks to my loan due', 'weeks to a loan I made is due', 'pass price', 'ticket price', 'prize pool', 'notes held', 'fresh notes', 'flags on me', 'friends', 'market drawdown', 'market 4w', 'season phase', 'pack value vs price', 'last week games'];
 export const BOT_OUT = ['cash target', 'lend share', 'lend rate', 'borrow share', 'max borrow rate', 'pass bid', 'pass ask', 'ticket bid', 'ticket ask', 'research count', 'Standard packs', 'Premium packs', 'Elite packs', 'Holo packs', 'share notes', 'steal notes', 'accept swaps', ...GKEYS.map((g) => `enter ${g}`)];
@@ -870,18 +871,18 @@ const bufs = (sh) => sh.slice(1).map((m) => new Float64Array(m));
 // The card network's forward pass with its shape fixed (it runs about 350,000 times a week)
 // Inputs 0 and 19–23 are the same for every card a bot looks at in a week, so their share of the first layer is folded
 // into a bias once per bot and week (`fold`); inputs that are zero are skipped. The result is the same.
-const VARY = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 24, 25], FIXED = [0, 19, 20, 21, 22, 23];
+const VARY = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 24, 25, 26], FIXED = [0, 19, 20, 21, 22, 23];
 const FOLD = new Float64Array(16); let foldKey = null, foldT = -1;
 function foldFor(w, x, t) {
   if (foldKey === w && foldT === t && x[19] === FOLD._c && x[20] === FOLD._d && x[21] === FOLD._e && x[22] === FOLD._f && x[23] === FOLD._g) return;
-  for (let j = 0, k = 0; j < 16; j++, k += 27) { let s = w[k + 26]; for (const i of FIXED) s += w[k + i] * x[i]; FOLD[j] = s; }
+  for (let j = 0, k = 0; j < 16; j++, k += 28) { let s = w[k + 27]; for (const i of FIXED) s += w[k + i] * x[i]; FOLD[j] = s; }
   foldKey = w; foldT = t; FOLD._c = x[19]; FOLD._d = x[20]; FOLD._e = x[21]; FOLD._f = x[22]; FOLD._g = x[23];
 }
 function forwardCard(w, x, buf) {
-  const h1 = buf[0], h2 = buf[1], out = buf[2], N0 = 26, N1 = 16, N2 = 8, N3 = 6;
+  const h1 = buf[0], h2 = buf[1], out = buf[2], N0 = 27, N1 = 16, N2 = 8, N3 = 6;
   foldFor(w, x, CUR_T);
   let k = 0;
-  for (let j = 0; j < N1; j++) { let s = FOLD[j]; for (let v = 0; v < 20; v++) { const i = VARY[v], xi = x[i]; if (xi !== 0) s += w[k + i] * xi; } k += N0 + 1; h1[j] = fastTanh(s); }
+  for (let j = 0; j < N1; j++) { let s = FOLD[j]; for (let v = 0; v < VARY.length; v++) { const i = VARY[v], xi = x[i]; if (xi !== 0) s += w[k + i] * xi; } k += N0 + 1; h1[j] = fastTanh(s); }
   for (let j = 0; j < N2; j++) { let s = w[k + N1]; for (let i = 0; i < N1; i++) s += w[k + i] * h1[i]; k += N1 + 1; h2[j] = fastTanh(s); }
   for (let j = 0; j < N3; j++) { let s = w[k + N2]; for (let i = 0; i < N2; i++) s += w[k + i] * h2[i]; k += N2 + 1; out[j] = s; }
   return out;
@@ -910,7 +911,7 @@ function cardInputs(W, b, c, nw, ctx, it) {
   x[12] = fr ? 1 : 0; x[13] = fr ? clamp((n.est * mult - price) / price, -1, 1) : 0; x[14] = n ? clamp((W.t - n.week) / W.cfg.knowledgeWeeks, 0, 2) : 1; x[15] = fr && n.ovr ? (n.ovr - 80) / 20 : 0;
   x[16] = it ? 1 : Math.log1p(q) / 2; const ac = q ? avgCost(b, c.id) : null; x[17] = it ? clamp(it.cost ? price / it.cost - 1 : 0, -1, 1) : ac ? clamp(P / ac - 1, -1, 1) : 0; x[18] = clamp(((it ? 1 : q) * price) / nw, 0, 1);
   x[19] = clamp(b.cash / nw, -1, 1); x[20] = clamp((b.debt || 0) / nw, 0, 2); x[21] = ctx.drop; x[22] = ctx.m4; x[23] = ctx.phase;
-  x[24] = it ? 1 : 0; x[25] = it ? Math.log(it.mult / c.mult) / 2 : 0;
+  x[24] = it ? 1 : 0; x[25] = it ? Math.log(it.mult / c.mult) / 2 : 0; x[26] = fr && n.risk != null ? (n.risk - 80) / 20 : 0;
   return x;
 }
 const cardNet = (W, b, c, nw, ctx, it) => forward(CARD_SHAPE, b.g.card, cardInputs(W, b, c, nw, ctx, it), CB);
@@ -1385,6 +1386,7 @@ export function frame(W, { full = false } = {}) {
     mkt: marketStats(W),
     flow: W.flow ? { net: W.flow.net.map(Math.round), realized: W.flow.realized.map(Math.round), trips: W.flow.trips, tax: Math.round(W.flow.tax), paidOut: Math.round(W.flow.paidOut) } : null,
     movers: movers(W),
+    top: topCards(W),
     bands: bandBubble(W),
     bandHold: bandHoldings(W),
     sens: W.t % 4 === 0 ? (W.nnSens = nnSensitivity(W)) : null,
@@ -1682,3 +1684,14 @@ function liftFlags(W) {
     jot(W, { type: 'flagLift', bot: t.name, by: k });
   }
 }
+
+// The most valuable cards in circulation right now: every card market with copies out, and every one-of-a-kind card,
+// by what it would trade at (its market price; a one-of-a-kind card at its plain card's price × its premium)
+function topCards(W, k = 3) {
+  const out = [];
+  for (const m of W.cards) if (m.circ > 0) out.push([m.P, m.label, m.pid, Math.round(m.F), null, m.circ, m.id]);
+  for (const it of W.items.values()) if (it.owner) out.push([markItem(W, it), it.label, it.pid, Math.round(intrinsicItem(W, it)), it.owner.name, 1, null]);
+  out.sort((a, b) => b[0] - a[0]);
+  return out.slice(0, k).map(([P, label, pid, F, owner, n, id]) => ({ label, pid, P: Math.round(P), F, owner: owner ?? holderOf(W, id), n }));
+}
+function holderOf(W, id) { let best = null, q = 0; for (const b of W.bots) { const x = b.h.get(id) || 0; if (x > q) { q = x; best = b.name; } } if (best) return best; if ((W.liq?.get(id) || 0) > 0) return 'the liquidator'; const au = W.auctions.find((a) => a.cardId === id && !a.uid); return au ? `up for auction by ${au.seller === 'liq' ? 'the liquidator' : au.seller.name}` : null; }

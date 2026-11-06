@@ -76,6 +76,7 @@
     <div class="kpi"><span>Game skill</span><b id="kWin">–</b><small id="kWinS"></small></div>
     <div class="kpi"><span>Loan rate</span><b id="kBank">–</b><small id="kBankS"></small></div>
   </div>
+  <div class="mvc" id="mvc" aria-live="polite"></div>
 
   <div class="desk">
     <section class="panel watch" aria-labelledby="w-h">
@@ -100,9 +101,9 @@
       <div id="detail" class="detail"></div>
     </section>
 
-    <section class="panel acct" aria-labelledby="a-h">
-      <div class="head"><h2 id="a-h">Account</h2><span class="note">click any bot</span></div>
-      <div id="acct"></div>
+    <section class="panel lbp" aria-labelledby="lb-h">
+      <div class="head"><h2 id="lb-h">Leaderboard</h2><span class="note">click a bot for its account below</span></div>
+      <div class="tablewrap"><table id="lb"><thead><tr><th>Bot</th><th class="num">Worth</th><th class="num">4 wk</th><th class="num">Gen</th></tr></thead><tbody></tbody></table></div>
     </section>
   </div>
 
@@ -188,11 +189,7 @@
     </section>
   </div>
 
-  <div class="grid three">
-    <section class="panel" aria-labelledby="lb-h">
-      <div class="head"><h2 id="lb-h">Leaderboard</h2></div>
-      <div class="tablewrap"><table id="lb"><thead><tr><th>Bot</th><th class="num">Worth</th><th class="num">Gen return</th><th class="num">Line</th><th>Style</th></tr></thead><tbody></tbody></table></div>
-    </section>
+  <div class="grid two">
     <section class="panel" aria-labelledby="sp-h">
       <div class="head"><h2 id="sp-h">Most traded</h2><span class="legend"><span><i class="line" style="background:var(--gold)"></i>Price</span><span><i class="dash"></i>Value</span></span></div>
       <div class="cards" id="spot"></div>
@@ -222,5 +219,10 @@
       </div>
     </div>
     <div class="feed" id="feed"></div>
+  </section>
+
+  <section class="panel acct" id="acctPanel" aria-labelledby="a-h">
+    <div class="head"><h2 id="a-h">Account</h2><span class="note">click any bot on the floor, the leaderboard or a holders list</span></div>
+    <div id="acct"></div>
   </section>
 </div>
