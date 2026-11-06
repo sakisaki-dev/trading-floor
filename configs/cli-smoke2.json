@@ -1,0 +1,8 @@
+{
+  "id": "cli-smoke2",
+  "weeks": 2,
+  "budgetUsd": 1,
+  "concurrency": 3,
+  "world": { "seed": 88, "population": 0 },
+  "aiBots": [ { "name": "AI-01", "model": "claude-haiku-5-5" }, { "name": "AI-02", "model": "claude-haiku-5-5" }, { "name": "AI-03", "model": "claude-haiku-5-5" } ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "ai20",
+  "weeks": 400,
+  "budgetUsd": 40,
+  "concurrency": 5,
+  "world": { "seed": 88, "population": 0 },
+  "aiBots": [
+    { "name": "AI-01", "model": "claude-haiku-5-5" }, { "name": "AI-02", "model": "claude-haiku-5-5" },
+    { "name": "AI-03", "model": "claude-haiku-5-5" }, { "name": "AI-04", "model": "claude-haiku-5-5" },
+    { "name": "AI-05", "model": "claude-haiku-5-5" }, { "name": "AI-06", "model": "claude-haiku-5-5" },
+    { "name": "AI-07", "model": "claude-haiku-5-5" }, { "name": "AI-08", "model": "claude-haiku-5-5" },
+    { "name": "AI-09", "model": "claude-haiku-5-5" }, { "name": "AI-10", "model": "claude-haiku-5-5" },
+    { "name": "AI-11", "model": "claude-haiku-5-5" }, { "name": "AI-12", "model": "claude-haiku-5-5" },
+    { "name": "AI-13", "model": "claude-haiku-5-5" }, { "name": "AI-14", "model": "claude-haiku-5-5" },
+    { "name": "AI-15", "model": "claude-haiku-5-5" }, { "name": "AI-16", "model": "claude-haiku-5-5" },
+    { "name": "AI-17", "model": "claude-haiku-5-5" }, { "name": "AI-18", "model": "claude-haiku-5-5" },
+    { "name": "AI-19", "model": "claude-haiku-5-5" }, { "name": "AI-20", "model": "claude-haiku-5-5" }
+  ]
+}

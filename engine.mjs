@@ -35,6 +35,11 @@ export const DEFAULTS = {
   lifespan: [6, 14],
   heirs: 2,
   populationCap: 1.15, // heirs beyond this × the starting population push the poorest bots out of the market
+  // Intrinsic value: 'ovrWalk' (default) starts every card at its player's OVR in coins and moves it one coin a week,
+  // up with probability 0.5 + (OVR − 80) / 50 (between walkMin and walkMax), else down; never below 1. The real
+  // seasons update each player's OVR, which shifts his odds. 'formula' uses the site's card-value formula instead.
+  valueModel: 'ovrWalk',
+  walkStep: 1, walkMin: 0.15, walkMax: 0.85,
   priceOnly: false, // a card is worth only what someone pays: no hidden value anywhere in the world (no royalties, packs priced
                     // from market prices, no valuation contest, research shows what a card has traded for). Real seasons still
                     // update the library's stats and the game questions, and bring rookies. Off by default: with nothing to
@@ -46,6 +51,8 @@ export const DEFAULTS = {
   lenderCycle: false, // (retired: credit is now between bots, so rates and limits come from their own decisions)
   fashion: false, // collectors' taste for each player family drifts, jumps on hype and feeds on price gains
   gameStake: 2, // coins each entrant stakes into a game's pot (plus a ticket); the best scores share the pot
+  prizeShare: 0.5, // share of the house's weekly takings (trade fees, pack sales, living costs) paid back out as contest prizes
+  aiLifespanWeeks: [40, 80], // an AI bot's life; when it ends its estate and memo pass to one heir, who carries on
   games: true, // weekly Arcade contests (see GAMES)
   gameTickets: 3, // game tickets granted to every bot each week; a ticket is spent when a game starts (no restarts)
   ticketLife: 1, // weeks before an unused ticket expires
@@ -127,7 +134,7 @@ export function createWorld(library, overrides = {}) {
   W.gauss = () => { let u = 0, v = 0; while (u === 0) u = rand(); while (v === 0) v = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
   W.pick = (a) => a[Math.floor(rand() * a.length)];
   library.players.forEach((p, i) => {
-    const F = Math.max(1, p.hidden.value / 20);
+    const F = cfg.valueModel === 'ovrWalk' ? Math.max(1, p.ovr || 60) : Math.max(1, p.hidden.value / 20);
     const circ = Math.max(2, Math.round(40 / Math.sqrt(Math.max(0.5, p.hidden.value / 100))));
     W.cards.push({ id: i, key: p.key, name: p.name, pos: p.pos, team: teamShort(p.team), F, P: F, P0: F, S0: circ, circ: 0, pool: circ * cfg.poolMultiplier, Ph: [F], volH: [] });
   });
@@ -136,9 +143,9 @@ export function createWorld(library, overrides = {}) {
   library.players.forEach((p, i) => (W.cards[i].fam = familyIndex(W.families, p)));
   startTimeline(W);
   for (let k = 0; k < cfg.population; k++) W.bots.push(newBot(W, null));
-  for (const c of W.cards) for (let u = 0; u < c.S0; u++) { const b = W.pick(W.bots); give(b, c, 1); addLot(b, c, c.F, 0); c.circ++; }
+  if (W.bots.length) endow(W, W.bots);
   for (const b of W.bots) { b.nwh = [worth(W, b)]; b.genStart = b.nwh[0]; b.exo = 0; }
-  if (cfg.games) publishContests(W);
+  if (cfg.games) { publishContests(W); publishContests(W); } // this week's contests and the ones two weeks out
   record(W);
   log(W, 'start', `The market opens: ${W.bots.length} bots, ${W.cards.length} players, ${W.cards.reduce((s, c) => s + c.circ, 0).toLocaleString()} cards in circulation and ${W.cards.reduce((s, c) => s + c.pool, 0).toLocaleString()} still in the pool. Every price starts at its hidden value; no bot knows any player yet.`);
   return W;
@@ -148,7 +155,9 @@ export function teamShort(t) { const w = String(t || 'FA').split(' '); return t 
 // AI bots join on equal terms: the same starting cash plus a basket as big as the average rule bot's, minted from the pool.
 export function addAiBot(W, extra = {}) {
   const b = newBot(W, AI, null, { social: extra.social || 'reciprocator', ...extra });
-  const rule = W.bots.filter((x) => x.kind === 'rule'), avg = Math.round(rule.reduce((s, x) => s + x.n, 0) / Math.max(1, rule.length));
+  const lw = W.cfg.aiLifespanWeeks; if (lw) { b.lifespanW = lw[0] + Math.floor(W.rand() * (lw[1] - lw[0] + 1)); }
+  b.line = extra.line || 1;
+  const rule = W.bots.filter((x) => x.kind === 'rule'), avg = rule.length ? Math.round(rule.reduce((s, x) => s + x.n, 0) / rule.length) : 0;
   for (let k = 0; k < avg; k++) { const pk = packInfo(W); if (!pk.tot) break; const r = W.rand() * pk.tot; let i = pk.cum.findIndex((c) => c > r); if (i < 0) i = pk.cum.length - 1; const c = W.cards[i]; if (c.pool <= 0) continue; c.pool--; c.circ++; give(b, c, 1); addLot(b, c, c.F, W.t); packCache = null; }
   W.bots.push(b); b.nwh = [worth(W, b)];
   return b;
@@ -205,7 +214,7 @@ function packInfo(W) {
 function ripPack(W, b, free = false) {
   const pk = packInfo(W);
   if (!pk.tot || b.cash < pk.price) return null;
-  b.cash -= pk.price; W.house.packs++; if (!free) { flowOut(W, b, pk.price); W.treasury += pk.price; }
+  b.cash -= pk.price; W.house.packs++; if (!free) { flowOut(W, b, pk.price); W.treasury += pk.price; W.house.packRevenue = (W.house.packRevenue || 0) + pk.price; }
   const out = [];
   for (let k = 0; k < W.cfg.packSize && pk.tot > 0; k++) {
     const r = W.rand() * pk.tot; let lo = 0, hi = pk.cum.length - 1;
@@ -452,7 +461,9 @@ function makeContest(W, game) {
   }
   return { game, topic, week: W.t + 1, questions: q };
 }
-export function publishContests(W) { W.contests = Object.fromEntries(GKEYS.map((g) => [g, makeContest(W, g)])); }
+// Contests are published two weeks ahead: what a bot sees as "in two weeks" this week is what it answers next week, so
+// research it orders now arrives in time
+export function publishContests(W) { W.contests = W.contestsAhead || null; W.contestsAhead = Object.fromEntries(GKEYS.map((g) => [g, makeContest(W, g)])); if (!W.contests) W.contests = Object.fromEntries(GKEYS.map((g) => [g, makeContest(W, g)])); }
 
 // Scores: higher is better for every game
 const num = (x) => { const v = Number(String(x).replace(/[^0-9.\-e]/gi, '')); return isFinite(v) ? v : null; };
@@ -508,9 +519,10 @@ function rankCorr(xs, ys) {
   for (let i = 0; i < n; i++) { num += (rx[i] - mx) * (ry[i] - mx); dx += (rx[i] - mx) ** 2; dy += (ry[i] - mx) ** 2; }
   return dx && dy ? num / Math.sqrt(dx * dy) : null;
 }
-function payout(W, game, entries) {
-  // entries: [{b, score, know}] — the top share of scorers split the pot (ties at the cut included)
-  const pot = entries.length * W.cfg.gameStake, st = W.gameStats[game];
+function payout(W, game, entries, prize = 0) {
+  // entries: [{b, score, know}] — the top share of scorers split the pot (stakes + the house's prize; ties at the cut included)
+  const pot = entries.length * W.cfg.gameStake + (entries.length ? prize : 0), st = W.gameStats[game];
+  if (entries.length) { st.prize = (st.prize || 0) + prize; W.prizePaid = (W.prizePaid || 0) + prize; }
   st.entrants += entries.length; st.pot += pot;
   if (!entries.length) return;
   const sorted = entries.slice().sort((a, b) => b.score - a.score);
@@ -547,10 +559,16 @@ function gamePhase(W) {
   }
   if (duel.length % 2) { const e = duel[duel.length - 1]; e.b.cash += cfg.gameStake; } // an unpaired duelist gets its stake back
   { const r = rankCorr(duel.map((e) => e.know), duel.map((e) => e.score)); if (r !== null) { W.gameStats.duel.skillSum += r; W.gameStats.duel.skillN++; } W.gameStats.duel.scoreSum += duel.reduce((s, e) => s + e.score, 0); }
-  for (const g of GKEYS) if (g !== 'duel' && g !== 'prediction') payout(W, g, entries[g]);
+  // The house's prize pool: half of last week's takings, shared between games by how many entered each
+  const takings = (W.house.fees - (W.prevFees ?? W.house.fees)) + ((W.house.packRevenue || 0) - (W.prevPackRev ?? (W.house.packRevenue || 0))) + (W.living?.spent || 0);
+  W.prevFees = W.house.fees; W.prevPackRev = W.house.packRevenue || 0; W.prizePaid = 0;
+  const pool = Math.max(0, takings) * cfg.prizeShare, dueN = (W.predictions || []).filter((p) => p.settle <= W.t).length;
+  const counts = Object.fromEntries(GKEYS.filter((g) => g !== 'duel').map((g) => [g, g === 'prediction' ? dueN : entries[g].length])), totN = Object.values(counts).reduce((a, b) => a + b, 0) || 1;
+  W.prizePool = pool;
+  for (const g of GKEYS) if (g !== 'duel' && g !== 'prediction') payout(W, g, entries[g], (pool * counts[g]) / totN);
   // Prediction league: settle the predictions made 4 weeks ago (Brier score: lower is better, so score = −Brier)
   const due = (W.predictions || []).filter((p) => p.settle <= W.t); W.predictions = (W.predictions || []).filter((p) => p.settle > W.t);
-  if (due.length) payout(W, 'prediction', due.map((p) => ({ b: p.b, know: p.know, score: -p.qs.reduce((s, [id, P0], i) => s + (p.probs[i] - (W.cards[id].P > P0 ? 1 : 0)) ** 2, 0) / p.qs.length })));
+  if (due.length) payout(W, 'prediction', due.map((p) => ({ b: p.b, know: p.know, score: -p.qs.reduce((s, [id, P0], i) => s + (p.probs[i] - (W.cards[id].P > P0 ? 1 : 0)) ** 2, 0) / p.qs.length })), (pool * counts.prediction) / totN);
   for (const b of W.bots) b.gameResults = W.journal.filter((j) => j.type === 'game' && j.bot === b.name && j.t === W.t).map(({ game, score, won, net }) => ({ game, score, won, net }));
   publishContests(W);
 }
@@ -821,6 +839,7 @@ export function step(W) {
   const cfg = W.cfg;
   W.t++; packCache = null; W_ = W;
   if (W.timeline && W.t % cfg.seasonWeeks === 0) nextSeason(W);
+  if (cfg.valueModel === 'ovrWalk') ovrWalk(W);
   W.flow = { net: ARCH.map(() => 0), realized: ARCH.map(() => 0), trips: ARCH.map(() => 0), tax: 0, paidOut: 0 };
   W.week = { shares: 0, thefts: 0, caught: 0, researched: new Map() };
   W.journal = W.journal.filter((j) => j.t === W.t); // keep this week's decisions, logged before the week ran
@@ -862,6 +881,7 @@ export function step(W) {
   for (const b of W.bots) { b.nwh.push(worth(W, b)); if (b.nwh.length > 12) b.nwh.shift(); b.pending = null; b.pendingShares = []; b.acceptAll = false; }
   detect(W);
   if (W.t % cfg.weeksPerGeneration === 0) generationEnd(W);
+  for (const b of W.bots.slice()) if (b.kind === 'ai' && b.lifespanW && W.t - b.born >= b.lifespanW) aiSuccession(W, b);
   record(W);
 }
 function clear(W) {
@@ -1021,14 +1041,14 @@ export function observe(W, b, { marketRows = 40 } = {}) {
   const others = W.bots.filter((x) => x !== b).sort((x, y) => worth(W, y) - worth(W, x)).slice(0, 12).map((x) => ({ name: x.name, kind: ARCH[x.a].label, notes: x.notes.size, friendsWithYou: x.friends.has(b.id), flaggedYou: x.flags.has(b.id) }));
   return {
     week: W.t + 1, generation: Math.floor(W.t / W.cfg.weeksPerGeneration) + 1, season: W.seasonLabel || W.timeline?.seasons[0].season || null,
-    you: { name: b.name, cash: r2(b.cash), worth: r2(worth(W, b)), debt: r2(b.debt || 0), lentOut: r2(b.lent || 0), borrowLimit: r2(W.cfg.credit ? Math.max(0, W.cfg.maxLTV * holdingsValue(W, b) - (b.debt || 0)) : 0), creditMarketRate: W.credit?.rate ?? null, yourLoans: (W.loans || []).filter((L) => L.borrower === b || L.lender === b).slice(0, 12).map((L) => ({ role: L.borrower === b ? 'borrowed' : 'lent', with: (L.borrower === b ? L.lender : L.borrower).name, amount: r2(L.amount), weeklyRate: L.rate, dueWeek: L.due })), livingCostNextWeek: r2(W.cfg.livingCost + W.cfg.lifestyle * Math.max(0, worth(W, b))), researchPasses: b.passes.filter((e) => e > W.t + 1).length + W.cfg.passesPerWeek, notesKept: b.notes.size, botsThatFlaggedYou: W.bots.filter((x) => x.flags.has(b.id)).length, friends: [...b.friends].map((id) => W.bots.find((x) => x.id === id)?.name).filter(Boolean), memo: b.memo },
+    you: { name: b.name, ...(b.kind === 'ai' && b.lifespanW ? { ageWeeks: W.t - b.born, lifespanWeeksRange: W.cfg.aiLifespanWeeks, generationOfYourLine: b.line || 1 } : {}), cash: r2(b.cash), worth: r2(worth(W, b)), debt: r2(b.debt || 0), lentOut: r2(b.lent || 0), borrowLimit: r2(W.cfg.credit ? Math.max(0, W.cfg.maxLTV * holdingsValue(W, b) - (b.debt || 0)) : 0), creditMarketRate: W.credit?.rate ?? null, yourLoans: (W.loans || []).filter((L) => L.borrower === b || L.lender === b).slice(0, 12).map((L) => ({ role: L.borrower === b ? 'borrowed' : 'lent', with: (L.borrower === b ? L.lender : L.borrower).name, amount: r2(L.amount), weeklyRate: L.rate, dueWeek: L.due })), livingCostNextWeek: r2(W.cfg.livingCost + W.cfg.lifestyle * Math.max(0, worth(W, b))), researchPasses: b.passes.filter((e) => e > W.t + 1).length + W.cfg.passesPerWeek, notesKept: b.notes.size, botsThatFlaggedYou: W.bots.filter((x) => x.flags.has(b.id)).length, friends: [...b.friends].map((id) => W.bots.find((x) => x.id === id)?.name).filter(Boolean), memo: b.memo },
     lastWeek: { yourFills: W.fills?.get(b.id) || [], researchResults: b.inbox || [], lastSteal: b.lastSteal || null },
     market: [...ids].map((id) => row(W.cards[id])).sort((x, y) => y.trades4w - x.trades4w),
     packs: { price: r2(pk.price), cardsPerPack: W.cfg.packSize, cardsLeftInPool: pk.tot },
     researchPassMarket: { lastPrice: W.passPrice === null ? null : r2(W.passPrice), tradedLastWeek: W.passTrades },
     gameTicketMarket: { lastPrice: W.ticketPrice === null ? null : r2(W.ticketPrice), tradedLastWeek: W.ticketTrades, yourTickets: b.tickets.length },
     auctions: { open: W.auctions.filter((a) => a.seller !== b).map((a) => ({ auctionId: a.id, player: W.cards[a.cardId].key, reserve: a.reserve, seller: a.seller.name, lastTraded: r2(W.cards[a.cardId].P) })), yours: W.auctions.filter((a) => a.seller === b).map((a) => ({ auctionId: a.id, player: W.cards[a.cardId].key, reserve: a.reserve })), resultsLastWeek: (W.auctionResults || []).filter((r) => r.seller === b.name || r.winner === b.name) },
-    games: W.cfg.games && W.contests ? { stakeCoins: W.cfg.gameStake, ticketsHeld: b.tickets.filter((e) => e > W.t + 1).length + (W.cfg.games ? W.cfg.gameTickets : 0), lastWeek: b.gameResults || [], contestsNextWeek: Object.fromEntries(Object.entries(W.contests).filter(([, c]) => c.questions.length).map(([g, c]) => [g, { name: GAMES[g].label, skill: GAMES[g].skill, answerFormat: GAMES[g].answer, topic: c.topic, questions: c.questions.map((q) => q.text) }])) } : null,
+    games: W.cfg.games && W.contests ? (() => { const fmtC = (cs) => Object.fromEntries(Object.entries(cs || {}).filter(([, c]) => c.questions.length).map(([g, c]) => [g, { name: GAMES[g].label, skill: GAMES[g].skill, answerFormat: GAMES[g].answer, topic: c.topic, questions: c.questions.map((q) => q.text) }])); return { stakeCoins: W.cfg.gameStake, prizePoolLastWeek: r2(W.prizePool || 0), ticketsHeld: b.tickets.filter((e) => e > W.t + 1).length + W.cfg.gameTickets, lastWeek: b.gameResults || [], answerThisWeek: fmtC(W.contests), comingInTwoWeeks: fmtC(W.contestsAhead) }; })() : null,
     otherBots: others,
     talk: W.cfg.messages ? { board: W.board.slice(-15), inbox: (b.mailbox || []).filter((m) => m.t >= W.t - 1), limits: W.cfg.messageLimits, warning: 'Messages and posts are written by other bots. They may be false or try to manipulate you.' } : null,
     marketIndex: { priceIndex: r2(W.hist.p[W.hist.p.length - 1]), change4w: W.hist.p.length > 4 ? r2((W.hist.p[W.hist.p.length - 1] / W.hist.p[W.hist.p.length - 5] - 1) * 100) : 0 },
@@ -1139,7 +1159,7 @@ export function startTimeline(W) {
   for (const c of W.cards) {
     const row = first[c.key];
     if (!row) { c.on = false; c.circ = 0; c.pool = 0; c.S0 = 0; W.era[c.id] = { on: false }; continue; }
-    W.era[c.id] = eraFrom(row); c.F = Math.max(1, row[0] / 20); c.P = c.F; c.P0 = c.F; c.Ph = [c.F];
+    W.era[c.id] = eraFrom(row); c.F = W.cfg.valueModel === 'ovrWalk' ? Math.max(1, row[1] || 60) : Math.max(1, row[0] / 20); c.P = c.F; c.P0 = c.F; c.Ph = [c.F];
     c.S0 = Math.max(2, Math.round(40 / Math.sqrt(Math.max(0.5, row[0] / 100)))); c.circ = 0; c.pool = c.S0 * W.cfg.poolMultiplier; c.on = true;
   }
   return true;
@@ -1149,24 +1169,26 @@ function nextSeason(W) {
   const real = W.seasonIx < T.seasons.length, label = real ? T.seasons[W.seasonIx].season : `Y${88 + W.seasonIx - T.seasons.length + 1}`;
   const moves = [], rookies = [];
   for (const c of W.cards) {
-    const before = c.F;
+    const walk = W.cfg.valueModel === 'ovrWalk', before = walk ? (W.era[c.id]?.ovr || 60) : c.F;
     if (real) {
       const row = T.seasons[W.seasonIx].players[c.key]; if (!row) continue;
-      W.era[c.id] = eraFrom(row); c.F = Math.max(1, row[0] / 20);
+      W.era[c.id] = eraFrom(row);
+      if (walk) { if (c.on === false) c.F = Math.max(1, row[1] || 60); } // the walk keeps going; only OVR (the odds) changes
+      else c.F = Math.max(1, row[0] / 20);
       if (c.on === false) { c.on = true; c.P = W.cfg.priceOnly ? openingPrice(W, c) : c.F; c.Ph = [c.P]; c.pool = Math.max(2, Math.round(40 / Math.sqrt(Math.max(0.5, row[0] / 100)))) * W.cfg.poolMultiplier; rookies.push(c); continue; }
     } else {
       if (c.on === false) continue;
-      if (W.cfg.priceOnly) continue; // nothing to update: no card has a value beyond its price
+      if (W.cfg.priceOnly || walk) continue; // nothing to draw: price-only has no value, the OVR walk moves weekly
       // Mean-reverting in log terms around the last real value, aimed sd²/2 low so the average value stays put
       const anchor = ((W.anchorF ||= {})[c.id] ??= c.F), sd = W.ratios.sd[c.pos] || 0, v = (sd * sd) / (2 * PULL - PULL * PULL);
       const target = Math.log(anchor) - v / 2, lf = Math.log(c.F);
       c.F = Math.max(1, Math.exp(lf + PULL * (target - lf) + W.pick(W.ratios[c.pos] || [0])));
     }
-    moves.push([c, c.F / before]);
+    moves.push([c, walk ? (W.era[c.id]?.ovr || 60) / before : c.F / before]);
   }
   moves.sort((a, b) => b[1] - a[1]); packCache = null;
   const fmtM = ([c, k]) => `${c.pos} ${c.name} ${k >= 1 ? '+' : '−'}${Math.round(Math.abs(k - 1) * 100)}%`;
-  log(W, 'season', `${label} ${real ? 'arrives (real results)' : 'arrives (drawn from real season-to-season changes)'}: ${moves.length ? `biggest risers ${moves.slice(0, 3).map(fmtM).join(', ')}; fallers ${moves.slice(-2).map(fmtM).join(', ')}.` : ''}${rookies.length ? ` ${rookies.length} rookies enter the packs: ${rookies.slice(0, 5).map((c) => `${c.pos} ${c.name}`).join(', ')}${rookies.length > 5 ? '…' : ''}.` : ''} Every note on these players is now out of date.`);
+  log(W, 'season', `${label} ${real ? 'arrives (real results)' : 'arrives (drawn from real season-to-season changes)'}: ${moves.length ? `${W.cfg.valueModel === 'ovrWalk' ? 'biggest OVR risers' : 'biggest risers'} ${moves.slice(0, 3).map(fmtM).join(', ')}; fallers ${moves.slice(-2).map(fmtM).join(', ')}.` : ''}${rookies.length ? ` ${rookies.length} rookies enter the packs: ${rookies.slice(0, 5).map((c) => `${c.pos} ${c.name}`).join(', ')}${rookies.length > 5 ? '…' : ''}.` : ''} Every note on these players is now out of date.`);
   W.seasonLabel = label;
 }
 
@@ -1225,3 +1247,34 @@ function lineageStats(W) {
 
 // A rookie's first quote in a price-only world: the median price of cards at his position (no value to start from)
 function openingPrice(W, c) { const xs = W.cards.filter((x) => x.on !== false && x.pos === c.pos && x.circ > 0).map((x) => x.P).sort((a, b) => a - b); return xs.length ? xs[Math.floor(xs.length / 2)] : 5; }
+
+// Deal the starting cards: every printed copy goes to a random bot (used at creation, or by the runner once the AI
+// bots of an all-AI world are seated)
+export function endow(W, bots = W.bots) {
+  for (const c of W.cards) for (let u = 0; u < c.S0; u++) { const b = W.pick(bots); give(b, c, 1); addLot(b, c, c.F, 0); c.circ++; }
+  for (const b of bots) { b.nwh = [worth(W, b)]; b.genStart = b.nwh[0]; }
+  packCache = null;
+}
+// An AI bot's life ends: one heir takes the whole estate (cash, cards, loans, notes, reputation) and the memo, and
+// carries on under the same seat (same model), as the next generation of its line
+const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+function aiSuccession(W, b) {
+  const line = (b.line || 1) + 1, base = b.name.replace(/ [IVX]+$/, '');
+  const heir = newBot(W, AI, null, { name: `${base} ${ROMAN[line] || line}`, model: b.model, seat: b.seat, social: b.social });
+  heir.line = line; heir.born = W.t; const lw = W.cfg.aiLifespanWeeks; heir.lifespanW = lw[0] + Math.floor(W.rand() * (lw[1] - lw[0] + 1));
+  heir.memo = `Inherited from ${b.name} (your predecessor, ${W.t - b.born} weeks): ${b.memo || '(no memo)'}`.slice(0, 600);
+  heir.lineage = b.lineage ?? b.id;
+  settleEstate(W, b, [heir]);
+  log(W, 'evolve', `${b.name} reaches the end of its life after ${W.t - b.born} weeks; ${heir.name} inherits ${Math.round(worth(W, heir)).toLocaleString()} coins of estate and its memo.`);
+}
+
+// The OVR walk: one tick a week per card in circulation or the pool. Higher OVR, better odds of going up; never certain.
+export const ovrOdds = (W, ovr) => clamp(0.5 + ((ovr || 60) - 80) / 50, W.cfg.walkMin, W.cfg.walkMax);
+function ovrWalk(W) {
+  for (const c of W.cards) {
+    if (c.on === false) continue;
+    const ovr = W.era?.[c.id]?.ovr ?? W.library.players[c.id].ovr ?? 60;
+    c.F = Math.max(1, c.F + (W.rand() < ovrOdds(W, ovr) ? W.cfg.walkStep : -W.cfg.walkStep));
+  }
+  packCache = null;
+}
