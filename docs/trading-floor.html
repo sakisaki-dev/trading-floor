@@ -1541,10 +1541,15 @@ function eraFrom(row) {
 function realRatios(T) {
   const out = {};
   for (let i = 1; i < T.seasons.length; i++) for (const [k, row] of Object.entries(T.seasons[i].players)) { const prev = T.seasons[i - 1].players[k]; if (prev && prev[0] > 0 && row[0] > 0) (out[k.slice(0, 2)] ||= []).push(Math.log(row[0] / prev[0])); }
-  // Centred on zero: keep the real spread of winners and losers, drop the upward drift of careers still being built
-  for (const pos of Object.keys(out)) { const m = out[pos].reduce((a, b) => a + b, 0) / out[pos].length; out[pos] = out[pos].map((x) => Math.exp(x - m)); }
+  // Centred on zero: keep the real spread of winners and losers (log changes), drop the upward drift of careers still
+  // being built. sd is each position's spread, for the drawn seasons' pull back (nextSeason).
+  for (const pos of Object.keys(out)) { const m = out[pos].reduce((a, b) => a + b, 0) / out[pos].length; out[pos] = out[pos].map((x) => x - m); }
+  out.sd = Object.fromEntries(Object.entries(out).map(([pos, xs]) => [pos, Math.sqrt(xs.reduce((a, x) => a + x * x, 0) / xs.length)]));
   return out;
 }
+// How far a drawn season pulls each value back toward its last real one. Without it the draws compound: a log change
+// averaging zero still grows the average value by exp(sd²/2) a season (16% for linemen, about 400× in 40 seasons).
+const PULL = 0.25;
 function startTimeline(W) {
   const T = W.library.timeline; if (!T || !W.cfg.history) return false;
   W.timeline = T; W.seasonIx = 0; W.ratios = realRatios(T); W.era = {};
@@ -1570,7 +1575,10 @@ function nextSeason(W) {
     } else {
       if (c.on === false) continue;
       if (W.cfg.priceOnly) continue; // nothing to update: no card has a value beyond its price
-      const rs = W.ratios[c.pos] || [1]; c.F = Math.max(1, c.F * W.pick(rs));
+      // Mean-reverting in log terms around the last real value, aimed sd²/2 low so the average value stays put
+      const anchor = ((W.anchorF ||= {})[c.id] ??= c.F), sd = W.ratios.sd[c.pos] || 0, v = (sd * sd) / (2 * PULL - PULL * PULL);
+      const target = Math.log(anchor) - v / 2, lf = Math.log(c.F);
+      c.F = Math.max(1, Math.exp(lf + PULL * (target - lf) + W.pick(W.ratios[c.pos] || [0])));
     }
     moves.push([c, c.F / before]);
   }
