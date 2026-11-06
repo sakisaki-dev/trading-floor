@@ -47,10 +47,11 @@ export const DEFAULTS = {
   // Never below 1% of where it started. 'formula' follows the site's value formula season by season instead.
   // 'factors' (default): value = player factor × supply factor and nothing else. The player factor is the site's value
   // for him from his real data (OVR, skill, Career Legacy); it changes only when a season changes that data, and past the
-  // real history each season draws one real season-to-season change, as it happened (no pull back). The supply factor is
+  // real history it holds (pastSave 'hold': no data, no change; 'draw' replays a random real season-to-season change from
+  // his position, which compounds about ×1.21 a season). The supply factor is
   // (copies out now + print run) ÷ (copies out at the start + print run), raised to −scarcity: packs opened add copies and
   // lower it, collectors taking cards out raise it. Nothing here says which way a value goes.
-  valueModel: 'factors', scarcity: 0.5,
+  valueModel: 'factors', scarcity: 0.5, pastSave: 'hold',
   walkUp: 0.55, walkVolLow: 0.10, walkVolHigh: 0.01, riskLo: 60, riskHi: 95, riskPerDoubling: 10,
   startSeason: 'latest', // 'latest' opens the market at the present (site prices and price history imported); 'first' replays from Y79
   priceOnly: false, // a card is worth only what someone pays: no hidden value anywhere in the world (no royalties, packs priced
@@ -1647,7 +1648,8 @@ function nextSeason(W) {
     } else {
       if (c.on === false) continue;
       if (W.cfg.priceOnly || walk) continue; // nothing to draw: price-only has no value, the OVR walk moves weekly
-      if (fac) { c.B = Math.max(0.05 * W.cfg.coinScale, (c.B ?? c.F) * Math.exp(W.pick(W.rawRatios?.[c.pos] || [0]))); moves.push([c, c.B / before]); continue; } // one real season's change, as it happened
+      if (fac && W.cfg.pastSave !== 'draw') continue; // no real data past the save, so no change: the player factor holds and only supply moves the value
+      if (fac) { c.B = Math.max(0.05 * W.cfg.coinScale, (c.B ?? c.F) * Math.exp(W.pick(W.rawRatios?.[c.pos] || [0]))); moves.push([c, c.B / before]); continue; } // 'draw': one real season's change from his position's history
       // Mean-reverting in log terms around the last real value, aimed sd²/2 low so the average value stays put
       const anchor = ((W.anchorF ||= {})[c.id] ??= c.F), sd = W.ratios.sd[c.pos] || 0, v = (sd * sd) / (2 * PULL - PULL * PULL);
       const target = Math.log(anchor) - v / 2, lf = Math.log(c.F);
@@ -1657,6 +1659,7 @@ function nextSeason(W) {
   }
   moves.sort((a, b) => b[1] - a[1]); packCache = null;
   const fmtM = ([c, k]) => `${c.pos} ${c.name} ${k >= 1 ? '+' : '−'}${Math.round(Math.abs(k - 1) * 100)}%`;
+  if (!real && W.cfg.valueModel === 'factors' && W.cfg.pastSave !== 'draw') log(W, 'season', `${label} arrives: no real data past the save, so player values hold; only the supply of copies moves them.`); else
   log(W, 'season', `${label} ${real ? 'arrives (real results)' : 'arrives (drawn from real season-to-season changes)'}: ${moves.length ? `${W.cfg.valueModel === 'ovrWalk' ? 'biggest OVR risers' : 'biggest risers'} ${moves.slice(0, 3).map(fmtM).join(', ')}; fallers ${moves.slice(-2).map(fmtM).join(', ')}.` : ''}${rookies.length ? ` ${rookies.length} rookies enter the packs: ${rookies.slice(0, 5).map((c) => `${c.pos} ${c.name}`).join(', ')}${rookies.length > 5 ? '…' : ''}.` : ''} Every note on these players is now out of date.`);
   W.seasonLabel = label;
 }
