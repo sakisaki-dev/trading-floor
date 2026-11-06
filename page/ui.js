@@ -15,7 +15,7 @@ const PRESETS = {
   noanchor: { label: 'Anchors off', set: { allowance: 0, outsideCollectors: false, royalties: false }, hyp: '<b>Anchors off.</b> No allowance, collectors or royalties. Only research ties prices to value.' },
 };
 const SOC = ['Sharer', 'Reciprocator', 'Thief'];
-const TAGS = { margin: 'Margin', start: 'Open', gen: 'Gen', evolve: 'Evolution', crash: 'Crash', bubble: 'Bubble', corner: 'Corner', flag: 'Flagged', pool: 'Pool', update: 'Update', auction: 'Auction', games: 'Games' };
+const TAGS = { season: 'Season', people: 'People', credit: 'Credit', fashion: 'Fashion', margin: 'Margin', start: 'Open', gen: 'Gen', evolve: 'Evolution', crash: 'Crash', bubble: 'Bubble', corner: 'Corner', flag: 'Flagged', pool: 'Pool', update: 'Update', auction: 'Auction', games: 'Games' };
 
 const $ = (id) => document.getElementById(id);
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -32,11 +32,15 @@ let opts = { seed: 88 }, presetKey = 'balanced';
 let WORLD = null, FRAMES = [], H = null, mode = 'live', RUN = null, cursor = 0;
 let playing = !matchMedia('(prefers-reduced-motion: reduce)').matches, speed = 1, acc = 0, lastT = 0, panelT = 0, chartT = 0;
 const KEYS = ['p', 'f', 'bub', 'gini', 'share', 'trades', 'pass', 'informed', 'flags', 'shares', 'thefts', 'gamePacks'];
-function newHist() { H = Object.fromEntries(KEYS.map((k) => [k, []])); H.ticket = []; H.hlWin = []; H.ouWin = []; H.mcap = []; H.vcap = []; H.cashTop = []; H.bank = []; }
+function newHist() { H = Object.fromEntries(KEYS.map((k) => [k, []])); H.ticket = []; H.skill = []; H.mcap = []; H.vcap = []; H.cashTop = []; H.bank = []; }
+// Games over the last k frames: per game [entries, pots, skill sum, skill n], per strategy [entries, wins, net]
 function gamesOver(i, k) {
-  const out = { hl: [0, 0, 0], ou: [0, 0, 0], topic: {}, arch: ARCH.map(() => [0, 0, 0]) };
-  const add = (a, b) => { a[0] += b[0]; a[1] += b[1]; a[2] += b[2]; };
-  for (let j = Math.max(0, i - k + 1); j <= i; j++) { const g = FRAMES[j]?.gw; if (!g) continue; add(out.hl, g.hl); add(out.ou, g.ou); for (const [t, v] of Object.entries(g.topic)) add((out.topic[t] ||= [0, 0, 0]), v); g.arch.forEach((v, a) => add(out.arch[a], v)); }
+  const out = { game: {}, arch: ARCH.map(() => [0, 0, 0]), skill: [0, 0] };
+  for (let j = Math.max(0, i - k + 1); j <= i; j++) {
+    const f = FRAMES[j]; if (!f?.gs) continue;
+    for (const [g, [e, pot, , sk]] of Object.entries(f.gs)) { const o = (out.game[g] ||= [0, 0, 0, 0]); o[0] += e; o[1] += pot; if (sk != null) { o[2] += sk; o[3]++; out.skill[0] += sk; out.skill[1]++; } }
+    f.garch?.forEach((v, a) => { out.arch[a][0] += v[0]; out.arch[a][1] += v[1]; out.arch[a][2] += v[2]; });
+  }
   return out;
 }
 function pushFrame(f) {
@@ -45,7 +49,7 @@ function pushFrame(f) {
   H.ticket.push(f.tickets ?? null);
   H.mcap.push(f.mkt?.mcap ?? null); H.vcap.push(f.mkt?.vcap ?? null); H.cashTop.push(f.mkt?.cashTop10 ?? null); H.bank.push(f.mkt?.bank ?? null);
   const g = gamesOver(FRAMES.length - 1, 4);
-  H.hlWin.push(g.hl[0] ? g.hl[1] / g.hl[0] : null); H.ouWin.push(g.ou[0] ? g.ou[1] / g.ou[0] : null);
+  H.skill.push(g.skill[1] ? g.skill[0] / g.skill[1] : null);
 }
 const gpw = () => (mode === 'replay' ? RUN.config.weeksPerGeneration : WORLD.cfg.weeksPerGeneration);
 const when = (t) => (t ? `Week ${t}` : 'Start');
@@ -188,7 +192,7 @@ function crosshair(id, render) {
 }
 crosshair('cashTop', (i) => `<b>${when(FRAMES[i].t)}</b><br>Richest 10% hold <span class="mono">${pct(H.cashTop[i])}</span> of all cash<br><span class="k">Bank rate ${H.bank[i] == null ? '–' : H.bank[i].toFixed(2) + '×'}</span>`);
 crosshair('access', (i) => `<b>${when(FRAMES[i].t)}</b><br>Research pass <span class="mono">${H.pass[i] == null ? '–' : H.pass[i].toFixed(2)}</span><br>Game ticket <span class="mono">${H.ticket[i] == null ? '–' : H.ticket[i].toFixed(2)}</span>`);
-crosshair('wins', (i) => `<b>${when(FRAMES[i].t)}</b><br>Higher or Lower <span class="mono">${pct(H.hlWin[i])}</span><br>Over / Under <span class="mono">${pct(H.ouWin[i])}</span><br><span class="k">Tickets that won a pack, 4-week average</span>`);
+crosshair('wins', (i) => `<b>${when(FRAMES[i].t)}</b><br>Skill index <span class="mono">${H.skill[i] == null ? '–' : H.skill[i].toFixed(2)}</span><br><span class="k">Rank correlation between what entrants knew and how they scored, all games, 4-week average</span>`);
 crosshair('gini', (i) => `<b>${when(FRAMES[i].t)}</b><br>Gini <span class="mono">${H.gini[i].toFixed(3)}</span>`);
 crosshair('notes', (i) => `<b>${when(FRAMES[i].t)}</b><br>Swaps <span class="mono">${H.shares[i]}</span> · thefts <span class="mono">${H.thefts[i]}</span><br><span class="k">${H.flags[i]} flags in force</span>`);
 crosshair('strat', (i) => `<b>${when(FRAMES[i].t)}</b><br>` + ARCH.map((a, k) => [a, H.share[i][k] || 0]).filter(([, v]) => v > 0).sort((x, y) => y[1] - x[1]).map(([a, v]) => `<span class="sw" style="background:${a.color}"></span>${a.label} <span class="mono">${pct(v)}</span>`).join('<br>'));
@@ -196,7 +200,7 @@ function drawCharts() {
   line('cashTop', [{ data: H.cashTop, color: '#e66767', fill: true }], { fy: (v) => pct(v), min: 0 });
   drawMain();
   line('access', [{ data: H.pass, color: COL.gold }, { data: H.ticket, color: '#9cc7ff' }], { fy: (v) => v.toFixed(1), min: 0 });
-  line('wins', [{ data: H.hlWin, color: '#3987e5' }, { data: H.ouWin, color: '#e66767' }], { fy: (v) => pct(v), min: 0 });
+  line('wins', [{ data: H.skill, color: '#3987e5', fill: true }], { fy: (v) => v.toFixed(2), ref: 0 });
   line('gini', [{ data: H.gini, color: '#3987e5', fill: true }], { fy: (v) => v.toFixed(2), min: 0, max: 0.4 });
   line('notes', [{ data: H.shares, color: '#3987e5' }, { data: H.thefts, color: '#e66767' }], { fy: (v) => Math.round(v), min: 0 });
   stack('strat', H.share);
@@ -244,7 +248,7 @@ function drawHeatmaps() {
   { // Families: price ÷ hidden value over time
     const { cols, range } = buckets(n, hmWidth('hmFam')), rows = FAMS.map((fm) => ({ label: `${fm.pos} ${fm.name}` }));
     const val = (i, j) => { const [a, b] = range(j); const xs = []; for (let k = a; k <= b; k++) xs.push(FRAMES[k].fam?.[i]); return avg(xs); };
-    heatmap('hmFam', rows, cols, val, (v) => diverge(Math.log(v) / Math.log(1.6)), (i, j) => { const [a, b] = range(j); const v = val(i, j); return `<b>${esc(rows[i].label)}</b><br>${FAMS[i].n} players · weeks ${FRAMES[a].t}–${FRAMES[b].t}<br>Price ÷ value <span class="mono">${v == null ? '–' : v.toFixed(2) + '×'}</span>`; }, (j) => `W${FRAMES[range(j)[0]].t}`);
+    heatmap('hmFam', rows, cols, val, (v) => diverge(Math.log(v) / Math.log(1.6)), (i, j) => { const [a, b] = range(j); const v = val(i, j); const fx = FRAMES[b].fashion?.[i]; return `<b>${esc(rows[i].label)}</b><br>${FAMS[i].n} players · weeks ${FRAMES[a].t}–${FRAMES[b].t}<br>Price ÷ value <span class="mono">${v == null ? '–' : v.toFixed(2) + '×'}</span>${fx != null ? `<br><span class="k">Collector demand ${Math.exp(fx).toFixed(2)}× normal</span>` : ''}`; }, (j) => `W${FRAMES[range(j)[0]].t}`);
   }
   { // Holdings: each strategy's share of a family's held card value, now
     const held = f.hold || [], tot = FAMS.map((_, j) => ln.reduce((s, a) => s + (held[a]?.[j] || 0), 0));
@@ -285,20 +289,21 @@ function gameRows(tableId, rows) {
 }
 function drawPanels() {
   const f = cur(), n = nNow(); if (!f) return;
-  const g4 = gamesOver(n - 1, 4), games = g4.hl[0] + g4.ou[0], wins = g4.hl[1] + g4.ou[1];
-  $('kWeek').textContent = String(f.t); $('kWeekS').textContent = `gen ${Math.floor(Math.max(0, f.t - 1) / gpw()) + 1}${mode === 'replay' ? ` · replay ${cursor + 1}/${FRAMES.length}` : ''}`;
+  const g4 = gamesOver(n - 1, 4), games = Object.values(g4.game).reduce((s, x) => s + x[0], 0), pots = Object.values(g4.game).reduce((s, x) => s + x[1], 0);
+  $('kWeek').textContent = String(f.t); $('kWeekS').textContent = `${f.season ? `season ${f.season} · ` : ''}gen ${Math.floor(Math.max(0, f.t - 1) / gpw()) + 1}${mode === 'replay' ? ` · replay ${cursor + 1}/${FRAMES.length}` : ''}`;
   $('kBub').textContent = f.h.bub.toFixed(2) + '×'; $('kBubS').innerHTML = pill(f.h.bub);
   $('kGini').textContent = f.h.gini.toFixed(3); $('kGiniS').textContent = `${f.h.gini >= H.gini[0] ? '▲' : '▼'} from ${H.gini[0].toFixed(3)}`;
   $('kTrades').textContent = f.h.trades.toLocaleString(); $('kTradesS').textContent = `${f.house.packs.toLocaleString()} packs bought`;
   $('kPass').textContent = f.h.pass == null ? '–' : f.h.pass.toFixed(2); $('kPassS').textContent = `coins · ${f.h.informed.toFixed(1)} notes/bot`;
   $('kTicket').textContent = f.tickets == null ? '–' : f.tickets.toFixed(2); $('kTicketS').textContent = f.games ? `${f.games.packsWeek} game packs this wk` : 'games off';
-  $('kWin').textContent = games ? pct(wins / games) : '–'; $('kWinS').textContent = games ? `${games.toLocaleString()} games, last 4 wk` : 'no games';
+  $('kWin').textContent = g4.skill[1] ? (g4.skill[0] / g4.skill[1]).toFixed(2) : '–'; $('kWinS').textContent = games ? `${games.toLocaleString()} entries · ${fmt(pots)} coins in pots` : 'no games';
   const ranked = f.bots.slice().sort((a, b) => b[3] - a[3]);
   $('kBank').textContent = f.mkt?.mcap ? pct(f.mkt.debt / f.mkt.mcap) : '–'; $('kBankS').textContent = `${f.mkt?.calls ?? 0} margin calls · ${f.mkt?.broke ?? 0} short of bills`;
   $('lb').tBodies[0].innerHTML = ranked.slice(0, 12).map((b) => `<tr data-bot="${b[0]}"><td><span class="sw" style="background:${ARCH[b[1]].color}"></span>${esc(b[2])}</td><td class="num">${fmt(b[3])}</td><td class="num">${pct(b[7] / Math.max(1, b[3]))}</td><td class="num">${b[8]}</td><td>${SOC[b[5]]}${b[6] >= 5 ? ' <span class="pill pill--hot">flagged</span>' : ''}</td></tr>`).join('');
-  $('gBars').textContent = f.games ? `H/L ${f.games.need} in a row · O/U ${f.games.legs} legs` : '';
-  gameRows('gTopic', [['Higher or Lower', g4.hl], ['Over / Under', g4.ou], ...Object.entries(g4.topic).sort((a, b) => b[1][0] - a[1][0]).map(([t, v]) => [t === 'all' ? 'No topic' : t, v])]);
-  gameRows('gArch', lanes().map((a) => [ARCH[a].label, g4.arch[a], ARCH[a].color]));
+  { const rows = Object.entries(GAMES).map(([g, d]) => [g, d, g4.game[g] || [0, 0, 0, 0]]).sort((a, b) => (b[2][3] ? b[2][2] / b[2][3] : -1) - (a[2][3] ? a[2][2] / a[2][3] : -1));
+    $('gTopic').tBodies[0].innerHTML = rows.map(([g, d, [e, pot, sk, kn]]) => { const r = kn ? sk / kn : null; return `<tr title="${esc(d.skill)}"><td>${esc(d.label)}</td><td class="k">${esc(f.topics?.[g] || '')}</td><td class="num">${e.toLocaleString()}</td><td class="num">${fmt(pot)}</td><td class="num">${r == null ? '–' : r.toFixed(2)}</td><td class="bar"><span class="${r != null && r < 0 ? 'neg' : ''}" style="width:${r == null ? 0 : Math.min(100, Math.abs(r) * 100)}%"></span></td></tr>`; }).join(''); }
+  { const rows = lanes().map((a) => [a, g4.arch[a]]), max = Math.max(0.01, ...rows.map(([, x]) => (x[0] ? x[1] / x[0] : 0)));
+    $('gArch').tBodies[0].innerHTML = rows.filter(([, x]) => x[0]).map(([a, [e, w, net]]) => `<tr><td><span class="sw" style="background:${ARCH[a].color}"></span>${ARCH[a].label}</td><td class="num">${e.toLocaleString()}</td><td class="num">${pct(w / e)}</td><td class="bar"><span style="width:${((w / e) / max) * 100}%;background:${ARCH[a].color}"></span></td><td class="num ${net >= 0 ? 'up' : 'down'}">${net >= 0 ? '+' : ''}${fmt(net)}</td></tr>`).join('') || '<tr><td colspan="5" class="k">No games played.</td></tr>'; }
   const soc = [0, 1, 2].map((s) => { const xs = f.bots.filter((b) => b[5] === s); return [s, xs.length, avg(xs.map((b) => b[3])), avg(xs.map((b) => b[6]))]; });
   $('social').tBodies[0].innerHTML = soc.map(([s, k, w, fl]) => `<tr><td>${SOC[s]}</td><td class="num">${k}</td><td class="num">${fmt(w)}</td><td class="num">${fl == null ? '–' : fl.toFixed(1)}</td></tr>`).join('');
   $('researched').textContent = f.researched.length ? 'Most researched: ' + f.researched.map(([id, k]) => `${LIBRARY.players[id].name} (${k})`).join(', ') : '';
@@ -338,7 +343,10 @@ const ACT = {
   research: (j) => ['Research', `<b>${esc(j.bot)}</b> researched ${esc(j.player)}`],
   share: (j) => ['Swap', `<b>${esc(j.a)}</b> ⇄ <b>${esc(j.b)}</b> · ${j.notesMoved} notes`],
   steal: (j) => ['Theft', j.ok ? `<b>${esc(j.thief)}</b> took ${j.notes} notes from ${esc(j.victim)}${j.caught ? ` · caught, ${j.flaggedBy} flag it` : ''}` : `<b>${esc(j.thief)}</b> blocked by ${esc(j.victim)}`],
-  game: (j) => ['Game', `<b>${esc(j.bot)}</b> ${j.game === 'higherOrLower' ? 'H/L' : 'O/U'} ${esc(j.topic)} · ${j.correct}/${j.of} · ${j.packs} pack${j.packs === 1 ? '' : 's'}`],
+  game: (j) => ['Game', `<b>${esc(j.bot)}</b> ${esc(GAMES[j.game]?.label || j.game)}${j.topic ? ` (${esc(j.topic)})` : ''}${j.opponent ? ` vs ${esc(j.opponent)}` : ''} · score ${j.score} · ${j.won ? `<span class="up">won ${j.net >= 0 ? '+' : ''}${j.net}</span>` : `<span class="down">lost ${-j.net}</span>`}`],
+  entered: (j) => ['Joined', `<b>${esc(j.bot)}</b> (${esc(j.kind)}) joined with ${fmt(j.cash)} coins`],
+  exited: (j) => ['Left', `<b>${esc(j.bot)}</b> (${esc(j.kind)}) ${esc(j.reason)} at ${fmt(j.worth)}`],
+  default: (j) => ['Default', `<b>${esc(j.bot)}</b> defaulted on ${fmt(j.debt)} of loans`],
   pack: (j) => ['Pack', `<b>${esc(j.bot)}</b> ${j.free ? 'free pack' : `pack · ${j.price}`}: ${j.pulls.map(esc).join(', ')}`],
   post: (j) => ['Board', `<b>${esc(j.from)}</b>: ${esc(j.text)}`],
   message: (j) => ['DM', `<b>${esc(j.from)}</b> → ${esc(j.to)}: ${esc(j.text)}`],
@@ -347,7 +355,7 @@ const ACT = {
   eliminated: (j) => ['Evolution', `<b>${esc(j.bot)}</b> eliminated (${esc(j.kind)}, ${esc(j.social)})`],
   born: (j) => ['Evolution', `<b>${esc(j.bot)}</b> born from ${esc(j.parent)}`],
 };
-const GROUP = { trade: ['trade', 'passTrade', 'ticketTrade'], auction: ['auctionList', 'auctionResult'], research: ['research'], notes: ['share', 'steal'], game: ['game'], pack: ['pack'], talk: ['post', 'message'], ai: ['aiActions'] };
+const GROUP = { people: ['entered', 'exited', 'default'], trade: ['trade', 'passTrade', 'ticketTrade'], auction: ['auctionList', 'auctionResult'], research: ['research'], notes: ['share', 'steal'], game: ['game'], pack: ['pack'], talk: ['post', 'message'], ai: ['aiActions'] };
 function drawFeed() {
   const n = nNow(), rows = [];
   if (feedF === 'news') {
@@ -505,7 +513,7 @@ function drawDetail() {
   const f = cur(); if (!f) return;
   if (SEL.type === 'market') {
     const m = f.mkt || {}, c = cfgNow();
-    $('detail').innerHTML = `<div class="stats">${tile('Market value', fmt(m.mcap))}${tile('Hidden value', fmt(m.vcap))}${tile('Premium', m.vcap ? ((m.mcap / m.vcap - 1) * 100).toFixed(1) + '%' : '–')}${tile('Coins held', fmt(m.cash))}${tile('Loans out', fmt(m.debt))}${tile('Margin calls', m.calls ?? 0)}${tile('Living costs / wk', fmt(m.spent))}${tile('Cards out', fmt(m.cards))}${tile('Richest 10% cash', pct(m.cashTop10))}${tile('Safeguards', [c.store && 'store', c.priceLimit && 'limits', c.wealthTax && 'tax', c.positionLimit && 'caps', c.centralBank && 'bank', c.closedEconomy && 'closed'].filter(Boolean).join(' · ') || 'none')}</div>`;
+    $('detail').innerHTML = `<div class="stats">${tile('Market value', fmt(m.mcap))}${tile('Hidden value', fmt(m.vcap))}${tile('Premium', m.vcap ? ((m.mcap / m.vcap - 1) * 100).toFixed(1) + '%' : '–')}${tile('Coins held', fmt(m.cash))}${tile('Loans out', fmt(m.debt))}${tile('Margin calls', m.calls ?? 0)}${f.lender ? tile('Lenders', `${pct(f.lender.ltv)} · ${(f.lender.rate * 100).toFixed(2)}%/wk`) : ''}${f.season ? tile('Season', f.season) : ''}${tile('Bots', f.bots.length + (f.people ? ` (+${f.people.joined}/−${f.people.left})` : ''))}${tile('Living costs / wk', fmt(m.spent))}${tile('Cards out', fmt(m.cards))}${tile('Richest 10% cash', pct(m.cashTop10))}${tile('Safeguards', [c.store && 'store', c.priceLimit && 'limits', c.wealthTax && 'tax', c.positionLimit && 'caps', c.centralBank && 'bank', c.closedEconomy && 'closed'].filter(Boolean).join(' · ') || 'none')}</div>`;
     return;
   }
   if (SEL.type === 'card') {

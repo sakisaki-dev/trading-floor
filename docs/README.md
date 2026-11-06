@@ -525,3 +525,58 @@ An earlier build looked like a permanent bubble. Two reasons:
 - For any bot you click: its account (worth, cash, loan, realized and unrealized P&L, positions with average cost,
   and a live activity log).
 - AI bots can also `borrow` or repay, and see their debt, borrowing limit and next week's living cost.
+
+---
+
+## 18. What keeps the market from settling (prototype 1.3)
+
+With constant fundamentals and constant flows, the market found a fixed point and oscillated around it. Real markets
+never settle for four reasons, and the sandbox now has each one, driven by real data or by the market itself:
+
+1. **News is the save's real history.** `sandbox/timeline.ts` takes the last snapshot of each real season from
+   `data/y80/market_history.json`: Y79 to Y88, 10 seasons, growing from 119 to 203 players. The sandbox starts at Y79.
+   Every 20 weeks the next real season arrives: real values, OVR, grades, Career Legacy and career totals, with real
+   rookies entering the pool. Library pages and game questions show only the current era. After Y88, values move by
+   real season-to-season changes for the player's position, centred on zero (the real spread, without the upward
+   drift of careers still being built). Each new real upload to the site extends the record.
+2. **People change.** Newcomers arrive faster after rallies and are mostly speculators, as in real hype cycles, each
+   bringing outside money. Bots that lose 70% of their peak quit, and a few retire. Both sell everything.
+3. **Credit cycles.** Lenders tighten (lower limits, higher rates) after margin calls and defaults, and loosen in
+   calm rising markets. An insolvent bot defaults, and its written-off loan disappears from the money supply. Total
+   loans swing from about 16k to 470k and back.
+4. **Fashion.** Each family's popularity with collectors drifts, sometimes jumps or slumps, and feeds on its own price
+   gains. Collectors bid more often, and higher, for what is in fashion.
+
+**Result (seed 88, 600 weeks, balanced market):** price ÷ value goes 0.59 → 1.14 → 0.23 → 1.19 → 0.75 → 1.50 → 0.47,
+in booms and busts with no rules forcing it. The Gini moves between 0.45 and 0.72.
+
+## 19. Skill-based games (weekly contests)
+
+Each game runs one contest a week. Entry costs a ticket plus a 2-coin stake into the pot. Every entrant answers the
+same questions, which are published a week ahead with the topic so bots can research. The best scores share the pot
+(the top 10–25%; duels pay winner takes all), so **games create no money**: they move coins from weaker players to
+stronger ones.
+
+**Metric: the skill index.** For each game, this is the rank correlation between how much an entrant knew (its fresh
+notes on the players asked about) and its score. 0 means luck; 1 means knowing more always scores more.
+
+| Game | Skill it tests | Skill index (rule bots, 600 weeks) |
+|---|---|---|
+| Closest guess | Precise career stats | 0.59–0.66 |
+| Valuation contest | Estimating hidden value | 0.49–0.69 |
+| League Grid | Breadth (position × award × club) | 0.32–0.36 |
+| Over / Under | Career rates | 0.26–0.30 |
+| Higher or Lower | Comparing two players' rates | 0.19–0.36 |
+| Head-to-head duel | Higher or Lower against one opponent | 0.08–0.23 |
+| Blind Rank | Ordering five players | 0.17–0.29 |
+| Imposter | Play-style families | 0.08–0.19 |
+| Keep 3 / Cut 3 | Career Legacy | 0.06–0.17 (card prices already hint at legacy) |
+| Price prediction league | Reading the market 4 weeks ahead | −0.18 to −0.03 (knowing value doesn't predict short moves: efficient-market behaviour) |
+
+Strategy results from games (net coins over the run): contrarians, momentum and value bots gain; the retail herd,
+pack arbitrage and collectors pay in.
+
+**Page:** the games panel shows each game's topic, entries, pot total and skill index (4 weeks), a skill-index chart
+over time, and every strategy's entries, win rate and net coins. Every contest entry is in the journal with its
+score and payout. The season, lender terms, bot turnover and collector demand per family (in the family heatmap's
+tooltip) are on the market panel.

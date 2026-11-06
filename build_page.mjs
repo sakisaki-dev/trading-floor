@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const read = (p) => fs.readFileSync(path.join(here, p), 'utf8');
 const engine = read('engine.mjs').replace(/^export /gm, '');
-const library = read('data/library.json');
+const library = JSON.stringify({ ...JSON.parse(read('data/library.json')), timeline: JSON.parse(read('data/timeline.json')) });
 const head = `<title>Vault Trading Floor</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">

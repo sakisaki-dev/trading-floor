@@ -51,8 +51,7 @@ const SCHEMA = obj({
   auctionBids: arr(obj({ auctionId: str, bid: num })),
   passOrders: arr(obj({ side: { type: 'string', enum: ['buy', 'sell'] }, price: num, qty: int })),
   ticketOrders: arr(obj({ side: { type: 'string', enum: ['buy', 'sell'] }, price: num, qty: int })),
-  games: arr(obj({ game: { type: 'string', enum: ['higherOrLower', 'overUnder'] }, answers: arr(str) })),
-  nextGameTopic: { type: 'string', enum: [...E.TOPICS, 'all'] },
+  games: arr(obj({ game: { type: 'string', enum: Object.keys(E.GAMES) }, answers: arr(str) })),
   share: arr(str),
   acceptShares: arr(str),
   steal: str,
@@ -117,14 +116,15 @@ function mockPolicy(o) {
     if (r.yourNote && r.price < r.yourNote.estimate * 0.85 && o.you.cash > r.price * 2) orders.push({ player: r.player, side: 'buy', price: +(r.price * 1.03).toFixed(2), qty: 1 });
     if (r.yourNote && r.youHold && r.price > r.yourNote.estimate * 1.2) orders.push({ player: r.player, side: 'sell', price: +(r.price * 0.98).toFixed(2), qty: 1 });
   }
-  const games = o.games ? o.games.higherOrLower.sets.slice(0, o.games.tickets).map((set) => ({ game: 'higherOrLower', answers: set.map(() => (mr() < 0.5 ? 'A' : 'B')) })) : [];
+  const games = o.games ? Object.entries(o.games.contestsNextWeek).slice(0, 3).map(([game, c]) => ({ game, answers: c.questions.map(() => (game === 'valuation' ? '20' : game === 'prediction' ? '0.5' : 'A')) })) : [];
   const auctionBids = (o.auctions?.open || []).filter((a) => rows.find((r) => r.player === a.player && r.yourNote && r.yourNote.estimate > a.reserve * 1.1)).map((a) => ({ auctionId: a.auctionId, bid: a.reserve * 1.05 }));
   const friend = (o.otherBots || []).find((b) => !b.flaggedYou);
-  return { borrow: 0, research, notes, orders: orders.slice(0, 12), packs: o.you.cash > o.packs.price * 4 ? 1 : 0, auction: [], auctionBids, passOrders: [], ticketOrders: [], games, nextGameTopic: 'all', share: friend ? [friend.name] : [], acceptShares: ['all'], steal: '', post: '', messages: [], memo: `Week ${o.week}: tracking ${notes.length} new notes.` };
+  return { borrow: 0, research, notes, orders: orders.slice(0, 12), packs: o.you.cash > o.packs.price * 4 ? 1 : 0, auction: [], auctionBids, passOrders: [], ticketOrders: [], games, share: friend ? [friend.name] : [], acceptShares: ['all'], steal: '', post: '', messages: [], memo: `Week ${o.week}: tracking ${notes.length} new notes.` };
 }
 
 /* ---------- Main loop ---------- */
 const lib = JSON.parse(fs.readFileSync(path.join(here, 'data/library.json'), 'utf8'));
+lib.timeline = JSON.parse(fs.readFileSync(path.join(here, 'data/timeline.json'), 'utf8'));
 const W = E.createWorld(lib, worldCfg);
 const seats = new Map();
 for (const s of config.aiBots || []) { const b = E.addAiBot(W, { name: s.name, model: DRY ? `${s.model} (dry)` : s.model }); seats.set(b.id, s); }
