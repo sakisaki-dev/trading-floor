@@ -72,9 +72,9 @@
 
   <p class="hyp" id="hyp"></p>
 
-  <div class="status" id="status" role="status" aria-label="Market status"></div>
+  <div class="status" id="status" role="status" aria-label="Market status"><span class="status__badge" id="statusBadge"></span><div class="marq" id="statusView"><div class="marq__track"><div class="marq__set" id="statusSet"></div><div class="marq__set" id="statusSet2" aria-hidden="true"></div></div></div></div>
 
-  <div class="tape" id="tape" aria-label="Biggest movers over four weeks"><div class="tape__track" id="tapeTrack"></div></div>
+  <div class="tape marq" id="tape" aria-label="Biggest movers over four weeks"><div class="marq__track"><div class="marq__set" id="tapeTrack"></div><div class="marq__set" id="tapeTrack2" aria-hidden="true"></div></div></div>
 
   <div class="kpis">
     <div class="kpi"><span>Week</span><b id="kWeek">–</b><small id="kWeekS"></small></div>
@@ -88,7 +88,59 @@
   </div>
   <div class="mvc" id="mvc" aria-live="polite"></div>
 
+  <h2 class="zone">Maps and heatmaps<span class="note">where the money sits and what the bots learned</span></h2>
+  <section class="panel" aria-labelledby="map-h">
+    <div class="head"><h2 id="map-h">Market map</h2><div class="maptools"><span class="note">each box is a player, sized by the market value of his cards out, coloured by price change · grouped by position · click to open</span><div class="seg" role="group" aria-label="Colour by" id="mapTf"><button type="button" data-k="1" aria-pressed="false">1W</button><button type="button" data-k="4" aria-pressed="true">4W</button><button type="button" data-k="12" aria-pressed="false">12W</button></div><span class="scale" id="scaleMap"></span></div></div>
+    <canvas id="map" aria-label="Market map: every player sized by market value and coloured by price change"></canvas>
+    <div class="tip" id="mapTip" hidden></div>
+  </section>
 
+  <div class="grid main">
+    <section class="panel" aria-labelledby="floor-h">
+      <div class="head"><h2 id="floor-h">Floor</h2><span class="note">x = worth · y = average OVR of the cards it holds · blue = gaining, red = losing (4 weeks) · gold ring = AI bot · dashed = thief · faint ring = flagged by 5+ · click a bot</span></div>
+      <canvas id="floor" aria-label="Every bot by worth and the average OVR of its cards, coloured by its 4-week return"></canvas>
+      <div class="tip" id="floorTip" hidden></div>
+    </section>
+    <div class="stack">
+      <section class="panel" aria-labelledby="hsec-h">
+        <div class="head"><h2 id="hsec-h">Sector returns over time</h2><span class="scale" id="scaleSec"></span></div>
+        <canvas id="hmSec" class="hm hm--short" aria-label="Heatmap of each position's 4-week return over time"></canvas>
+        <div class="tip" id="hmSecTip" hidden></div>
+      </section>
+      <section class="panel" aria-labelledby="hs-h">
+        <div class="head"><h2 id="hs-h">Wealth groups · 4-week return</h2><span class="scale" id="scaleRet"></span></div>
+        <canvas id="hmRet" class="hm hm--short" aria-label="Heatmap of each wealth group's average 4-week return over time"></canvas>
+        <div class="tip" id="hmRetTip" hidden></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="panel" aria-labelledby="hg-h">
+    <div class="head"><h2 id="hg-h">What they learned</h2><span class="scale" id="scaleGene"></span></div>
+    <p class="note">Each row is one thing the card network sees. The colour is how much raising it moves the richest 10% of bots toward buying (red) or selling (blue), measured on their own networks every 4 weeks. Nobody programmed these: they are what survived selection.</p>
+    <canvas id="hmGene" class="hm hm--tall" aria-label="Heatmap of how strongly each input moves the richest bots toward buying or selling, over time"></canvas>
+    <div class="tip" id="hmGeneTip" hidden></div>
+  </section>
+
+  <div class="grid three">
+    <section class="panel" aria-labelledby="hf-h">
+      <div class="head"><h2 id="hf-h">OVR bands · price ÷ value</h2><span class="scale" id="scaleFam"></span></div>
+      <canvas id="hmFam" class="hm" aria-label="Heatmap of price over hidden value per OVR band over time"></canvas>
+      <div class="tip" id="hmFamTip" hidden></div>
+    </section>
+    <section class="panel" aria-labelledby="hh-h">
+      <div class="head"><h2 id="hh-h">Who holds which OVR bands</h2><span class="scale" id="scaleHold"></span></div>
+      <canvas id="hmHold" class="hm" aria-label="Heatmap of each wealth group's share of every OVR band's card value"></canvas>
+      <div class="tip" id="hmHoldTip" hidden></div>
+    </section>
+    <section class="panel" aria-labelledby="hb-h">
+      <div class="head"><h2 id="hb-h">Top 20 bots · worth vs median</h2><span class="scale" id="scaleBots"></span></div>
+      <canvas id="hmBots" class="hm" aria-label="Heatmap of the 20 richest bots' worth relative to the median bot over time"></canvas>
+      <div class="tip" id="hmBotsTip" hidden></div>
+    </section>
+  </div>
+
+  <h2 class="zone">Charts<span class="note">every graph of the market, the cards and the bots</span></h2>
   <div class="desk">
     <section class="panel watch" aria-labelledby="w-h">
       <div class="head"><h2 id="w-h">Watchlist</h2><select id="wsort" aria-label="Sort the watchlist"><option value="vol">Most traded</option><option value="up">Top gainers</option><option value="down">Top losers</option><option value="cap">Market value</option><option value="rich">Most overpriced</option><option value="cheap">Most underpriced</option></select></div>
@@ -122,82 +174,21 @@
     </section>
   </div>
 
-
-  <div class="movers">
-    <section class="panel"><div class="head"><h2>Top gainers</h2><span class="note">4 weeks</span></div><table id="mvUp"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
-    <section class="panel"><div class="head"><h2>Top losers</h2><span class="note">4 weeks</span></div><table id="mvDown"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
-    <section class="panel"><div class="head"><h2>Most active</h2><span class="note">trades, 4 weeks</span></div><table id="mvAct"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">Volume</th></tr></thead><tbody></tbody></table></section>
-    <section class="panel"><div class="head"><h2>New highs</h2><span class="note" id="mvHiN"></span></div><table id="mvHi"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
-    <section class="panel"><div class="head"><h2>Most shorted</h2><span class="note">copies out on loan</span></div><table id="mvShort"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">Short</th></tr></thead><tbody></tbody></table></section>
-    <section class="panel"><div class="head"><h2>New lows</h2><span class="note" id="mvLoN"></span></div><table id="mvLo"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
-  </div>
-
-  <div class="grid main">
-    <section class="panel" aria-labelledby="sec-h">
-      <div class="head"><h2 id="sec-h">Sectors</h2><span class="note">the eight positions, each weighted by the cards it has out</span></div>
-      <div class="tablewrap"><table id="sectors"><thead><tr><th>Sector</th><th class="num">Players</th><th class="num">1W</th><th class="num">4W</th><th class="num">12W</th><th class="num">Price ÷ value</th><th class="num">Share of market</th><th class="num">Trades</th><th class="num">Up / down</th></tr></thead><tbody></tbody></table></div>
-      <div class="head"><h2 class="h3">Sector returns over time</h2><span class="scale" id="scaleSec"></span></div>
-      <canvas id="hmSec" class="hm hm--short" aria-label="Heatmap of each position's 4-week return over time"></canvas>
-      <div class="tip" id="hmSecTip" hidden></div>
-    </section>
-    <section class="panel" aria-labelledby="cal-h">
-      <div class="head"><h2 id="cal-h">Calendar</h2><span class="note">what the rules have scheduled</span></div>
-      <div id="cal" class="cal"></div>
-    </section>
-  </div>
-
-  <div class="grid main">
-    <section class="panel" aria-labelledby="floor-h">
-      <div class="head"><h2 id="floor-h">Floor</h2><span class="note">x = worth · y = average OVR of the cards it holds · blue = gaining, red = losing (4 weeks) · gold ring = AI bot · dashed = thief · faint ring = flagged by 5+ · click a bot</span></div>
-      <canvas id="floor" aria-label="Every bot by worth and the average OVR of its cards, coloured by its 4-week return"></canvas>
-      <div class="tip" id="floorTip" hidden></div>
-    </section>
-    <div class="stack">
-      <section class="panel" aria-labelledby="cons-h">
-        <div class="head"><h2 id="cons-h">Where the money goes</h2><span class="note">last 20 weeks · bills and interest leave the economy</span></div>
-        <div class="tablewrap"><table id="pnl"><thead><tr><th>Wealth group</th><th class="num">Realized P&amp;L</th><th class="bar"><span class="sr-only">P&amp;L bar</span></th><th class="num">Net cash</th><th class="num">Quick flips</th></tr></thead><tbody></tbody></table></div>
-        <p class="note" id="consNote"></p>
-      </section>
-      <section class="panel" aria-labelledby="ct-h">
-        <div class="head"><h2 id="ct-h">Cash held by the richest 10%</h2></div>
-        <canvas id="cashTop" class="ch" aria-label="Share of all cash held by the richest 10% of bots"></canvas>
-        <div class="tip" id="cashTopTip" hidden></div>
-      </section>
-      <section class="panel" aria-labelledby="ac-h">
-        <div class="head"><h2 id="ac-h">Cost of access</h2><span class="legend"><span><i class="line" style="background:var(--gold)"></i>Research pass</span><span><i class="line" style="background:#9cc7ff"></i>Game ticket</span></span></div>
-        <canvas id="access" class="ch" aria-label="Research pass and game ticket prices in coins"></canvas>
-        <div class="tip" id="accessTip" hidden></div>
-      </section>
-    </div>
-  </div>
-
-  <section class="panel" aria-labelledby="hg-h">
-    <div class="head"><h2 id="hg-h">What they learned</h2><span class="scale" id="scaleGene"></span></div>
-    <p class="note">Each row is one thing the card network sees. The colour is how much raising it moves the richest 10% of bots toward buying (red) or selling (blue), measured on their own networks every 4 weeks. Nobody programmed these: they are what survived selection.</p>
-    <canvas id="hmGene" class="hm hm--tall" aria-label="Heatmap of how strongly each input moves the richest bots toward buying or selling, over time"></canvas>
-    <div class="tip" id="hmGeneTip" hidden></div>
+  <section class="panel" aria-labelledby="ind-h">
+    <div class="head"><h2 id="ind-h">Indicators</h2><span class="note">every gauge of the market over the last 52 weeks · the i says what each one measures · click one to chart it full size</span></div>
+    <div id="ind" class="indboard"></div>
   </section>
 
   <div class="grid two">
-    <section class="panel" aria-labelledby="hf-h">
-      <div class="head"><h2 id="hf-h">OVR bands · price ÷ value</h2><span class="scale" id="scaleFam"></span></div>
-      <canvas id="hmFam" class="hm" aria-label="Heatmap of price over hidden value per OVR band over time"></canvas>
-      <div class="tip" id="hmFamTip" hidden></div>
+    <section class="panel" aria-labelledby="ct-h">
+      <div class="head"><h2 id="ct-h">Cash held by the richest 10%</h2></div>
+      <canvas id="cashTop" class="ch" aria-label="Share of all cash held by the richest 10% of bots"></canvas>
+      <div class="tip" id="cashTopTip" hidden></div>
     </section>
-    <section class="panel" aria-labelledby="hh-h">
-      <div class="head"><h2 id="hh-h">Who holds which OVR bands</h2><span class="scale" id="scaleHold"></span></div>
-      <canvas id="hmHold" class="hm" aria-label="Heatmap of each wealth group's share of every OVR band's card value"></canvas>
-      <div class="tip" id="hmHoldTip" hidden></div>
-    </section>
-    <section class="panel" aria-labelledby="hs-h">
-      <div class="head"><h2 id="hs-h">Wealth groups · 4-week return</h2><span class="scale" id="scaleRet"></span></div>
-      <canvas id="hmRet" class="hm hm--short" aria-label="Heatmap of each wealth group's average 4-week return over time"></canvas>
-      <div class="tip" id="hmRetTip" hidden></div>
-    </section>
-    <section class="panel" aria-labelledby="hb-h">
-      <div class="head"><h2 id="hb-h">Top 20 bots · worth vs median</h2><span class="scale" id="scaleBots"></span></div>
-      <canvas id="hmBots" class="hm" aria-label="Heatmap of the 20 richest bots' worth relative to the median bot over time"></canvas>
-      <div class="tip" id="hmBotsTip" hidden></div>
+    <section class="panel" aria-labelledby="ac-h">
+      <div class="head"><h2 id="ac-h">Cost of access</h2><span class="legend"><span><i class="line" style="background:var(--gold)"></i>Research pass</span><span><i class="line" style="background:#9cc7ff"></i>Game ticket</span></span></div>
+      <canvas id="access" class="ch" aria-label="Research pass and game ticket prices in coins"></canvas>
+      <div class="tip" id="accessTip" hidden></div>
     </section>
   </div>
 
@@ -228,22 +219,43 @@
     </section>
   </div>
 
-  <div class="grid two">
     <section class="panel" aria-labelledby="sp-h">
       <div class="head"><h2 id="sp-h">Most traded</h2><span class="legend"><span><i class="line" style="background:var(--gold)"></i>Price</span><span><i class="dash"></i>Value</span></span></div>
       <div class="cards" id="spot"></div>
+    </section>
+
+  <h2 class="zone">Tables and logs<span class="note">movers, sectors, the calendar, every trade and every account</span></h2>
+  <div class="movers">
+    <section class="panel"><div class="head"><h2>Top gainers</h2><span class="note">4 weeks</span></div><table id="mvUp"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>Top losers</h2><span class="note">4 weeks</span></div><table id="mvDown"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>Most active</h2><span class="note">trades, 4 weeks</span></div><table id="mvAct"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">Volume</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>New highs</h2><span class="note" id="mvHiN"></span></div><table id="mvHi"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>Most shorted</h2><span class="note">copies out on loan</span></div><table id="mvShort"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">Short</th></tr></thead><tbody></tbody></table></section>
+    <section class="panel"><div class="head"><h2>New lows</h2><span class="note" id="mvLoN"></span></div><table id="mvLo"><thead><tr><th>Player</th><th class="num">Price</th><th class="num">4W</th></tr></thead><tbody></tbody></table></section>
+  </div>
+
+  <div class="grid main">
+    <section class="panel" aria-labelledby="sec-h">
+      <div class="head"><h2 id="sec-h">Sectors</h2><span class="note">the eight positions, each weighted by the cards it has out</span></div>
+      <div class="tablewrap"><table id="sectors"><thead><tr><th>Sector</th><th class="num">Players</th><th class="num">1W</th><th class="num">4W</th><th class="num">12W</th><th class="num">Price ÷ value</th><th class="num">Share of market</th><th class="num">Trades</th><th class="num">Up / down</th></tr></thead><tbody></tbody></table></div>
+    </section>
+    <section class="panel" aria-labelledby="cal-h">
+      <div class="head"><h2 id="cal-h">Calendar</h2><span class="note">what the rules have scheduled</span></div>
+      <div id="cal" class="cal"></div>
+    </section>
+  </div>
+
+  <div class="grid two">
+    <section class="panel" aria-labelledby="cons-h">
+      <div class="head"><h2 id="cons-h">Where the money goes</h2><span class="note">last 20 weeks · bills and interest leave the economy</span></div>
+      <div class="tablewrap"><table id="pnl"><thead><tr><th>Wealth group</th><th class="num">Realized P&amp;L</th><th class="bar"><span class="sr-only">P&amp;L bar</span></th><th class="num">Net cash</th><th class="num">Quick flips</th></tr></thead><tbody></tbody></table></div>
+      <p class="note" id="consNote"></p>
     </section>
     <section class="panel" aria-labelledby="lib-h">
       <div class="head"><h2 id="lib-h">Library page</h2><select id="libPick" aria-label="Player"></select></div>
       <div id="libPage"></div>
     </section>
   </div>
-
-  <section class="panel" aria-labelledby="map-h">
-    <div class="head"><h2 id="map-h">Market map</h2><div class="maptools"><span class="note">each box is a player, sized by the market value of his cards out, coloured by price change · grouped by position · click to open</span><div class="seg" role="group" aria-label="Colour by" id="mapTf"><button type="button" data-k="1" aria-pressed="false">1W</button><button type="button" data-k="4" aria-pressed="true">4W</button><button type="button" data-k="12" aria-pressed="false">12W</button></div><span class="scale" id="scaleMap"></span></div></div>
-    <canvas id="map" aria-label="Market map: every player sized by market value and coloured by price change"></canvas>
-    <div class="tip" id="mapTip" hidden></div>
-  </section>
 
   <section class="panel" aria-labelledby="fd-h">
     <div class="head">
@@ -266,11 +278,6 @@
     </div>
     <div class="feed" id="feed"></div>
     <button type="button" class="more" id="feedMore">Show more</button>
-  </section>
-
-  <section class="panel" aria-labelledby="ind-h">
-    <div class="head"><h2 id="ind-h">Indicators</h2><span class="note">every gauge of the market over the last 52 weeks · the i says what each one measures · click one to chart it full size</span></div>
-    <div id="ind" class="indboard"></div>
   </section>
 
   <section class="panel acct" id="acctPanel" aria-labelledby="a-h">

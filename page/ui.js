@@ -124,6 +124,11 @@ function startReplay(run) {
 }
 
 /* ---------- Canvas helpers ---------- */
+// Only what is on screen (or about to be) gets painted; anything that scrolls into view is brought up to date at once
+const SEEN = new Map(); let wake = false, floorDirty = true;
+const seen = (el) => { if (typeof el === 'string') el = $(el); return !el || SEEN.get(el) !== false; };
+const IO = typeof IntersectionObserver === 'function' ? new IntersectionObserver((es) => { for (const e of es) { const was = SEEN.get(e.target); SEEN.set(e.target, e.isIntersecting); if (e.isIntersecting && was === false) wake = true; } }, { rootMargin: '300px 0px' }) : null;
+function watchVis() { if (IO) for (const el of document.querySelectorAll('canvas, #ind, #spot')) if (!SEEN.has(el)) { SEEN.set(el, true); IO.observe(el); } }
 function fit(cv) { const r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1; const w = Math.max(10, Math.round(r.width * d)), h = Math.max(10, Math.round(r.height * d)); if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; } const x = cv.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); return [x, r.width, r.height]; }
 function placeTip(tip, cv, px, py) { const r = cv.getBoundingClientRect(), pr = cv.parentElement.getBoundingClientRect(); tip.style.left = C(px + (r.left - pr.left) + 12, 8, Math.max(8, pr.width - 250)) + 'px'; tip.style.top = C(py + (r.top - pr.top) + 12, 8, Math.max(8, pr.height - 100)) + 'px'; tip.hidden = false; }
 
@@ -134,8 +139,9 @@ const floor = $('floor'), floorTip = $('floorTip');
 let dom = [2.5, 4], oDom = [60, 95], pos = new Map(), hover = null, arcs = [];
 const retColor = (r) => divergeInv(C((r || 0) / 0.15, -1, 1));
 const grpColor = (b) => GROUPS[b[17] ?? 2].color;
+let floorMoving = false;
 function drawFloor() {
-  const f = cur(); if (!f) return;
+  const f = cur(); if (!f) return; if (!seen(floor)) { arcs.length = 0; return; } floorDirty = false; floorMoving = false;
   const [x, Wd, Ht] = fit(floor); x.clearRect(0, 0, Wd, Ht);
   const pad = { l: 34, r: 10, t: 8, b: 16 }, small = Wd < 560 ? 0.7 : 1;
   const vals = f.bots.map((b) => b[3]).filter((v) => v > 0), ovs = f.bots.map((b) => b[15]).filter((v) => v != null);
@@ -154,6 +160,7 @@ function drawFloor() {
     const [id, , , w, n] = b; ids.add(id);
     const jit = (((id * 2654435761) % 1000) / 1000 - 0.5) * 6, ty = b[15] == null ? Ht - pad.b - 4 + jit / 3 : Y(b[15]) + jit;
     const p = pos.get(id) || { x: X(w), y: ty };
+    if (Math.abs(p.x - X(w)) > 0.3 || Math.abs(p.y - ty) > 0.3) floorMoving = true;
     p.x = L(p.x, X(w), 0.15); p.y = L(p.y, ty, 0.2); p.r = C(2 + Math.sqrt(n) * 0.35, 2.5, 8) * small * (b[9] ? 1.5 : 1); p.b = b; pos.set(id, p);
   }
   for (const id of [...pos.keys()]) if (!ids.has(id)) pos.delete(id);
@@ -174,7 +181,7 @@ function floorPointer(e) {
   const r = floor.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
   let best = null, bd = 196;
   for (const [id, p] of pos) { const d = (p.x - mx) ** 2 + (p.y - my) ** 2; if (d < bd) { bd = d; best = [id, p]; } }
-  hover = best ? best[0] : null;
+  if ((best ? best[0] : null) !== hover) floorDirty = true; hover = best ? best[0] : null;
   if (!best) { floorTip.hidden = true; return; }
   const b = best[1].b, [id, , name, w, n, soc, flaggedBy, cash, notes, isAi, gen, model] = b;
   let extra = '';
@@ -190,7 +197,7 @@ function floorPointer(e) {
 }
 floor.addEventListener('pointermove', floorPointer); floor.addEventListener('pointerdown', floorPointer);
 floor.addEventListener('click', () => { if (hover != null) selectBot(hover); });
-floor.addEventListener('pointerleave', () => { hover = null; floorTip.hidden = true; });
+floor.addEventListener('pointerleave', () => { hover = null; floorDirty = true; floorTip.hidden = true; });
 
 /* ---------- Line charts ---------- */
 const charts = {};
@@ -204,6 +211,7 @@ function axes(x, Wd, Ht, pad, lo, hi, fy, n) {
   if (n > 1) { x.fillStyle = COL.faint; x.fillText('W0', pad.l, Ht - 2); x.textAlign = 'right'; x.fillText(`W${FRAMES[n - 1].t}`, Wd - pad.r, Ht - 2); x.textAlign = 'left'; }
 }
 function line(id, series, o) {
+  if (!seen(id)) return;
   const cv = $(id), [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
   const n = nNow(), pad = { l: 6, r: 52, t: 8, b: 16 }, data = series.map((s) => s.data.slice(0, n));
   let lo = Infinity, hi = -Infinity; data.forEach((d) => d.forEach((v) => { if (v == null) return; lo = Math.min(lo, v); hi = Math.max(hi, v); }));
@@ -270,6 +278,7 @@ const seq = (t) => (t < 0.5 ? mix(NEUTRAL, BLUE, t * 2) : mix(BLUE, BLUE_HI, Mat
 function scale(id, left, right, fn) { $(id).innerHTML = `${left}<i style="background:linear-gradient(90deg,${[0, 0.25, 0.5, 0.75, 1].map((t) => fn(t)).join(',')})"></i>${right}`; }
 const hm = {};
 function heatmap(id, rows, cols, cell, color, tip, colLabel) {
+  if (!seen(id)) return;
   const cv = $(id), [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
   const LW = Wd < 480 ? 92 : 128, top = 2, bot = colLabel ? 14 : 2, cw = (Wd - LW - 4) / cols, rh = (Ht - top - bot) / rows.length;
   const max = LW < 100 ? 14 : 20;
@@ -392,7 +401,7 @@ function drawPanels() {
   $('social').tBodies[0].html = soc.map(([s, k, w, fl]) => `<tr><td>${SOC[s]}</td><td class="num">${k}</td><td class="num">${fmt(w)}</td><td class="num">${fl == null ? '–' : fl.toFixed(1)}</td></tr>`).join('');
   $('researched').textContent = f.researched.length ? 'Most researched: ' + f.researched.map(([id, k]) => `${LIBRARY.players[id].name} (${k})`).join(', ') : '';
   $('spot').html = f.hot.map(([id, P, F, vol, circ, pool], i) => { const p = LIBRARY.players[id]; return `<button type="button" class="cardrow" data-lib="${id}" data-card="${id}"><div><b>${p.pos} ${esc(p.name)}</b><span>${fmt(P)} vs ${fmt(F)} ${pill(P / F)}<br>${vol} trades · ${circ} out · ${pool} in pool</span></div><canvas id="sp${i}" aria-label="${esc(p.name)} price and value"></canvas></button>`; }).join('');
-  f.hot.forEach(([id], i) => {
+  if (seen('spot')) f.hot.forEach(([id], i) => {
     const [x, Wd, Ht] = fit($('sp' + i)); x.clearRect(0, 0, Wd, Ht);
     const [P, F] = series(id), all = P.concat(F).filter((v) => v != null); if (!all.length) return;
     const lo = Math.min(...all), hi = Math.max(...all), sp = hi - lo || 1;
@@ -492,8 +501,9 @@ function loop(ts) {
   let ran = false;
   if (mode === 'live') { ran = dirty; dirty = false; } // the worker sets the pace
   else if (playing) { acc += dt * 3 * speed; while (acc >= 1) { if (!advance()) { acc = 0; break; } acc -= 1; ran = true; } }
-  drawFloor();
-  if (ran) { frameT = ts; drawFast(); drawCharts(); } // a new week: tiles, lists and charts update at once
+  if (wake) { wake = false; watchVis(); floorDirty = true; drawCharts(); drawMain(); drawPanels(); panelT = ts; }
+  if (ran || floorDirty || floorMoving || arcs.length) drawFloor();
+  if (ran) { frameT = ts; drawFast(); drawCharts(); watchVis(); } // a new week: tiles, lists and charts update at once
   if (ran) drawMain();
   if (ran && ts - panelT > 500) { drawPanels(); panelT = ts; } // heatmaps, map, feed, account: every half second
   requestAnimationFrame(loop);
@@ -546,11 +556,17 @@ const riskNow = (id) => FRAMES[ix()]?.risk?.[id] ?? null;
 const swingOf = (r) => { const c = cfgNow(); if (r == null || c.walkVolLow == null) return null; return L(c.walkVolLow, c.walkVolHigh, C((r - c.riskLo) / (c.riskHi - c.riskLo), 0, 1)); };
 const riskText = (id) => { const r = riskNow(id), v = swingOf(r); return r == null ? '' : `risk ${Math.round(r)} · ±${(v * 100).toFixed(1)}%/wk`; };
 
+// Marquee: two identical copies slide on the compositor (smooth even while the page is busy). Every item has a fixed
+// width, so the loop length stays the same week to week and the text changes under it without a jump.
+function marquee(view, a, b, html) {
+  if (a._html === html) return; a.html = html; b.html = html;
+  const w = a.offsetWidth; if (w && Math.abs((view._w || 0) - w) > 2) { view._w = w; view.style.setProperty('--marq-dur', Math.max(20, w / 40).toFixed(1) + 's'); }
+}
 function drawTape() {
-  const m = cur().movers; if (!m) { $('tapeTrack').html = ''; return; }
-  const item = ([id, P, r]) => { const p = LIBRARY.players[id]; return `<button type="button" class="tk" data-card="${id}"><b>${p.pos} ${esc(p.name)}</b>${fmt(P)} ${chgSpan(r)}</button>`; };
-  const html = [...m.up.map(item), ...m.down.map(item)].join('');
-  $('tapeTrack').html = html;
+  const m = cur().movers || { up: [], down: [] };
+  const item = ([id, P, r]) => { const p = LIBRARY.players[id]; return `<button type="button" class="tk" data-card="${id}"><b>${p.pos} ${esc(p.name)}</b><span>${fmt(P)} ${chgSpan(r)}</span></button>`; };
+  const items = [...m.up.map(item), ...m.down.map(item)]; while (items.length < 14) items.push('<span class="tk" aria-hidden="true"></span>');
+  marquee($('tape'), $('tapeTrack'), $('tapeTrack2'), items.join(''));
 }
 function drawWatch() {
   const rows = LIBRARY.players.map((p, id) => ({ id, p, ...cardNow(id) })).filter((r) => r.P != null && (!wq || r.p.name.toLowerCase().includes(wq) || r.p.pos.toLowerCase() === wq));
@@ -577,6 +593,7 @@ function barsFor(sel) {
 
 const MAIN = {};
 function drawMain() {
+  if (!seen('chart')) return;
   const sel = SEL, all = barsFor(sel), bars = TF ? all.slice(-TF) : all;
   const cv = $('chart'), [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
   const vc = $('volc'), [vx, vW, vH] = fit(vc); vx.clearRect(0, 0, vW, vH);
@@ -731,12 +748,13 @@ const IND_GROUPS = [
 ];
 const METRICS = IND_GROUPS.flatMap(([, ms]) => ms);
 const GTAG = { Market: 'MARKET', Breadth: 'BREADTH', 'Order flow': 'FLOW', Supply: 'SUPPLY', 'Short selling': 'SHORTS', Money: 'MONEY', Credit: 'CREDIT', 'Knowledge and trust': 'TRUST', Population: 'PEOPLE' };
-const metricSeries = (m, upto = ix()) => {
-  const out = [];
-  if (m.cum) { let s = 0; for (let i = 0; i <= upto; i++) { const b = breadth(i); if (b) s += b.adv - b.dec; out.push(s); } return out; }
-  for (let i = 0; i <= upto; i++) { const v = m.get(FRAMES[i], i); out.push(v == null || !isFinite(v) ? null : v); }
-  return out;
-};
+// Every indicator value is worked out once per week and kept on that week's frame (frames never change once in)
+function mval(m, i) {
+  const f = FRAMES[i], c = (f._m ||= {}); if (m.key in c) return c[m.key];
+  if (m.cum) { let j = i; while (j > 0 && !(m.key in (FRAMES[j - 1]._m ||= {}))) j--; let s = j > 0 ? FRAMES[j - 1]._m[m.key] : 0; for (; j <= i; j++) { const b = breadth(j); if (b) s += b.adv - b.dec; (FRAMES[j]._m ||= {})[m.key] = s; } return s; }
+  const v = m.get(f, i); return (c[m.key] = v == null || !isFinite(v) ? null : v);
+}
+const metricSeries = (m, upto = ix(), from = 0) => { const out = []; for (let i = Math.max(0, from); i <= upto; i++) out.push(mval(m, i)); return out; };
 // A market-site mini chart: the last 52 weeks, green when it ended above where it started and red when below, a dotted
 // baseline at the start, a fading fill, high and low marks, and a dot on the latest value
 const UP = '#26c281', DN = '#ff5c5c';
@@ -767,12 +785,13 @@ addEventListener('resize', () => evenTiles());
 // The indicators board: built once, then only values and sparklines change each week
 function drawIndicators() {
   const f = cur(); const host = $('ind'); if (!f || !host) return; const at = ix();
+  if (host.dataset.built && !seen(host)) return;
   if (!host.dataset.built) {
     host.innerHTML = IND_GROUPS.map(([g, ms]) => `<div class="indg"><h3>${g}${INFO[g] ? ' ' + infoBtn(g) : ''}</h3><div class="indt">${ms.map((m) => `<div class="qt" role="button" tabindex="0" data-metric="${m.key}" title="${esc(m.label)}: click to chart it"><span class="qt__top"><span class="qt__name">${m.label}${infoBtn(m.key)}</span><span class="qt__tf">52W</span></span><span class="qt__row"><b data-v></b><span class="qt__chg" data-c></span></span><canvas aria-hidden="true"></canvas></div>`).join('')}</div></div>`).join('');
     host.dataset.built = '1'; evenTiles();
   }
   for (const el of host.querySelectorAll('[data-metric]')) {
-    const m = METRICS.find((x) => x.key === el.dataset.metric), d = metricSeries(m, at), v = d[d.length - 1], on = SEL.type === 'metric' && SEL.key === m.key;
+    const m = METRICS.find((x) => x.key === el.dataset.metric), d = metricSeries(m, at, at - 51), v = d[d.length - 1], on = SEL.type === 'metric' && SEL.key === m.key;
     el.setAttribute('aria-pressed', String(on)); el.querySelector('[data-v]').textContent = v == null ? '–' : m.show(v);
     const w = d.slice(-52), r = spark(el.querySelector('canvas'), w, m.show, m.zero, on), c = el.querySelector('[data-c]');
     if (!r) { c.textContent = ''; continue; }
@@ -937,9 +956,9 @@ let MAPK = 4, STUD = { ma: true, bb: false, rsi: true }, watchAll = false, lbAll
 function drawStatus() {
   const f = cur(), at = ix(); if (!f) return;
   const p1 = FRAMES[Math.max(0, at - 1)]?.h.p ?? f.h.p, b = breadth(at) || {}, o = f.ord || {};
-  const st = mode === 'replay' ? `<span class="paused">REPLAY</span>` : playing ? `<span class="live">LIVE</span>` : `<span class="paused">PAUSED</span>`;
-  const item = (k, v) => `<span>${k}<b>${v}</b></span>`;
-  $('status').html = [st, item('WK', f.t), item('SEASON', f.season || '–'), `<span>VAULT<b>${f.h.p.toFixed(1)}</b> ${chgSpan(f.h.p / p1 - 1)}</span>`, item('PREMIUM', f.mkt?.vcap ? ((f.mkt.mcap / f.mkt.vcap - 1) * 100).toFixed(1) + '%' : '–'), `<span>A/D<b><span class="up">${b.adv ?? 0}</span>/<span class="down">${b.dec ?? 0}</span></b></span>`, item('VOL', b.vix == null ? '–' : (b.vix * 100).toFixed(1) + '%'), item('TRADES', f.h.trades), item('COINS TRADED', fmt(o.coins)), item('BUY PRESSURE', o.bids + o.asks ? pct(o.bids / (o.bids + o.asks)) : '–'), item('RATE', f.mkt?.rate == null ? '–' : (f.mkt.rate * 100).toFixed(2) + '%'), item('BOTS', f.bots.length), f.top?.[0] ? item('TOP CARD', `${esc(f.top[0].label)} ${fmt(f.top[0].P)}`) : ''].join('');
+  $('statusBadge').html = mode === 'replay' ? `<span class="paused">REPLAY</span>` : playing ? `<span class="live">LIVE</span>` : `<span class="paused">PAUSED</span>`;
+  const item = (k, v, w) => `<span style="width:${k.length + w + 4}ch">${k}<b>${v}</b></span>`; // w = the widest the value gets
+  marquee($('statusView'), $('statusSet'), $('statusSet2'), [item('WK', f.t, 4), item('SEASON', f.season || '–', 4), `<span style="width:20ch">VAULT<b>${f.h.p.toFixed(1)}</b> ${chgSpan(f.h.p / p1 - 1)}</span>`, item('PREMIUM', f.mkt?.vcap ? ((f.mkt.mcap / f.mkt.vcap - 1) * 100).toFixed(1) + '%' : '–', 7), `<span style="width:13ch">A/D<b><span class="up">${b.adv ?? 0}</span>/<span class="down">${b.dec ?? 0}</span></b></span>`, item('VOL', b.vix == null ? '–' : (b.vix * 100).toFixed(1) + '%', 6), item('TRADES', f.h.trades, 6), item('COINS TRADED', fmt(o.coins), 8), item('BUY PRESSURE', o.bids + o.asks ? pct(o.bids / (o.bids + o.asks)) : '–', 4), item('RATE', f.mkt?.rate == null ? '–' : (f.mkt.rate * 100).toFixed(2) + '%', 6), item('BOTS', f.bots.length, 4), `<span style="width:58ch">TOP CARD<b>${f.top?.[0] ? `${esc(f.top[0].label)} ${fmt(f.top[0].P)}` : '–'}</b></span>`].join(''));
 }
 // Squarified treemap: rectangles close to square, biggest first
 function squarify(items, x, y, w, h) {
@@ -960,7 +979,7 @@ const mapCol = (r) => { if (r == null) return 'rgb(34,34,38)'; const t = C(r / (
 let MAPR = [];
 scale('scaleMap', 'down', 'up', (t) => mapCol(((t * 2 - 1) * 0.2)));
 function drawMap() {
-  const at = ix(), f = FRAMES[at]; if (!f?.prices) return;
+  const at = ix(), f = FRAMES[at]; if (!f?.prices || !seen('map')) return;
   const cv = $('map'), [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
   const back = FRAMES[Math.max(0, at - MAPK)]?.prices || f.prices;
   const groups = SECTORS.map((pos) => ({ pos, v: 0, kids: [] }));
