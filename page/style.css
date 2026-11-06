@@ -222,7 +222,12 @@
   .indboard { display: grid; gap: 14px; }
   .indg { display: grid; gap: 6px; }
   .indg h3 { font: 800 13px/1 var(--display); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0; }
-  .indt { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 6px; }
+  .indt { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(188px, 100%), 1fr)); gap: 6px; }
+  .qt { overflow: hidden; }
+  .qt__row b { flex: 1 1 auto; min-width: 0; }
+  .qt__chg { flex: none; }
+  .qt__name { min-width: 0; flex: 1 1 auto; }
+  .qt__tf { flex: none; }
   .qt { all: unset; cursor: pointer; display: grid; gap: 4px; padding: 10px 11px 9px; border-radius: 8px; background: #0d1222; box-shadow: inset 0 0 0 1px var(--line); min-width: 0; }
   .qt:hover { box-shadow: inset 0 0 0 1px var(--muted); }
   .qt[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--gold); }
@@ -260,4 +265,44 @@
     #gTopic td:first-child, #gTopic td:nth-child(2) { white-space: normal; }
   }
   @media (max-width: 560px) { .movers { grid-template-columns: minmax(0, 1fr); } .status { font-size: 11px; gap: 2px 12px; } }
+
+  /* Market-data sections: a quote table beside the group's charts and tables */
+  .mod__body { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px 18px; align-items: start; }
+  .mod__side { display: grid; gap: 12px; min-width: 0; }
+  .fx { display: grid; gap: 6px; min-width: 0; position: relative; }
+  .fx h3, .mini h3 { font: 800 13px/1.1 var(--display); text-transform: uppercase; letter-spacing: 0.04em; margin: 0; }
+  .minis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .minis--one { grid-template-columns: minmax(0, 1fr); }
+  .mini { display: grid; gap: 4px; min-width: 0; }
+  .mini table { font-size: 12px; } .mini td:first-child { white-space: normal; }
+  .qtab { font-size: 12.5px; }
+  .qtab th { padding-bottom: 7px; }
+  .qtab td { padding: 6px 5px; vertical-align: middle; }
+  .qtab tr[data-metric] { cursor: pointer; }
+  .qtab tr[data-metric]:hover td { background: var(--panel-2); }
+  .qtab tr.on td { background: rgb(255 200 61 / 0.07); }
+  .qtab tr.on td:first-child { box-shadow: inset 2px 0 0 var(--gold); }
+  .qname { font-weight: 600; }
+  .qtab td.num { font-size: 12.5px; }
+  .qtab td.num[data-v] { font-weight: 700; color: var(--chalk); }
+  th.rng, td.rng { width: 22%; min-width: 110px; }
+  .rbar { position: relative; display: block; height: 4px; border-radius: 2px; background: rgb(150 162 196 / 0.2); margin: 2px 0 4px; }
+  .rbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: rgb(156 199 255 / 0.45); }
+  .rbar b { position: absolute; top: -3px; width: 2px; height: 10px; margin-left: -1px; background: var(--chalk); border-radius: 1px; }
+  .rlh { display: flex; justify-content: space-between; font: 500 9.5px/1 var(--mono); color: var(--faint); gap: 6px; }
+  th.sp, td.sp { width: 96px; }
+  td.sp canvas { width: 92px; height: 28px; }
+  /* Info cards */
+  .info { all: unset; cursor: pointer; display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%; font: 700 10px/1 var(--body); font-style: italic; color: var(--muted); box-shadow: inset 0 0 0 1px var(--faint); vertical-align: 1px; text-transform: none; letter-spacing: 0; }
+  .info:hover, .info:focus-visible { color: var(--bg); background: var(--gold); box-shadow: none; }
+  .infocard { position: absolute; z-index: 50; padding: 10px 12px; border-radius: 10px; background: #1d2540; box-shadow: 0 10px 30px rgb(0 0 0 / 0.55), inset 0 0 0 1px var(--line); font: 500 12.5px/1.5 var(--body); color: var(--chalk); }
+  .infocard b { font: 800 14px/1.2 var(--display); letter-spacing: 0.02em; display: inline-block; margin-bottom: 3px; }
+  @media (max-width: 1100px) { .mod__body { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 640px) { th.rng, td.rng { display: none; } th.sp, td.sp { width: 70px; } td.sp canvas { width: 66px; } .minis { grid-template-columns: minmax(0, 1fr); } .qtab td:first-child { white-space: normal; } }
+  /* A row whose number just moved flashes, then fades */
+  @keyframes flashUp { from { background: rgb(38 194 129 / 0.28); } to { background: transparent; } }
+  @keyframes flashDn { from { background: rgb(255 92 92 / 0.26); } to { background: transparent; } }
+  .flash-up, .flash-up td { animation: flashUp 0.9s ease-out; } .flash-dn, .flash-dn td { animation: flashDn 0.9s ease-out; }
+  @media (prefers-reduced-motion: reduce) { .flash-up, .flash-up td, .flash-dn, .flash-dn td { animation: none; } }
+  @media (max-width: 640px) { .qtab th:nth-child(3), .qtab td:nth-child(3) { display: none; } }
 </style>

@@ -78,6 +78,7 @@ async function saveRun() {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(run)], { type: 'application/json' })); a.download = `${run.meta.id || 'run'}.json`; document.body.appendChild(a); a.click(); a.remove();
 }
 const sendSel = () => tell({ cmd: 'sel', p: SEL.type === 'card' ? SEL.id : null, b: ACCT });
+let frameT = -1e9; const TWEEN = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 260;
 let playing = !matchMedia('(prefers-reduced-motion: reduce)').matches, speed = 1, acc = 0, lastT = 0, panelT = 0, chartT = 0;
 const KEYS = ['p', 'f', 'bub', 'gini', 'share', 'trades', 'pass', 'informed', 'flags', 'shares', 'thefts', 'gamePacks'];
 function newHist() { H = Object.fromEntries(KEYS.map((k) => [k, []])); H.ticket = []; H.skill = []; H.mcap = []; H.vcap = []; H.cashTop = []; H.bank = []; }
@@ -249,13 +250,12 @@ crosshair('notes', (i) => `<b>${when(FRAMES[i].t)}</b><br>Swaps <span class="mon
 crosshair('strat', (i) => `<b>${when(FRAMES[i].t)}</b><br>` + GROUPS.map((a, k) => [a, H.share[i][k] || 0]).map(([a, v]) => `<span class="sw" style="background:${a.color}"></span>${a.label} hold <span class="mono">${pct(v)}</span>`).join('<br>'));
 function drawCharts() {
   line('cashTop', [{ data: H.cashTop, color: '#e66767', fill: true }], { fy: (v) => pct(v), min: 0 });
-  drawMain();
   line('access', [{ data: H.pass, color: COL.gold }, { data: H.ticket, color: '#9cc7ff' }], { fy: (v) => v.toFixed(1), min: 0 });
   line('wins', [{ data: H.skill, color: '#3987e5', fill: true }], { fy: (v) => v.toFixed(2), ref: 0 });
   line('gini', [{ data: H.gini, color: '#3987e5', fill: true }], { fy: (v) => v.toFixed(2), min: 0, max: 0.4 });
   line('notes', [{ data: H.shares, color: '#3987e5' }, { data: H.thefts, color: '#e66767' }], { fy: (v) => Math.round(v), min: 0 });
   stack('strat', H.share);
-  drawHeatmaps();
+  drawFeatures();
 }
 
 /* ---------- Heatmaps ---------- */
@@ -337,6 +337,19 @@ scale('scaleSec', '−15%', '+15%', (t) => { const u = t * 2 - 1; return u >= 0 
 scale('scaleBots', '¼×', '4× median', (t) => divergeInv(t * 2 - 1));
 
 /* ---------- Panels ---------- */
+// Lists update in place: each row is kept by its key and only rewritten when its content changes; a row whose number
+// moved flashes green or red for a moment, the way a trading screen does. Nothing is rebuilt, so nothing jumps.
+function patchRows(host, rows) {
+  const have = new Map([...host.children].map((el) => [el.dataset.k, el]));
+  rows.forEach(({ key, html, val }, i) => {
+    let el = have.get(String(key));
+    if (!el) { const t = document.createElement('template'); t.innerHTML = html.trim(); el = t.content.firstElementChild; el.dataset.k = key; el._h = html; el._v = val; }
+    else { have.delete(String(key)); if (el._h !== html) { const t = document.createElement('template'); t.innerHTML = html.trim(); const n = t.content.firstElementChild; for (const a of [...el.attributes]) if (a.name !== 'data-k' && a.name !== 'class') el.removeAttribute(a.name); for (const a of [...n.attributes]) if (a.name !== 'class') el.setAttribute(a.name, a.value); el.innerHTML = n.innerHTML; el._h = html; }
+      if (val != null && el._v != null && val !== el._v) { el.classList.remove('flash-up', 'flash-dn'); void el.offsetWidth; el.classList.add(val > el._v ? 'flash-up' : 'flash-dn'); } el._v = val; }
+    if (host.children[i] !== el) host.insertBefore(el, host.children[i] || null);
+  });
+  for (const el of have.values()) el.remove();
+}
 const pill = (r) => (r > 1.2 ? '<span class="pill pill--hot">▲ rich</span>' : r < 0.85 ? '<span class="pill pill--cool">▼ cheap</span>' : '<span class="pill pill--fair">fair</span>');
 let libId = 0;
 function series(id) {
@@ -348,7 +361,8 @@ function gameRows(tableId, rows) {
   const used = rows.filter((r) => r[1][0]), max = Math.max(0.01, ...used.map((r) => r[1][1] / r[1][0]));
   $(tableId).tBodies[0].innerHTML = used.map(([label, [p, w, k], color]) => `<tr><td>${color ? `<span class="sw" style="background:${color}"></span>` : ''}${esc(label)}</td><td class="num">${p.toLocaleString()}</td><td class="num">${pct(w / p)}</td><td class="bar"><span style="width:${((w / p) / max) * 100}%;${color ? `background:${color}` : ''}"></span></td><td class="num">${(k / p).toFixed(3)}</td></tr>`).join('') || '<tr><td colspan="5" class="k">No games played.</td></tr>';
 }
-function drawPanels() {
+// Fast: what changes every week and is cheap to update in place (tiles, lists, quote tables). Slow: the rest.
+function drawFast() {
   const f = cur(), n = nNow(); if (!f) return;
   const g4 = gamesOver(n - 1, 4), games = Object.values(g4.game).reduce((s, x) => s + x[0], 0), pots = Object.values(g4.game).reduce((s, x) => s + x[1], 0);
   $('kWeek').textContent = String(f.t); $('kWeekS').textContent = `${f.season ? `season ${f.season} · ` : ''}gen ${Math.floor(Math.max(0, f.t - 1) / gpw()) + 1}${mode === 'replay' ? ` · replay ${cursor + 1}/${FRAMES.length}` : ''}`;
@@ -361,7 +375,13 @@ function drawPanels() {
   const ranked = f.bots.slice().sort((a, b) => b[3] - a[3]);
   $('kBank').textContent = f.mkt?.rate == null ? '–' : (f.mkt.rate * 100).toFixed(2) + '%'; $('kBankS').textContent = `per week · loans ${f.mkt?.mcap ? pct(f.mkt.debt / f.mkt.mcap) : '–'} of market · ${f.mkt?.defaults ?? 0} defaults`;
   const pctS = (v) => (v == null ? '–' : `<span class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${Math.round(v * 100)}%</span>`);
-  $('lb').tBodies[0].innerHTML = (lbAll ? ranked : ranked.slice(0, 20)).map((b) => `<tr data-bot="${b[0]}" title="${esc(b[2])} · ${kindOf(b)} · gen ${b[10]}${b[6] >= 5 ? ' · flagged' : ''}"><td><span class="sw" style="background:${grpColor(b)}"></span>${esc(b[2])}${b[9] ? ' <span class="pill pill--fair">AI</span>' : ''}${b[6] >= 5 ? ' <span class="pill pill--hot">flagged</span>' : ''}</td><td class="num">${fmt(b[3])}</td><td class="num">${pctS(b[16])}</td><td class="num">${pctS(b[13])}</td></tr>`).join('');
+  patchRows($('lb').tBodies[0], (lbAll ? ranked : ranked.slice(0, 20)).map((b) => ({ key: b[0], val: b[3], html: `<tr data-bot="${b[0]}" title="${esc(b[2])} · ${kindOf(b)} · gen ${b[10]}${b[6] >= 5 ? ' · flagged' : ''}"><td><span class="sw" style="background:${grpColor(b)}"></span>${esc(b[2])}${b[9] ? ' <span class="pill pill--fair">AI</span>' : ''}${b[6] >= 5 ? ' <span class="pill pill--hot">flagged</span>' : ''}</td><td class="num">${fmt(b[3])}</td><td class="num">${pctS(b[16])}</td><td class="num">${pctS(b[13])}</td></tr>` })));
+  drawWatch(); drawStatus(); drawGroups(); drawMvc(f);
+  $('lbMore').textContent = lbAll ? 'Show top 20' : `Show all ${f.bots.length} bots`;
+}
+function drawPanels() {
+  const f = cur(), n = nNow(); if (!f) return; drawFast();
+  const g4 = gamesOver(n - 1, 4);
   { const rows = Object.entries(GAMES).map(([g, d]) => [g, d, g4.game[g] || [0, 0, 0, 0]]).sort((a, b) => (b[2][3] ? b[2][2] / b[2][3] : -1) - (a[2][3] ? a[2][2] / a[2][3] : -1));
     $('gTopic').tBodies[0].innerHTML = rows.map(([g, d, [e, pot, sk, kn]]) => { const r = kn ? sk / kn : null; return `<tr title="${esc(d.skill)}"><td>${esc(d.label)}</td><td class="k">${esc(f.topics?.[g] || '')}</td><td class="num">${e.toLocaleString()}</td><td class="num">${fmt(pot)}</td><td class="num">${r == null ? '–' : r.toFixed(2)}</td><td class="bar"><span class="${r != null && r < 0 ? 'neg' : ''}" style="width:${r == null ? 0 : Math.min(100, Math.abs(r) * 100)}%"></span></td></tr>`; }).join(''); }
   { const rows = GROUPS.map((g, a) => [a, g4.arch[a]]), max = Math.max(0.01, ...rows.map(([, x]) => (x[0] ? x[1] / x[0] : 0)));
@@ -377,13 +397,14 @@ function drawPanels() {
     const draw = (d, col, dash) => { x.beginPath(); let on = false; d.forEach((v, k) => { if (v == null) { on = false; return; } const px = Wd - 2 - ((d.length - 1 - k) / 59) * (Wd - 4), py = Ht - 3 - ((v - lo) / sp) * (Ht - 6); on ? x.lineTo(px, py) : x.moveTo(px, py); on = true; }); x.setLineDash(dash ? [3, 3] : []); x.strokeStyle = col; x.lineWidth = 1.5; x.stroke(); x.setLineDash([]); };
     draw(F, COL.chalk, true); draw(P, COL.gold, false);
   });
+  drawFeed(); drawTape(); drawAcct(); drawCons(); drawDetail();
+  drawMovers(); drawSectors(); drawMap(); drawCalendar(); drawHeatmaps();
+}
+function drawMvc(f) {
   { // The most valuable card in circulation this week, and the next two
     const tops = f.top || [];
     $('mvc').innerHTML = tops.map((x, i) => `<button type="button" class="${i ? '' : 'first'}" data-card="${x.pid}" data-lib="${x.pid}"><span>${i ? `No. ${i + 1}` : 'Most valuable card'}</span><b>${esc(x.label)}</b><small><span class="mono" style="font-size:inherit;color:var(--chalk);text-transform:none;letter-spacing:0">${fmt(x.P)}</span> coins · value ${fmt(x.F)} · ${x.owner ? (x.owner.startsWith('up for') ? esc(x.owner) : `held by ${esc(x.owner)}`) : 'no holder found'}${x.n > 1 ? ` · ${x.n} copies` : ''}</small></button>`).join('');
   }
-  drawFeed(); drawTape(); drawWatch(); drawAcct(); drawCons(); drawDetail();
-  drawStatus(); drawIndicators(); drawMovers(); drawSectors(); drawMap(); drawCalendar();
-  $('lbMore').textContent = lbAll ? 'Show top 20' : `Show all ${f.bots.length} bots`;
 }
 function drawLibrary() {
   const p = LIBRARY.players[libId]; if (!p) return;
@@ -469,8 +490,9 @@ function loop(ts) {
   if (mode === 'live') { ran = dirty; dirty = false; } // the worker sets the pace
   else if (playing) { acc += dt * 3 * speed; while (acc >= 1) { if (!advance()) { acc = 0; break; } acc -= 1; ran = true; } }
   drawFloor();
-  if (ran && ts - chartT > 120) { drawCharts(); chartT = ts; }
-  if (ran && ts - panelT > 500) { drawPanels(); panelT = ts; }
+  if (ran) { frameT = ts; drawFast(); drawCharts(); } // a new week: tiles, lists and small charts update at once
+  if (ts - frameT < TWEEN + 40 || MAIN.hi != null) drawMain(); // the main chart slides the new week in
+  if (ran && ts - panelT > 500) { drawPanels(); panelT = ts; } // heatmaps, map, feed, account: every half second
   requestAnimationFrame(loop);
 }
 function redrawAll() { $('stratLegend').innerHTML = GROUPS.map((g) => `<span><i style="background:${g.color}"></i>${g.label}</span>`).join(''); drawFloor(); drawCharts(); drawPanels(); libId = cur().hot[0]?.[0] ?? 0; $('libPick').value = libId; drawLibrary(); }
@@ -494,7 +516,7 @@ Object.assign(COL, { chalk: css('--chalk'), muted: css('--muted'), faint: css('-
 let acctScroll = false; // scroll to the account once it has drawn the newly clicked bot
 let SEL = { type: 'market' }, ACCT = null, TF = 52, CMODE = 'line', wsortKey = 'vol', wq = '';
 const cfgNow = () => (mode === 'replay' ? RUN.config : LIVECFG || {});
-function select(s) { SEL = s; if (mode === 'live') sendSel(); if (FRAMES.length) { drawMap(); drawIndicators(); } $('toMarket').hidden = s.type === 'market'; if (s.type === 'card') { libId = s.id; $('libPick').value = s.id; drawLibrary(); } drawMain(); drawDetail(); drawWatch(); }
+function select(s) { SEL = s; if (mode === 'live') sendSel(); if (FRAMES.length) { drawMap(); drawGroups(); } $('toMarket').hidden = s.type === 'market'; if (s.type === 'card') { libId = s.id; $('libPick').value = s.id; drawLibrary(); } drawMain(); drawDetail(); drawWatch(); }
 function selectBot(id) { ACCT = id; SEL = { type: 'bot', id }; if (mode === 'live') sendSel(); acctScroll = true; $('toMarket').hidden = false; drawMain(); drawDetail(); drawAcct(); }
 $('toMarket').addEventListener('click', () => select({ type: 'market' }));
 document.querySelectorAll('#tf [data-tf]').forEach((b) => b.addEventListener('click', () => { TF = +b.dataset.tf; document.querySelectorAll('#tf [data-tf]').forEach((o) => o.setAttribute('aria-pressed', String(o === b))); drawMain(); }));
@@ -533,7 +555,7 @@ function drawWatch() {
   const by = { vol: (a, b) => b.vol4 - a.vol4, up: (a, b) => b.chg - a.chg, down: (a, b) => a.chg - b.chg, cap: (a, b) => b.P * (b.circ ?? 1) - a.P * (a.circ ?? 1), rich: (a, b) => b.P / b.F - a.P / a.F, cheap: (a, b) => a.P / a.F - b.P / b.F }[wsortKey];
   rows.sort(by);
   $('watchMore').textContent = watchAll ? 'Show top 14' : `Show all ${rows.length} players`;
-  $('watch').innerHTML = (watchAll ? rows : rows.slice(0, 14)).map((r) => `<button type="button" class="wrow" role="option" data-card="${r.id}" aria-selected="${SEL.type === 'card' && SEL.id === r.id}"><b>${r.p.pos} ${esc(r.p.name)}</b><span class="px">${fmt(r.P)}</span><small>${esc(teamShort(r.p.team))} · OVR ${ovrOf(r.id)}${riskNow(r.id) != null ? ` · risk ${Math.round(riskNow(r.id))}` : ''} · ${r.vol4} trades · ${(r.P / r.F).toFixed(2)}×</small><span class="chg">${chgSpan(r.chg)}</span></button>`).join('');
+  patchRows($('watch'), (watchAll ? rows : rows.slice(0, 14)).map((r) => ({ key: r.id, val: r.P, html: `<button type="button" class="wrow" role="option" data-card="${r.id}" aria-selected="${SEL.type === 'card' && SEL.id === r.id}"><b>${r.p.pos} ${esc(r.p.name)}</b><span class="px">${fmt(r.P)}</span><small>${esc(teamShort(r.p.team))} · OVR ${ovrOf(r.id)}${riskNow(r.id) != null ? ` · risk ${Math.round(riskNow(r.id))}` : ''} · ${r.vol4} trades · ${(r.P / r.F).toFixed(2)}×</small><span class="chg">${chgSpan(r.chg)}</span></button>` })));
 }
 
 // Bars for the main chart: [{t, o, h, l, c, v, val}]
@@ -568,11 +590,16 @@ function drawMain() {
   $('chLegend').innerHTML = `<span><i class="line" style="background:var(--gold)"></i>${sel.type === 'bot' ? 'Worth' : met ? met.label : 'Price'}</span>${valLabel ? `<span><i class="dash"></i>${valLabel}</span>` : ''}${sel.type !== 'bot' && STUD.ma ? '<span><i class="line" style="background:#9085e9"></i>4W avg</span><span><i class="line" style="background:#4fd18b"></i>12W avg</span>' : ''}${sel.type !== 'bot' && STUD.bb ? '<span><i class="line" style="background:#9cc7ff"></i>Bands</span>' : ''}`;
   if (!bars.length) return;
   const pad = { l: 8, r: 58, t: 10, b: 18 }, iw = Wd - pad.l - pad.r, ih = Ht - pad.t - pad.b;
+  // The newest week slides in from the right and its value glides from the week before
+  const tw = TWEEN && bars.length > 1 ? C((performance.now() - frameT) / TWEEN, 0, 1) : 1, ease = 1 - (1 - tw) ** 3;
+  if (ease < 1) { const k = bars.length - 1, a = bars[k - 1], z = bars[k], c = a.c + (z.c - a.c) * ease; bars[k] = { ...z, c, h: Math.max(z.o, c), l: Math.min(z.o, c), v: z.v * ease }; }
+  const SH = (1 - ease) * (iw / bars.length);
   let lo = Infinity, hi = -Infinity; for (const b of bars) { lo = Math.min(lo, b.l, b.val ?? Infinity); hi = Math.max(hi, b.h, b.val ?? -Infinity); }
   const sp = hi - lo || hi || 1; lo -= sp * 0.06; hi += sp * 0.06; if (!(met && met.zero)) lo = Math.max(0, lo);
-  const X = (i) => pad.l + (iw * (i + 0.5)) / bars.length, Y = (v) => pad.t + ih * (1 - (v - lo) / (hi - lo)), bw = Math.max(1, (iw / bars.length) * 0.66);
+  const X = (i) => pad.l + (iw * (i + 0.5)) / bars.length + SH, Y = (v) => pad.t + ih * (1 - (v - lo) / (hi - lo)), bw = Math.max(1, (iw / bars.length) * 0.66);
   x.font = `500 10px ${css('--mono')}`; x.textBaseline = 'middle';
   for (let i = 0; i <= 5; i++) { const v = lo + ((hi - lo) * i) / 5, y = Y(v); x.fillStyle = 'rgba(255,255,255,0.06)'; x.fillRect(pad.l, Math.round(y), iw, 1); x.fillStyle = COL.faint; x.fillText(show(v), Wd - pad.r + 6, y); }
+  x.save(); x.beginPath(); x.rect(pad.l, 0, iw, Ht); x.clip();
   x.textBaseline = 'alphabetic'; x.fillStyle = COL.faint;
   const step = Math.max(1, Math.ceil(bars.length / 8)); for (let i = 0; i < bars.length; i += step) x.fillText(`W${bars[i].t}`, X(i) - 8, Ht - 3);
   // Hidden value (or median) line
@@ -585,6 +612,7 @@ function drawMain() {
     x.beginPath(); bars.forEach((b, i) => (i ? x.lineTo(X(i), Y(b.c)) : x.moveTo(X(i), Y(b.c)))); x.strokeStyle = COL.gold; x.lineWidth = 2; x.stroke();
   }
   if (sel.type !== 'bot') drawStudies(x, bars, X, Y);
+  x.restore();
   // Last price tag
   if (last) { const y = Y(last.c); x.fillStyle = COL.gold; x.fillRect(Wd - pad.r + 2, y - 8, pad.r - 4, 16); x.fillStyle = '#1a1205'; x.font = `700 10px ${css('--mono')}`; x.textBaseline = 'middle'; x.fillText(show(last.c), Wd - pad.r + 6, y); }
   // Volume
@@ -700,6 +728,7 @@ const IND_GROUPS = [
   ]],
 ];
 const METRICS = IND_GROUPS.flatMap(([, ms]) => ms);
+const GTAG = { Market: 'MARKET', Breadth: 'BREADTH', 'Order flow': 'FLOW', Supply: 'SUPPLY', 'Short selling': 'SHORTS', Money: 'MONEY', Credit: 'CREDIT', 'Knowledge and trust': 'TRUST', Population: 'PEOPLE' };
 const metricSeries = (m, upto = ix()) => {
   const out = [];
   if (m.cum) { let s = 0; for (let i = 0; i <= upto; i++) { const b = breadth(i); if (b) s += b.adv - b.dec; out.push(s); } return out; }
@@ -727,22 +756,110 @@ function spark(cv, d, show, zero, selected) {
   if (show && Wd > 120) { x.font = `500 9px ${css('--mono')}`; x.fillStyle = COL.faint; x.textBaseline = 'top'; x.textAlign = X(iHi) > Wd / 2 ? 'right' : 'left'; x.fillText('H ' + show(hi), C(X(iHi), 2, Wd - 2), 0); x.textBaseline = 'bottom'; x.textAlign = X(iLo) > Wd / 2 ? 'right' : 'left'; x.fillText('L ' + show(lo), C(X(iLo), 2, Wd - 2), Ht); x.textAlign = 'left'; x.textBaseline = 'alphabetic'; }
   return { first, last, up };
 }
-// The indicators board: built once, then only values and sparklines change each week
-function drawIndicators() {
-  const f = cur(); if (!f) return; const host = $('ind'), at = ix();
-  if (!host.dataset.built) {
-    host.innerHTML = IND_GROUPS.map(([g, ms]) => `<div class="indg"><h3>${g}</h3><div class="indt">${ms.map((m) => `<button type="button" class="qt" data-metric="${m.key}" title="${esc(m.desc)} · click to chart it"><span class="qt__top"><span class="qt__name">${m.label}</span><span class="qt__tf">52W</span></span><span class="qt__row"><b data-v></b><span class="qt__chg" data-c></span></span><canvas aria-hidden="true"></canvas><small>${esc(m.desc)}</small></button>`).join('')}</div></div>`).join('');
-    host.dataset.built = '1';
+// The market-data sections: one quote table per group (every indicator with its last value, 1-week and 52-week
+// change, where it sits in its 52-week range, and its trend), with that group's charts and tables beside it
+const QROW = (m) => `<tr data-metric="${m.key}"><td><span class="qname">${m.label}</span>${infoBtn(m.key)}</td><td class="num" data-v></td><td class="num" data-c1></td><td class="num" data-c52></td><td class="rng"><span class="rbar"><i></i><b></b></span><span class="rlh"><span data-lo></span><span data-hi></span></span></td><td class="sp"><canvas aria-hidden="true"></canvas></td></tr>`;
+const chgOf = (m, a, b) => { if (a == null || b == null) return null; const rel = a > 0 && !m.zero && !m.noPct; return { rel, v: rel ? b / a - 1 : b - a }; };
+const chgHtml = (m, c) => (!c ? '<span class="k">–</span>' : Math.abs(c.v) < 1e-9 ? '<span class="k">0</span>' : `<span class="${c.v > 0 ? 'up' : 'down'}">${c.v > 0 ? '▲' : '▼'} ${c.rel ? Math.abs(c.v * 100).toFixed(1) + '%' : m.show(Math.abs(c.v))}</span>`);
+function drawGroups() {
+  const f = cur(); if (!f) return; const at = ix();
+  for (const tb of document.querySelectorAll('table.qtab')) {
+    const g = IND_GROUPS.find(([name]) => name === tb.dataset.group); if (!g) continue;
+    const body = tb.tBodies[0]; if (!body.dataset.built) { body.innerHTML = g[1].map(QROW).join(''); body.dataset.built = '1'; }
+    for (const tr of body.rows) {
+      const m = METRICS.find((x) => x.key === tr.dataset.metric), d = metricSeries(m, at), w = d.slice(-52), v = d[d.length - 1], on = SEL.type === 'metric' && SEL.key === m.key;
+      tr.classList.toggle('on', on);
+      tr.querySelector('[data-v]').textContent = v == null ? '–' : m.show(v);
+      const prev = d[Math.max(0, d.length - 2)], f52 = w.find((x) => x != null);
+      tr.querySelector('[data-c1]').innerHTML = chgHtml(m, chgOf(m, prev, v)); tr.querySelector('[data-c52]').innerHTML = chgHtml(m, chgOf(m, f52, v));
+      const vals = w.filter((x) => x != null), lo = vals.length ? Math.min(...vals) : null, hi = vals.length ? Math.max(...vals) : null;
+      const pos = v == null || lo == null || hi === lo ? 0.5 : (v - lo) / (hi - lo);
+      tr.querySelector('.rbar b').style.left = `${(pos * 100).toFixed(1)}%`; tr.querySelector('.rbar i').style.width = `${(pos * 100).toFixed(1)}%`;
+      tr.querySelector('[data-lo]').textContent = lo == null ? '' : m.show(lo); tr.querySelector('[data-hi]').textContent = hi == null ? '' : m.show(hi);
+      spark(tr.querySelector('canvas'), w, null, m.zero, on);
+    }
   }
-  for (const el of host.querySelectorAll('[data-metric]')) {
-    const m = METRICS.find((x) => x.key === el.dataset.metric), d = metricSeries(m, at), v = d[d.length - 1], on = SEL.type === 'metric' && SEL.key === m.key;
-    el.setAttribute('aria-pressed', String(on)); el.querySelector('[data-v]').textContent = v == null ? '–' : m.show(v);
-    const w = d.slice(-52), r = spark(el.querySelector('canvas'), w, m.show, m.zero, on), c = el.querySelector('[data-c]');
-    if (!r) { c.textContent = ''; continue; }
-    const rel = r.first > 0 && !m.zero && !m.noPct, ch = rel ? r.last / r.first - 1 : r.last - r.first, flat = Math.abs(ch) < 1e-9;
-    c.className = 'qt__chg ' + (flat ? '' : ch > 0 ? 'qt--up' : 'qt--dn');
-    c.textContent = flat ? '0' : `${ch > 0 ? '▲' : '▼'} ${rel ? Math.abs(ch * 100).toFixed(1) + '%' : m.show(Math.abs(ch))}`;
-  }
+}
+const MS = (k) => metricSeries(METRICS.find((m) => m.key === k));
+function drawFeatures() {
+  if (!FRAMES.length) return;
+  line('fxMkt', [{ data: MS('mcap'), color: COL.gold, fill: true }, { data: MS('vcap'), color: COL.chalk, dash: true }], { fy: fmt, min: 0 });
+  line('fxPrem', [{ data: MS('prem'), color: '#9cc7ff', fill: true }], { fy: (v) => (v * 100).toFixed(0) + '%', ref: 0 });
+  line('fxAD', [{ data: MS('adline'), color: '#26c281', fill: true }], { fy: (v) => fmt(v), ref: 0 });
+  line('fxFlow', [{ data: MS('bids'), color: '#26c281' }, { data: MS('asks'), color: '#ff8a8a' }], { fy: fmt, min: 0 });
+  line('fxShort', [{ data: MS('sopen'), color: '#ff8a8a', fill: true }, { data: MS('slend'), color: '#9cc7ff' }], { fy: fmt, min: 0 });
+  line('fxCards', [{ data: MS('cards'), color: COL.gold, fill: true }], { fy: fmt });
+  line('fxMint', [{ data: MS('minted'), color: COL.gold }, { data: MS('packs'), color: '#9cc7ff' }], { fy: fmt, min: 0 });
+  line('fxDebt', [{ data: MS('debt'), color: COL.gold, fill: true }], { fy: fmt, min: 0 });
+  line('fxRate', [{ data: MS('rate'), color: '#9cc7ff', fill: true }], { fy: (v) => (v * 100).toFixed(2) + '%', min: 0 });
+}
+const fxTip = (keys) => (i) => `<b>${when(FRAMES[i].t)}</b><br>` + keys.map((k) => { const m = METRICS.find((x) => x.key === k), v = metricSeries(m, i)[i]; return `${m.label} <span class="mono">${v == null ? '–' : m.show(v)}</span>`; }).join('<br>');
+[['fxMkt', ['mcap', 'vcap', 'prem']], ['fxPrem', ['prem']], ['fxAD', ['adline', 'adv', 'dec']], ['fxFlow', ['bids', 'asks', 'press']], ['fxShort', ['sopen', 'slend', 'sval']], ['fxCards', ['cards']], ['fxMint', ['minted', 'packs']], ['fxDebt', ['debt', 'lev']], ['fxRate', ['rate']]].forEach(([id, ks]) => crosshair(id, fxTip(ks)));
+
+/* ---------- Info cards: a small "i" beside every stat and every chart opens what it is ---------- */
+const INFO = {
+  // panels and charts, by their title
+  'Watchlist': 'Every player, sorted the way you choose. A player’s price is what his cards trade for, brought back to a Prizm Base equivalent. The multiple at the end of each row is his price ÷ hidden value.',
+  'Leaderboard': 'The richest bots right now: worth (cash + cards at their price − loans − cards owed on shorts), their 4-week return, and their return over the last full generation.',
+  'Market value vs hidden value': 'Gold: every card in circulation at the price it last traded for. Dashed: the same cards at their hidden value, which no bot sees. The gap between them is the premium.',
+  'Premium (market ÷ hidden value − 1)': 'Above zero the market pays more than cards are worth (a bubble); below zero it pays less (a discount).',
+  'Advance–decline line': 'Each week, the number of players whose price rose minus the number whose price fell, added up since week 0. A falling line means most players are sliding, even if the index is flat.',
+  'Bids vs offers per week': 'How many buy orders (green) and sell orders (red) bots placed in the weekly market. More offers than bids pushes prices down.',
+  'Short interest (copies on loan)': 'Red: borrowed copies sold short and not yet bought back. Blue: copies their holders offered to lend this week, the supply short sellers can borrow from.',
+  'Cards out': 'Every copy in circulation, one-of-a-kind cards included. It only grows when packs are opened.',
+  'New cards and packs per week': 'Gold: new copies pulled from packs. Blue: packs bought. New copies add supply, which weighs on prices.',
+  'Loans out': 'Coins lent between bots. There is no bank: every loan is one bot’s cash lent to another, secured by the borrower’s cards.',
+  'Loan rate per week': 'The rate the weekly credit auction cleared at: what borrowers paid lenders, per week.',
+  'Cash held by the richest 10%': 'The share of all coins held by the richest tenth of bots. Rising means cash is concentrating at the top.',
+  'Where the money goes': 'Over the last 20 weeks, by wealth group: realized profit and loss from selling cards, net cash in or out, and quick flips (cards sold within 12 weeks of buying).',
+  'Cost of access': 'What a research pass (gold) and a game ticket (blue) last sold for in their own weekly markets. Passes reveal a player’s library page and hidden risk rating; tickets enter the Arcade contests.',
+  'Notes': 'Notes swapped between friends (blue) and stolen (red) each week. A thief that is caught gets flagged, and bots that flagged it won’t share, trade or lend with it until the flag lifts.',
+  'Wealth share': 'How total wealth splits between the richest 10%, the next 40% and the bottom 50%, week by week.',
+  'Gini': 'Inequality of wealth: 0 means every bot is equally rich, 1 means one bot owns everything.',
+  'Sectors': 'The eight positions as sectors. Returns and price ÷ value are weighted by the cards each player has out; up / down counts players whose price rose or fell this week.',
+  'Sector returns over time': 'Each position’s 4-week return, week by week. Green rows are rising sectors, red falling ones.',
+  'Calendar': 'What the rules have scheduled: season changes, the end of each generation (royalties, selection, deaths), loans falling due, contests and flags.',
+  'Floor': 'Every bot as a dot. Further right means richer; higher means the cards it holds have a higher average OVR. Blue dots gained over 4 weeks, red ones lost.',
+  'What they learned': 'For each input of the card network, how much raising it pushes the richest bots toward buying (red) or selling (blue), measured on their own networks. These weights came from selection, not from anyone programming them.',
+  'OVR bands · price ÷ value': 'For players grouped by OVR, what their cards trade for against their hidden value, week by week.',
+  'Who holds which OVR bands': 'Which wealth group holds the value in each OVR band right now.',
+  'Wealth groups · 4-week return': 'The average 4-week return of the richest 10%, the next 40% and the bottom 50%.',
+  'Top 20 bots · worth vs median': 'The 20 richest bots now, and their worth against the median bot over time.',
+  'Games · last 4 weeks': 'The Arcade contests: entries, prize pots, and the skill index (does knowing more score more? 0 = luck, 1 = pure skill), overall and by wealth group.',
+  'Most traded': 'The players traded most over 20 weeks, with their price (gold) against hidden value (dashed).',
+  'Library page': 'A player’s page as a research pass shows it: stats, OVR, grade, Career Legacy and awards.',
+  'Feed': 'Everything that happens, newest first: headlines, trades, auctions, research, notes, games, packs, credit and shorts.',
+  'Account': 'The selected bot: worth, cash, realized and unrealized profit, its positions (shorts shown as −1), what its networks currently decide, and its recent activity.',
+  'Market map': 'Every player as a box sized by the market value of his cards out, coloured by price change over the chosen weeks, grouped by position.',
+  'Top gainers': 'Traded players with the biggest price rise over 4 weeks.', 'Top losers': 'Traded players with the biggest price fall over 4 weeks.',
+  'New 12-week highs': 'Players trading at their highest price in 12 weeks.', 'New 12-week lows': 'Players trading at their lowest price in 12 weeks.',
+  'Most active': 'Players with the most trades over 4 weeks.', 'Most shorted': 'Players with the most copies borrowed and sold short right now.',
+  'Market': 'The market as a whole. Each row: the latest value, its change over 1 week and 52 weeks, where it sits between its 52-week low and high, and its 52-week trend. Click a row to chart it full size.',
+  'Breadth': 'How many players move, not just how far: advancers, decliners, the advance–decline line, and new highs and lows.',
+  'Order flow': 'The orders bots placed: bids, offers, and how unfilled orders moved prices.',
+  'Short selling': 'Borrowing cards to sell them, betting the price will fall, and buying them back later.',
+  'Supply': 'New cards from packs, cards in circulation, and the auction market for one-of-a-kind cards.',
+  'Money': 'Coins entering (allowance, prizes), leaving (living costs) and who holds them.',
+  'Credit': 'Coin loans between bots: how much, at what rate, and how many go wrong.',
+  'Knowledge and trust': 'Research, notes, theft and the flags that follow it.',
+  'Population': 'How many bots trade, how many family lines survive, and how wealth is shared.',
+};
+const infoText = (k) => { const m = METRICS.find((x) => x.key === k); return m ? `<b>${esc(m.label)}</b><br>${esc(m.desc[0].toUpperCase() + m.desc.slice(1))}.<br><span class="k">Click the row to chart it full size.</span>` : INFO[k] ? `<b>${esc(k)}</b><br>${esc(INFO[k])}` : null; };
+function infoBtn(k) { return `<button type="button" class="info" data-info="${esc(k)}" aria-label="What is this?">i</button>`; }
+// Every panel and chart title gets an info button if there is a card for it
+for (const h of document.querySelectorAll('.panel h2, .panel h3')) { const t = h.textContent.trim(); if (INFO[t] && !h.querySelector('.info')) h.insertAdjacentHTML('beforeend', ' ' + infoBtn(t)); }
+{
+  const card = document.createElement('div'); card.className = 'infocard'; card.hidden = true; card.setAttribute('role', 'tooltip'); document.body.appendChild(card);
+  let pinned = null;
+  const show = (btn) => { const html = infoText(btn.dataset.info); if (!html) return; card.innerHTML = html; card.hidden = false; const r = btn.getBoundingClientRect(), w = Math.min(300, innerWidth - 24); card.style.width = w + 'px'; let x = r.left + r.width / 2 - w / 2; x = C(x, 12, innerWidth - w - 12); card.style.left = x + scrollX + 'px'; const below = r.bottom + 8 + card.offsetHeight < innerHeight; card.style.top = (below ? r.bottom + 8 : r.top - card.offsetHeight - 8) + scrollY + 'px'; };
+  const hide = () => { card.hidden = true; pinned = null; };
+  document.addEventListener('pointerover', (e) => { const b = e.target.closest('.info'); if (b && !pinned && e.pointerType === 'mouse') show(b); });
+  document.addEventListener('pointerout', (e) => { const b = e.target.closest('.info'); if (b && !pinned && e.pointerType === 'mouse') card.hidden = true; });
+  document.addEventListener('click', (e) => { const b = e.target.closest('.info'); if (b) { e.stopPropagation(); e.preventDefault(); if (pinned === b) hide(); else { pinned = b; show(b); } return; } if (!e.target.closest('.infocard')) hide(); }, true);
+  document.addEventListener('focusin', (e) => { const b = e.target.closest?.('.info'); if (b) show(b); });
+  document.addEventListener('focusout', (e) => { if (e.target.closest?.('.info') && !pinned) card.hidden = true; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+  addEventListener('scroll', () => { if (!pinned) card.hidden = true; }, { passive: true });
 }
 // Movers: gainers and losers over 4 weeks, most active, new 12-week highs and lows
 function moverRows(rows, extra) { return rows.length ? rows.map((r) => { const p = LIBRARY.players[r.id]; return `<tr data-card="${r.id}"><td>${p.pos} ${esc(p.name)}</td><td class="num">${fmt(r.P)}</td><td class="num">${extra(r)}</td></tr>`; }).join('') : '<tr><td class="k" colspan="3">None this week.</td></tr>'; }
@@ -786,7 +903,7 @@ function drawSectors() {
 function internalsHtml(f, at) {
   const b = breadth(at) || { adv: 0, dec: 0, unch: 0, hi: [], lo: [] }, o = f.ord || {};
   const bar = (l, r, lc, rc, ll, rl) => { const t = l + r || 1; return `<div class="ibar"><div class="ibar__lab"><span>${ll} <b>${Math.round(l).toLocaleString()}</b></span><span><b>${Math.round(r).toLocaleString()}</b> ${rl}</span></div><div class="ibar__track"><i style="width:${(l / t) * 100}%;background:${lc}"></i><i style="width:${(r / t) * 100}%;background:${rc}"></i></div></div>`; };
-  return `<div style="grid-column:1/-1;display:grid;gap:10px"><h3>Market internals this week</h3>${bar(b.adv, b.dec, '#4fd18b', '#ff8a8a', 'Advancers', 'decliners')}${bar(o.bids || 0, o.asks || 0, '#4fd18b', '#ff8a8a', 'Bids', 'offers')}${bar(o.pullUp || 0, o.pullDown || 0, '#4fd18b', '#ff8a8a', 'Quotes pulled up', 'pulled down')}${bar(b.hi.length, b.lo.length, '#4fd18b', '#ff8a8a', 'New highs', 'new lows')}${bar(o.aucSold || 0, (o.aucListed || 0) - (o.aucSold || 0), '#9cc7ff', '#5d6889', 'Auctions sold', 'unsold')}<p class="note">Every indicator, with its history, is in the board above. Click one to chart it here.</p></div>`;
+  return `<div style="grid-column:1/-1;display:grid;gap:10px"><h3>Market internals this week</h3>${bar(b.adv, b.dec, '#4fd18b', '#ff8a8a', 'Advancers', 'decliners')}${bar(o.bids || 0, o.asks || 0, '#4fd18b', '#ff8a8a', 'Bids', 'offers')}${bar(o.pullUp || 0, o.pullDown || 0, '#4fd18b', '#ff8a8a', 'Quotes pulled up', 'pulled down')}${bar(b.hi.length, b.lo.length, '#4fd18b', '#ff8a8a', 'New highs', 'new lows')}${bar(o.aucSold || 0, (o.aucListed || 0) - (o.aucSold || 0), '#9cc7ff', '#5d6889', 'Auctions sold', 'unsold')}<p class="note">Every indicator, with its history, is in the sections below the desk. Click one to chart it here.</p></div>`;
 }
 
 /* ---------- Terminal: status line, market map, calendar, chart studies ---------- */
