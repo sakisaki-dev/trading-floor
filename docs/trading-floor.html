@@ -199,7 +199,7 @@
       <span class="kicker gold">Retro Vault · Sandbox</span>
       <h1>The <em>Trading</em> Floor</h1>
     </div>
-    <p class="sub">Bots trade real players' cards, replaying the save's real seasons. A card is worth only what someone pays: the site's card value is shown here as a yardstick, but no bot ever sees it. Every bot starts with a random strategy genome; what works spreads.</p>
+    <p class="sub">Bots trade real players' cards against hidden values, replaying the save's real seasons. Every bot starts with a random strategy genome; what works spreads.</p>
   </header>
 
   <div class="bar" role="group" aria-label="Simulation controls">
@@ -453,9 +453,10 @@ const DEFAULTS = {
   lifespan: [6, 14],
   heirs: 2,
   populationCap: 1.15, // heirs beyond this × the starting population push the poorest bots out of the market
-  priceOnly: true, // a card is worth only what someone pays: no hidden value anywhere in the world (no royalties, packs priced
-                   // from market prices, no valuation contest, research shows what a card has traded for). Real seasons still
-                   // update the library's stats and the game questions, and bring rookies.
+  priceOnly: false, // a card is worth only what someone pays: no hidden value anywhere in the world (no royalties, packs priced
+                    // from market prices, no valuation contest, research shows what a card has traded for). Real seasons still
+                    // update the library's stats and the game questions, and bring rookies. Off by default: with nothing to
+                    // anchor them (holding earns nothing, cards have no use), prices ratchet down to about zero.
   history: true, // replay the save's real seasons as news (sandbox/data/timeline.json), then real-change draws after
   seasonWeeks: 20, // weeks per season
   turnover: false, // bots join (faster after rallies, mostly speculators) and leave (after heavy losses, or retiring)
@@ -1650,6 +1651,7 @@ const PRESETS = {
   thieves: { label: "Thieves' den", set: { social: { sharer: 0.2, reciprocator: 0.2, thief: 0.6 } }, hyp: "<b>Thieves' den.</b> 60% of bots start as thieves." },
   honest: { label: 'Sharing circle', set: { social: { sharer: 0.7, reciprocator: 0.3, thief: 0 }, stealing: false }, hyp: '<b>Sharing circle.</b> No theft. Knowledge spreads freely.' },
   noevolve: { label: 'No selection', set: { evolve: false }, hyp: '<b>No selection.</b> Genomes never change: the starting mix plays out.' },
+  priceonly: { label: 'Price-only world', set: { priceOnly: true }, hyp: '<b>Price-only world.</b> No hidden value anywhere: a card is worth only what someone pays. No royalties, packs priced from market prices, research shows past trades. With nothing to anchor them, prices drift toward zero.' },
   policy: { label: 'Policy: all safeguards', set: { store: true, priceLimit: 0.15, centralBank: true, wealthTax: 0.002, positionLimit: 0.25 }, hyp: '<b>Policy: all safeguards.</b> Store ceiling, price limits, central bank, wealth tax and position caps, for comparison.' },
 };
 const SOC = ['Sharer', 'Reciprocator', 'Thief'];

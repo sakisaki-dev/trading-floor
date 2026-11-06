@@ -35,9 +35,10 @@ export const DEFAULTS = {
   lifespan: [6, 14],
   heirs: 2,
   populationCap: 1.15, // heirs beyond this × the starting population push the poorest bots out of the market
-  priceOnly: true, // a card is worth only what someone pays: no hidden value anywhere in the world (no royalties, packs priced
-                   // from market prices, no valuation contest, research shows what a card has traded for). Real seasons still
-                   // update the library's stats and the game questions, and bring rookies.
+  priceOnly: false, // a card is worth only what someone pays: no hidden value anywhere in the world (no royalties, packs priced
+                    // from market prices, no valuation contest, research shows what a card has traded for). Real seasons still
+                    // update the library's stats and the game questions, and bring rookies. Off by default: with nothing to
+                    // anchor them (holding earns nothing, cards have no use), prices ratchet down to about zero.
   history: true, // replay the save's real seasons as news (sandbox/data/timeline.json), then real-change draws after
   seasonWeeks: 20, // weeks per season
   turnover: false, // bots join (faster after rallies, mostly speculators) and leave (after heavy losses, or retiring)
