@@ -41,6 +41,31 @@ Acceptance:
   Report the ratio over time; don't tune toward a number.
 - A unit check: a card with only asks standing above its mark keeps its mark.
 
+## 1b. Bug: some marks still run away, with no orders behind them
+
+Seed 11906, Realism (`sandbox/runs/saves/page-seed11906-realism-w7973.json`, dealers off from week 1102, the corrected
+fade in place):
+- From week 5,600, single players' marks rise **+4% to +9% a week, smoothly, for hundreds of weeks**, with no trades of
+  those cards. Player 883 started at week 5,608, player 1211 at week 6,890, and DB Justin Mahe (player 1172) at week
+  7,120.
+- By week 7,973:
+  - 48 players are marked above 10× their hidden value;
+  - Mahe is at 2.1e28 against a value of 36,238;
+  - the market cap is 3.6e30 against 1.24M coins held by all bots.
+- Worth, the Gini (0.995), the wealth split and the price ÷ value tile are meaningless from about week 5,800.
+
+No funded order can be behind it: bids and sealed bids are checked against cash (`engine.mjs` around lines 1173 and 657),
+and no bot holds more than about 33,000 coins. So something moves `c.P` without an order. Find it by instrumenting a run:
+for every card whose mark rose more than 3% in a week without a trade, record which step moved it. The candidates are
+`compsMark`, `bookMark` (persistence or fade), `impliedPrices` and anything after them. Fix only that step.
+
+A headless replay runs at about 1 second a week. The first runaway appeared at week 5,608, so start the instrumentation
+from a run that reaches it, or make it reproducible sooner.
+
+Acceptance:
+- The same seed and settings run to week 8,000 with no player marked above 20× his hidden value.
+- A unit check: a card with no trades and no standing orders keeps its mark however long it sits.
+
 ## 2. Measurement: fire sales
 
 Fire sales are exactly 0 in every run. With a lone bidder paying its own bid, "sold for 1 coin or less" now almost never
@@ -115,6 +140,37 @@ Put these in a per-generation `gen` record in the frame (`gen.persistMark`, `gen
 `gen.netDist`, `gen.clusters`, `gen.clusterTop`, `gen.adaptKept`, `gen.adaptFollow`). Show them on the page under the
 bots' panels.
 
+## 4b. Diagnostics: the population shrinking
+
+Seed 11906, Realism, 804 weeks (`sandbox/runs/saves/page-seed11906-realism-w804.json`, no setting changes): the
+population fell from about 175 to 64 bots. 229 joined and 415 left, almost all "chose to leave" (`quitRule: 'network'`).
+
+How the rule works: a bot more than 20 weeks in the market whose quit output (`sigm`) is above 0.5 leaves with a weekly
+chance of up to `quitChance` (0.25). A newcomer's untrained network starts near 0.5, so roughly half of all newcomers
+can leave. Measure, without changing the rule:
+- per generation, the quit output's mean and 10th/50th/90th percentiles, for all bots and for bots under 40 weeks in the
+  market;
+- exits per 20 weeks by cause, by age in the market, and by worth decile;
+- entries per 20 weeks.
+
+Add `quitRule: 'drawdown'` (the old rule) to the comparisons in item 6, and report the population over time for each.
+
+## 4c. Diagnostics: bots trading with each other
+
+Seed 11906 with the dealers switched off at week 1102 (`sandbox/runs/saves/page-seed11906-realism-w1301.json`): trades
+fell from about 100 a week to 10–40, and only about 1 player price in 5 moved more than 1% in 50 weeks. To see why bots
+rarely trade with each other, record each week, without changing anything:
+- the median gap between a card's best bid and best ask (as a share of the mark), over cards with both;
+- the share of cards with only bids, only asks, or neither;
+- the median distance of bots' bids and asks from the mark, in units of `priceRange`. This shows whether bids and asks
+  sit at the edges of the allowed range.
+
+Two smaller items from the same run:
+- **Ledger label:** "outside sellers" also counts the liquidator selling the cards of bots that left. Split it into
+  "dealers" and "liquidator sales" so the money drain is readable.
+- **Dealers switched off mid-run:** report what happens to the cards the dealers hold (they stay out of circulation,
+  or go back). Don't change it; say which in the README.
+
 ## 5. Two settings to compare
 
 ### 5a. Dealers that fund themselves (`collectorFunding`)
@@ -161,8 +217,11 @@ Change one thing per comparison:
 | Why skill doesn't carry over | `fitnessValue: 'mark'`; `adapt.on: false` |
 | Dealer money | `collectorFunding: 'self'` |
 | Pack pricing | `packBid: 'contents'`; then `packBid: 'contents'` with `packReserve: 0.5` |
+| Population | `quitRule: 'drawdown'` |
+| No dealers | `outsideCollectors: false` from week 0 |
 
-That's 8 settings × 3 seeds = 24 runs. If time is short, run seeds 88 and 31761 first.
+That's 10 settings × 3 seeds = 30 runs. Report the correlation of 20-week price changes with 20-week value changes (the
+health board's "Prices follow the football") for every run; price levels alone can be stale when trades are rare. If time is short, run seeds 88 and 31761 first.
 
 ## Acceptance checks
 

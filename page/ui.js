@@ -7,9 +7,9 @@ const PRESETS = {
   realism: { label: 'Realism', set: { allowance: 200, livingCost: 200, lifestyle: 0.0005, royaltyFunding: 'minted', royaltyRate: 0.05, holdCost: 0.0005, wealthTax: 0.001, wealthTaxTo: 'equal', wealthTaxForced: true,
     outsideCollectors: true, outsideMode: 'value', outsideBudget: 100000, outsideNews: true, guideOn: true, guideEvery: 4, guideLag: 1, fee: 0.01, centralBank: false, closedEconomy: false,
     markRule: 'book', markHalfLife: 4, priceRule: 'comps', compsWeeks: 4, singleBidder: 'own', forcedSale: 'book', forcedOrder: 'network', liquidation: 'auction', vaultIndex: 'repeatSales',
-    priceAnchor: true, priceRange: 0.6, keepMax: 0.95, rateMax: 0.05, fitnessValue: 'bid', evolve: true, evolveShare: 0.1, nnFitnessGens: 6, practiceGens: 3, adaptOn: true, adaptEvery: 10, adaptSize: 0.05, quitRule: 'network',
+    priceAnchor: true, priceRange: 0.6, keepMax: 1, rateMax: 0.05, priceMap: 'log', priceLogK: 0.6, priceClamp: 50, rateMap: 'log', rateLogMid: 0.025, rateClamp: 10, deployOrders: 40, maxListings: 10, maxShorts: 30, maxPacks: 8, fitnessValue: 'bid', evolve: true, evolveShare: 0.1, nnFitnessGens: 6, practiceGens: 3, adaptOn: true, adaptEvery: 10, adaptSize: 0.05, quitRule: 'network',
     mortality: true, lifespan: [6, 14], heirs: 1, estateSale: 0.4, cashShockChance: 0.005, cashShockSize: 0.1, lossRate: 0.01, turnover: true, entryRate: 0.25, entryHype: 1,
-    valueModel: 'league', valueBasis: 'form', formSeasons: 2, rookieRule: 'measured', injuries: true, injuryByAge: true, retirement: true, retirementByAge: true, awards: true, rookies: true, pressure: true, pressureStrength: 1, hypeInjury: 0, startSeason: 'latest',
+    valueModel: 'league', valueBasis: 'form', formSeasons: 2, rookieRule: 'measured', injuries: true, injuryByAge: true, retirement: true, retirementByAge: true, awards: true, rookies: true, pressure: true, pressureStrength: 1, hypeInjury: 0, startSeason: 'latest', leagueFill: 'full',
     games: true, prizeShare: 0, gameFloor: null, credit: true, maxLTV: 0.6, marginCall: 0.75, loanWeeks: 8, shorting: true,
     fashion: false, store: false, priceLimit: 0, positionLimit: 0, capPoorest: false, leagueUpdates: false, lenderCycle: false },
     hyp: '<b>Realism.</b> One season is about one real year. Income comes mostly from the football: royalties of 5% of a card\'s value a year, paid from each week\'s game, with a stipend that only covers the flat living cost. Costs balance it: 1% of worth a year in lifestyle, holding costs of 1% of a card\'s price a year, and a 2% wealth tax above twice the median, paid back to every bot alike. Real frictions: 40% of a dynasty\'s cards sold at each death, cash shocks, 1% of cards lost a year, and more newcomers after rallies. A public price guide, like real collecting, re-publishes every player\'s value every 4 weeks, a week old: everyone sees the same number, and research is how to be early. Dealers price from the guide too, so their only edge is money. Prices stay inside the bids and asks. Bots price on the guide and their own research, learn within their lifetimes, decide when to quit, and are judged on what they could actually sell for. Every number not measured from the save is an assumption, marked in Rules.' },
@@ -112,7 +112,7 @@ function thin(i) {
   for (const k of THIN) delete f[k]; f._thin = true;
 }
 function pushFrame(f) {
-  for (const lp of f.newPlayers || []) if (!LIBRARY.players.some((x) => x.key === lp.key)) LIBRARY.players.push(lp); // rookies the league created
+  for (const lp of f.newPlayers || []) { const i = LIBRARY.players.findIndex((x) => x.key === lp.key); if (i < 0) LIBRARY.players.push(lp); else LIBRARY.players[i] = lp; } // rookies and generated veterans the league created (a restart's replace an earlier run's)
   FRAMES.push(f); if (mode === 'live' && FRAMES.length > FULL_WEEKS) thin(FRAMES.length - 1 - FULL_WEEKS);
   for (const k of KEYS) H[k].push(f.h[k]);
   H.ticket.push(f.tickets ?? null);
@@ -252,13 +252,13 @@ function line(id, series, o) {
   const c = (charts[id] ||= {}); Object.assign(c, { X, n, pad, Wd });
   if (c.hi !== undefined && c.hi < n) { x.fillStyle = 'rgba(238,241,250,0.35)'; x.fillRect(Math.round(X(c.hi)), pad.t, 1, Ht - pad.t - pad.b); series.forEach((s, k) => { const v = data[k][c.hi]; if (v == null) return; x.beginPath(); x.arc(X(c.hi), Y(v), 4, 0, Math.PI * 2); x.fillStyle = s.color; x.fill(); x.strokeStyle = COL.panel; x.lineWidth = 2; x.stroke(); }); }
 }
-function stack(id, layers) {
+function stack(id, layers, groups = GROUPS) {
   const cv = $(id), [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
   const n = nNow(), Ls = layers.slice(0, n), pad = { l: 6, r: 52, t: 8, b: 16 };
   const X = (i) => pad.l + ((Wd - pad.l - pad.r) * i) / Math.max(1, n - 1), Y = (v) => pad.t + (Ht - pad.t - pad.b) * (1 - v);
   axes(x, Wd, Ht, pad, 0, 1, (v) => pct(v), n);
   const base = new Array(n).fill(0);
-  GROUPS.forEach((a, k) => {
+  groups.forEach((a, k) => {
     const top = Ls.map((s, i) => base[i] + (s[k] || 0));
     x.beginPath(); top.forEach((v, i) => (i ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)))); for (let i = n - 1; i >= 0; i--) x.lineTo(X(i), Y(base[i])); x.closePath(); x.fillStyle = a.color; x.fill();
     x.beginPath(); top.forEach((v, i) => (i ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)))); x.strokeStyle = COL.panel; x.lineWidth = 2; x.stroke();
@@ -285,8 +285,30 @@ function drawCharts() {
   line('wins', [{ data: H.skill, color: '#3987e5', fill: true }], { fy: (v) => v.toFixed(2), ref: 0 });
   line('notes', [{ data: H.shares, color: '#3987e5' }, { data: H.thefts, color: '#e66767' }], { fy: (v) => Math.round(v), min: 0 });
   stack('strat', H.share); if ($('cashStrat')) stack('cashStrat', H.cashShare);
+  if ($('tacC') && seen('tacC')) { const T = tacSeries(); stack('tacC', T.layers, T.ids.map((id) => ({ color: tacColor(id) }))); }
   drawFeatures();
 }
+/* ---------- Tactics (engine tacticTrack: what bots actually did, clustered each generation and followed by id) ---------- */
+const TAC_COL = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#e66767', '#4fb3bf', '#008300', '#b0b4c0'];
+const tacColor = (id) => TAC_COL[(id - 1) % TAC_COL.length];
+let tacCache = null;
+function tacSeries() { // each frame's tactic shares, one layer slot per tactic id ever seen (frames between generation ends repeat the last)
+  const n = nNow(); if (tacCache && tacCache.n === n && tacCache.F === FRAMES) return tacCache;
+  const ids = [], at = new Map(), rows = [];
+  for (let i = 0; i < n; i++) for (const t of FRAMES[i].gen?.tactics?.list || []) if (!at.has(t.id)) { at.set(t.id, ids.length); ids.push(t.id); }
+  for (let i = 0; i < n; i++) { const r = new Array(ids.length).fill(0); for (const t of FRAMES[i].gen?.tactics?.list || []) r[at.get(t.id)] = t.share; rows.push(r); }
+  return (tacCache = { n, F: FRAMES, ids, layers: rows });
+}
+const tacRet = (v) => (v == null ? '–' : `<span class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${Math.round(v * 100)}%</span>`);
+const tacFrom = (t) => { const fr = t.from || {}, part = [['stay', 'stayed'], ['switch', 'switched in'], ['copy', 'copied'], ['heir', 'heirs'], ['new', 'new']].filter(([k]) => fr[k]).map(([k, l]) => `${fr[k]} ${l}`); return part.join(' · ') + (t.src?.length ? ` <span class="k">from ${t.src.map(([id, k]) => `T${id} (${k})`).join(', ')}</span>` : ''); };
+function drawTactics() {
+  const host = $('tacT'); if (!host) return; const f = cur(), T = f?.gen?.tactics;
+  $('tacLegend').html = T ? T.list.map((t) => `<span><i style="background:${tacColor(t.id)}"></i>T${t.id}</span>`).join('') : '';
+  host.tBodies[0].html = T ? T.list.map((t) => `<tr><td><span class="sw" style="background:${tacColor(t.id)}"></span>T${t.id}${t.age === 0 ? ' <span class="pill pill--fair">new</span>' : ''}</td><td title="${esc(t.top.map(([k, z]) => `${k} ${z >= 0 ? '+' : ''}${z} sd`).join(', '))}">${esc(t.name)}</td><td class="num">${t.n}</td><td class="num">${pct(t.share)}</td><td class="num">${tacRet(t.ret?.[1])}</td><td class="num">${tacRet(t.retMark?.[1])}</td><td class="num">${t.age} gen</td><td>${tacFrom(t)}</td><td>${t.crowding ? '<span class="pill pill--hot">crowding</span> ' : ''}${t.cannibalizedBy != null ? `<span class="pill pill--hot">cannibalized by T${t.cannibalizedBy}</span>` : ''}${t.age === 0 && t.parent != null ? `<span class="k">branched from T${t.parent}</span>` : ''}</td></tr>`).join('')
+    : `<tr><td colspan="9" class="k">${cfgNow()?.tactics === false ? 'The tactic tracker is off (Rules ▸ Population and learning).' : 'Tactics appear at the first generation end.'}</td></tr>`;
+  $('tacNote').html = T ? `Generation ${f.gen.gen}: ${T.k} tactics (silhouette ${T.sil}) among ${T.bots} bots${T.unprofiled ? `, ${T.unprofiled} too new to profile` : ''}.${T.died.length ? ' Gone: ' + T.died.map((d) => `T${d.id} after ${d.age} gen${d.into != null ? ` (nearest now T${d.into})` : ''}`).join(', ') + '.' : ''} Returns are medians: at selling value (what fitness uses) and at marks.` : '';
+}
+crosshair('tacC', (i) => { const T = FRAMES[i]?.gen?.tactics; return `<b>${when(FRAMES[i].t)}</b>${T ? ` · generation ${FRAMES[i].gen.gen}<br>` + T.list.map((t) => `<span class="sw" style="background:${tacColor(t.id)}"></span>T${t.id} <span class="mono">${pct(t.share)}</span> · ${tacRet(t.ret?.[1])} <span class="k">${esc(t.name)}</span>`).join('<br>') : '<br><span class="k">No generation has ended yet</span>'}`; });
 
 /* ---------- Heatmaps ---------- */
 // Diverging blue ↔ grey ↔ red (the validated pair), sequential blue for shares.
@@ -431,7 +453,7 @@ function drawPanels() {
   const soc = [0, 1, 2].map((s) => { const xs = f.bots.filter((b) => b[5] === s); return [s, xs.length, avg(xs.map((b) => b[3])), avg(xs.map((b) => b[6]))]; });
   $('social').tBodies[0].html = soc.map(([s, k, w, fl]) => `<tr><td>${SOC[s]}</td><td class="num">${k}</td><td class="num">${fmt(w)}</td><td class="num">${fl == null ? '–' : fl.toFixed(1)}</td></tr>`).join('');
   $('researched').textContent = f.researched.length ? 'Most researched: ' + f.researched.map(([id, k]) => `${LIBRARY.players[id].name} (${k})`).join(', ') : '';
-  drawTape(); drawAcct(); drawCons(); drawDetail(); drawLeagueNews(); drawHealth();
+  drawTape(); drawAcct(); drawCons(); drawDetail(); drawLeagueNews(); drawHealth(); drawTactics();
   drawSectors(); drawMap(); drawCalendar(); drawHeatmaps();
 }
 const LEAGUE_KINDS = new Set(['injury', 'return', 'champion', 'award', 'hof', 'retire', 'rookie']);
@@ -489,9 +511,9 @@ const GROUP = { credit: ['loan', 'marginCall', 'default'], shorts: ['short', 'co
 
 /* ---------- Controls ---------- */
 $('preset').innerHTML = Object.entries(PRESETS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
-const SLIDERS = { guideEvery: [1, (v) => v + ' wk'], guideLag: [1, (v) => v + ' wk old'], adaptEvery: [1, (v) => v + ' wk'], adaptSize: [0.01, (v) => '±' + (v / 100).toFixed(2)], lossRate: [0.001, (v) => (v ? (v / 10).toFixed(1) + '% a season' : 'off')], entryHype: [0.1, (v) => (v ? '×' + (v / 10).toFixed(1) : 'off')], cashShockChance: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% a week' : 'off')], priceRange: [0.01, (v) => '±' + v + '%'], keepMax: [0.01, (v) => v + '% of worth'], rateMax: [0.001, (v) => (v / 10).toFixed(1) + '%/wk'], deployOrders: [1, (v) => String(v)], maxOrderQty: [1, (v) => String(v)], maxListings: [1, (v) => String(v)], maxShorts: [1, (v) => String(v)], maxPacks: [1, (v) => String(v)], quitDrawdown: [0.01, (v) => v + '% of peak'], quitChance: [0.01, (v) => v + '%'], extraRookies: [1, (v) => String(v)], markDepth: [1, (v) => 'best ' + v + ' orders'], markHalfLife: [1, (v) => (v ? v + ' wk half-life' : 'off')], holdCost: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% of mark' : 'off')], estateSale: [0.01, (v) => (v ? v + '% of cards' : 'off')], cashShockChance: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% a week' : 'off')], cashShockSize: [0.01, (v) => v + '% of worth'], markWeeks: [1, (v) => v + ' wk'], collectorSaveWeeks: [1, (v) => v + ' wk of budget'], collectors: [1, (v) => String(v)], collectorError: [0.01, (v) => '±' + v + '%'], collectorStart: [0.01, (v) => v + '% of copies'], collectorPerCard: [1, (v) => v + ' copies'], collectorSpread: [0.01, (v) => v + '%'], royaltyRate: [0.01, (v) => v + '%'], nnFitnessGens: [1, (v) => v + ' gens'], practiceGens: [1, (v) => (v ? v + ' (on Restart)' : 'none')], compsWeeks: [1, (v) => v + ' wk'], formSeasons: [1, (v) => v + (v > 1 ? ' seasons' : ' season') + ` (${v * 17} games)`], hypeInjury: [0.01, (v) => (v ? '×' + (v / 100).toFixed(1) : 'off')], entryRate: [0.01, (v) => (v / 100).toFixed(2)], heirs: [1, (v) => String(v)], scarcity: [0.01, (v) => (v / 100).toFixed(2)], packsPerWeek: [1, (v) => String(v)], liqListings: [1, (v) => String(v)], outsideBudget: [1, (v) => v.toLocaleString()], outsideResale: [0.01, (v) => v + '%'], prizeShare: [0.01, (v) => v + '% of takings'], livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'], walkUp: [0.01, (v) => v + '%'], walkVolLow: [0.01, (v) => '±' + v + '%'], walkVolHigh: [0.01, (v) => '±' + v + '%'], riskPerDoubling: [1, (v) => '+' + v + ' pts'], flagWeeks: [1, (v) => (v ? v + ' wk clean' : 'forever')], cardLendFee: [0.0001, (v) => (v / 100).toFixed(2) + '%/wk'], shortMargin: [0.01, (v) => v + '%'], cardLoanWeeks: [1, (v) => v + ' wk'], nnMutation: [0.01, (v) => '±' + (v / 100).toFixed(2)], nnReset: [0.01, (v) => v.toFixed(1) + '%'], evolveShare: [0.01, (v) => v + '%'] };
-const SELECTS = ['quitRule', 'forcedOrder', 'wealthTaxTo', 'rookieRule', 'singleBidder', 'fitnessValue', 'markRule', 'royaltyFunding', 'vaultIndex', 'valueBasis', 'pastSave', 'valueModel', 'priceRule', 'outsideMode', 'liquidation', 'forcedSale', 'packSale'];
-const TOGGLES = ['guideOn', 'adaptOn', 'priceAnchor', 'wealthTaxForced', 'outsideNews', 'retirementByAge', 'injuryByAge', 'pressure', 'injuries', 'retirement', 'rookies', 'awards', 'capPoorest', 'turnover', 'twoSidedQuotes', 'shorting', 'credit', 'passesTradable', 'games', 'sharing', 'stealing', 'gossip', 'outsideCollectors', 'royalties', 'evolve', 'leagueUpdates', 'centralBank', 'store', 'closedEconomy'];
+const SLIDERS = { tacticMatch: [0.1, (v) => (v / 10).toFixed(1) + ' sd'], tacticWindow: [1, (v) => v + (v > 1 ? ' gens' : ' gen')], practiceWorlds: [1, (v) => (v > 1 ? v + ' worlds' : '1 (as before)')], populationFloor: [0.01, (v) => (v ? v + '% of the start' : 'off')], fitnessSharing: [0.1, (v) => (v ? 'strength ' + (v / 10).toFixed(1) : 'off')], sharingRadius: [0.01, (v) => (v / 100).toFixed(2)], guideEvery: [1, (v) => v + ' wk'], guideLag: [1, (v) => v + ' wk old'], adaptEvery: [1, (v) => v + ' wk'], adaptSize: [0.01, (v) => '±' + (v / 100).toFixed(2)], lossRate: [0.001, (v) => (v ? (v / 10).toFixed(1) + '% a season' : 'off')], entryHype: [0.1, (v) => (v ? '×' + (v / 10).toFixed(1) : 'off')], cashShockChance: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% a week' : 'off')], priceRange: [0.01, (v) => '±' + v + '%'], priceLogK: [0.01, (v) => (v / 100).toFixed(2) + ' (×' + Math.exp(v / 100).toFixed(2) + ' per unit)'], priceClamp: [1, (v) => '×' + v + ' either way'], rateLogMid: [0.001, (v) => (v / 10).toFixed(1) + '%/wk'], rateClamp: [1, (v) => (v * 100).toLocaleString() + '%/wk'], keepMax: [0.01, (v) => v + '% of worth'], rateMax: [0.001, (v) => (v / 10).toFixed(1) + '%/wk'], deployOrders: [1, (v) => String(v)], maxOrderQty: [1, (v) => String(v)], maxListings: [1, (v) => String(v)], maxShorts: [1, (v) => String(v)], maxPacks: [1, (v) => String(v)], quitDrawdown: [0.01, (v) => v + '% of peak'], quitChance: [0.01, (v) => v + '%'], extraRookies: [1, (v) => String(v)], dormantAfter: [1, (v) => (v ? 'after ' + v + ' wk' : 'never')], markDepth: [1, (v) => 'best ' + v + ' orders'], markHalfLife: [1, (v) => (v ? v + ' wk half-life' : 'off')], holdCost: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% of mark' : 'off')], estateSale: [0.01, (v) => (v ? v + '% of cards' : 'off')], cashShockChance: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% a week' : 'off')], cashShockSize: [0.01, (v) => v + '% of worth'], markWeeks: [1, (v) => v + ' wk'], collectorSaveWeeks: [1, (v) => v + ' wk of budget'], collectors: [1, (v) => String(v)], collectorError: [0.01, (v) => '±' + v + '%'], collectorStart: [0.01, (v) => v + '% of copies'], collectorPerCard: [1, (v) => v + ' copies'], collectorSpread: [0.01, (v) => v + '%'], royaltyRate: [0.01, (v) => v + '%'], nnFitnessGens: [1, (v) => v + ' gens'], practiceGens: [1, (v) => (v ? v + ' (on Restart)' : 'none')], compsWeeks: [1, (v) => v + ' wk'], formSeasons: [1, (v) => v + (v > 1 ? ' seasons' : ' season') + ` (${v * 17} games)`], hypeInjury: [0.01, (v) => (v ? '×' + (v / 100).toFixed(1) : 'off')], entryRate: [0.01, (v) => (v / 100).toFixed(2)], heirs: [1, (v) => String(v)], scarcity: [0.01, (v) => (v / 100).toFixed(2)], packsPerWeek: [1, (v) => String(v)], liqListings: [1, (v) => String(v)], outsideBudget: [1, (v) => v.toLocaleString()], outsideResale: [0.01, (v) => v + '%'], prizeShare: [0.01, (v) => v + '% of takings'], livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'], walkUp: [0.01, (v) => v + '%'], walkVolLow: [0.01, (v) => '±' + v + '%'], walkVolHigh: [0.01, (v) => '±' + v + '%'], riskPerDoubling: [1, (v) => '+' + v + ' pts'], flagWeeks: [1, (v) => (v ? v + ' wk clean' : 'forever')], cardLendFee: [0.0001, (v) => (v / 100).toFixed(2) + '%/wk'], shortMargin: [0.01, (v) => v + '%'], cardLoanWeeks: [1, (v) => v + ' wk'], nnMutation: [0.01, (v) => '±' + (v / 100).toFixed(2)], nnReset: [0.01, (v) => v.toFixed(1) + '%'], evolveShare: [0.01, (v) => v + '%'] };
+const SELECTS = ['priceMap', 'rateMap', 'entrants', 'quitRule', 'forcedOrder', 'wealthTaxTo', 'rookieRule', 'leagueFill', 'singleBidder', 'fitnessValue', 'markRule', 'royaltyFunding', 'vaultIndex', 'valueBasis', 'pastSave', 'valueModel', 'priceRule', 'outsideMode', 'liquidation', 'forcedSale', 'packSale'];
+const TOGGLES = ['tactics', 'guideOn', 'adaptOn', 'priceAnchor', 'wealthTaxForced', 'outsideNews', 'retirementByAge', 'injuryByAge', 'pressure', 'injuries', 'retirement', 'rookies', 'awards', 'capPoorest', 'turnover', 'twoSidedQuotes', 'shorting', 'credit', 'passesTradable', 'games', 'sharing', 'stealing', 'gossip', 'outsideCollectors', 'royalties', 'evolve', 'leagueUpdates', 'centralBank', 'store', 'closedEconomy'];
 function syncControls() {
   const c = cfgNow(); if (!c) return;
   for (const [k, [s, f]] of Object.entries(SLIDERS)) { $(k).value = Math.round((c[k] / s) * 100) / 100; $(k + 'V').textContent = f(+$(k).value); }
@@ -738,7 +760,7 @@ const IND_GROUPS = [
   ['Money', [
     { key: 'cash', label: 'Coins held', desc: 'all cash in bots’ hands', get: (f) => f.mkt?.cash, show: fmt },
     { key: 'minted', label: 'Coins created / wk', desc: 'new coins into bots’ hands this week: allowance, royalties, outside buyers, prizes, newcomers', get: (f) => f.money?.totalIn, show: fmt },
-    { key: 'burned', label: 'Coins removed / wk', desc: 'coins that left bots’ hands this week: living costs, fees, packs, outside sellers, holding costs, bots that left', get: (f) => f.money?.totalOut, show: fmt },
+    { key: 'burned', label: 'Coins removed / wk', desc: 'coins that left bots’ hands this week: living costs, fees, packs, liquidator sales, the Vault store, outside sellers, holding costs, bots that left', get: (f) => f.money?.totalOut, show: fmt },
     { key: 'netcoins', label: 'Net new coins / wk', desc: 'the change in all bots’ cash this week (created − removed ± anything untagged): above zero, the money supply grows', get: (f) => f.money?.net, show: (v) => (v >= 0 ? '+' : '') + fmt(v), zero: true },
     { key: 'top10', label: 'Cash held by the 10% with the most cash', desc: 'their share of all cash', get: (f) => f.mkt?.cashTop10, show: (v) => pct(v) },
     { key: 'gini', label: 'Gini', desc: '0 = equal, 1 = one bot owns everything', get: (f) => f.h.gini, show: (v) => v.toFixed(3) },
@@ -757,10 +779,52 @@ const IND_GROUPS = [
   ['Population', [
     { key: 'lines', label: 'Lineages', desc: 'families still trading', get: (f) => f.lineages?.count, show: (v) => String(Math.round(v)) },
     { key: 'family', label: 'Largest family', desc: 'its share of all wealth', get: (f) => f.lineages?.topShare, show: (v) => pct(v) },
+    { key: 'gQuitAll', na: 1, label: 'Wish to leave (median)', desc: 'the quit output (0–1) at the last generation end, all bots; above 0.5 a bot may leave under quitRule network', get: (f) => f.gen?.quitAll?.[2], show: (v) => v.toFixed(2) },
+    { key: 'gQuitNew', na: 1, label: 'Wish to leave, newcomers', desc: 'the same for bots under 40 weeks in the market', get: (f) => f.gen?.quitNew?.[2], show: (v) => v.toFixed(2) },
+    { key: 'gExits', na: 1, label: 'Left last generation', desc: 'bots that left in the last generation (all causes); hover the log for causes, ages and worth deciles', get: (f) => f.gen?.exits, show: (v) => String(v) },
+    { key: 'gEntries', na: 1, label: 'Joined last generation', desc: 'newcomers in the last generation (heirs not counted)', get: (f) => f.gen?.entries, show: (v) => String(v) },
+    { key: 'gPop', na: 1, label: 'Bots at the generation end', desc: 'the population when the last generation ended', get: (f) => f.gen?.population, show: (v) => String(v) },
+  ]],
+  ['Evolution', [
+    { key: 'gPersistMark', na: 1, label: 'Skill carries over (marks)', desc: 'rank correlation of bots’ returns at marks, this generation against the last', get: (f) => f.gen?.persistMark, show: (v) => v.toFixed(2), zero: true },
+    { key: 'gPersistBid', na: 1, label: 'Skill carries over (selling value)', desc: 'the same at what holdings could actually have sold for', get: (f) => f.gen?.persistBid, show: (v) => v.toFixed(2), zero: true },
+    { key: 'gFromTop', na: 1, label: 'Descended from the last top 10%', desc: 'share of bots whose networks were copied or inherited from the previous generation’s top 10% during the last generation', get: (f) => f.gen?.fromTop, show: (v) => pct(v) },
+    { key: 'gLineTop', na: 1, label: 'Largest lineage', desc: 'its share of all bots', get: (f) => f.gen?.lineTop, show: (v) => pct(v) },
+    { key: 'gNetDist', na: 1, label: 'Network distance', desc: 'mean cosine distance between card networks’ weights (50 bots); 0 = identical, 1 = unrelated', get: (f) => f.gen?.netDist, show: (v) => v.toFixed(2) },
+    { key: 'gNetCopy', na: 1, label: 'Distance, copies to sources', desc: 'the same between bots copied in the last generation and the bots they copied', get: (f) => f.gen?.netDistCopies, show: (v) => v.toFixed(2) },
+    { key: 'gResp', na: 1, label: 'Behaviour distance', desc: 'median RMS distance between bots’ card-network outputs on 24 fixed sample cards (what fitness sharing measures)', get: (f) => f.gen?.respDist, show: (v) => v.toFixed(2) },
+    { key: 'gClusters', na: 1, label: 'Strategy clusters', desc: 'k-means on the outputs on the sample cards, k = 2–8 by silhouette', get: (f) => f.gen?.clusters, show: (v) => String(v) },
+    { key: 'gClusterTop', na: 1, label: 'Largest strategy cluster', desc: 'its share of the bots', get: (f) => f.gen?.clusterTop, show: (v) => pct(v) },
+    { key: 'gAdaptKept', na: 1, label: 'Trials kept', desc: 'share of learning-within-a-lifetime trials kept last generation', get: (f) => f.gen?.adaptKept, show: (v) => pct(v) },
+    { key: 'gAdaptFollow', na: 1, label: 'Kept trials hold up', desc: 'rank correlation of a kept trial’s score with the same bot’s next period; near 0, the kept trials were noise', get: (f) => f.gen?.adaptFollow, show: (v) => v.toFixed(2), zero: true },
+  ]],
+  ['Bots’ order book', [
+    { key: 'bGap', na: 1, label: 'Bid–ask gap', desc: 'median gap between bots’ best standing bid and best standing ask after the cross, as a share of the mark, on cards with both', get: (f) => f.bookD?.gap, show: (v) => pct(v) },
+    { key: 'bBoth', na: 1, label: 'Cards with both sides', desc: 'share of cards in circulation with a bot bid and a bot ask standing', get: (f) => f.bookD?.both, show: (v) => pct(v) },
+    { key: 'bOnlyBid', na: 1, label: 'Only bids', desc: 'share of cards with bot bids but no bot asks', get: (f) => f.bookD?.onlyBid, show: (v) => pct(v) },
+    { key: 'bOnlyAsk', na: 1, label: 'Only asks', desc: 'share of cards with bot asks but no bot bids', get: (f) => f.bookD?.onlyAsk, show: (v) => pct(v) },
+    { key: 'bNeither', na: 1, label: 'Neither', desc: 'share of cards with no bot orders', get: (f) => f.bookD?.neither, show: (v) => pct(v) },
+    { key: 'bBidDist', na: 1, label: 'Bids from the mark', desc: 'median distance of bots’ bids from the mark, in units of the price range (−1 = 60% below with ±60%)', get: (f) => f.bookD?.bidDist, show: (v) => v.toFixed(2), zero: true },
+    { key: 'bAskDist', na: 1, label: 'Asks from the mark', desc: 'the same for asks', get: (f) => f.bookD?.askDist, show: (v) => v.toFixed(2), zero: true },
+    { key: 'bBidEdge', na: 1, label: 'Bids at the edge', desc: 'share of bots’ bids whose price-offset output is beyond 90% of its range', get: (f) => f.bookD?.bidEdge, show: (v) => pct(v) },
+    { key: 'bAskEdge', na: 1, label: 'Asks at the edge', desc: 'the same for asks', get: (f) => f.bookD?.askEdge, show: (v) => pct(v) },
+  ]],
+  ['Limits the networks press', [
+    { key: 'lBidWall', na: 1, label: 'Bids at the wall', desc: 'share of bots’ bids whose price is at the limit of its mapping: beyond 90% of the fixed range, or at the safety clamp on the log scale', get: (f) => f.limits?.bidEdge, show: (v) => pct(v) },
+    { key: 'lAskWall', na: 1, label: 'Asks at the wall', desc: 'the same for asks', get: (f) => f.limits?.askEdge, show: (v) => pct(v) },
+    { key: 'lBidFar', na: 1, label: 'Bids past ±60%', desc: 'share of bids priced beyond ×1.54 or ×0.46 of their base, the edges of the default range: how much the log scale’s extra room is used', get: (f) => f.limits?.bidFar, show: (v) => pct(v) },
+    { key: 'lAskFar', na: 1, label: 'Asks past ±60%', desc: 'the same for asks', get: (f) => f.limits?.askFar, show: (v) => pct(v) },
+    { key: 'lKeep', na: 1, label: 'Cash target at the top', desc: 'share of neural bots whose cash-target output is in the top 5% of its range', get: (f) => f.limits?.keep, show: (v) => pct(v) },
+    { key: 'lRate', na: 1, label: 'Loan rates at the ceiling', desc: 'share of neural bots whose borrowing rate is in the top 5% of the fixed range, or at the safety bound on the log scale', get: (f) => f.limits?.maxRate, show: (v) => pct(v) },
+    { key: 'lRate5', na: 1, label: 'Borrowing rates above 5%', desc: 'share of neural bots that would borrow at more than 5% a week (the default ceiling)', get: (f) => f.limits?.maxOver5, show: (v) => pct(v) },
+    { key: 'lOrders', na: 1, label: 'Buy orders cut off', desc: 'share of acting neural bots with one more buy order they wanted and could pay for when the weekly count stopped them', get: (f) => f.limits?.orders, show: (v) => pct(v) },
+    { key: 'lListings', na: 1, label: 'Listings cut off', desc: 'share with one more auction listing they wanted when the weekly count stopped them', get: (f) => f.limits?.listings, show: (v) => pct(v) },
+    { key: 'lShorts', na: 1, label: 'Shorts cut off', desc: 'share with one more short sale they wanted when the weekly count stopped them', get: (f) => f.limits?.shorts, show: (v) => pct(v) },
+    { key: 'lPacks', na: 1, label: 'Packs cut off', desc: 'share that wanted more packs than the weekly count allows', get: (f) => f.limits?.packs, show: (v) => pct(v) },
   ]],
 ];
 const METRICS = IND_GROUPS.flatMap(([, ms]) => ms);
-const GTAG = { Market: 'MARKET', Breadth: 'BREADTH', 'Order flow': 'FLOW', Supply: 'SUPPLY', 'Short selling': 'SHORTS', Money: 'MONEY', Credit: 'CREDIT', 'Knowledge and trust': 'TRUST', Population: 'PEOPLE' };
+const GTAG = { Market: 'MARKET', Breadth: 'BREADTH', 'Order flow': 'FLOW', Supply: 'SUPPLY', 'Short selling': 'SHORTS', Money: 'MONEY', Credit: 'CREDIT', 'Knowledge and trust': 'TRUST', Population: 'PEOPLE', Evolution: 'EVOLUTION', 'Bots’ order book': 'BOOK', 'Limits the networks press': 'LIMITS' };
 // Every indicator value is worked out once per week and kept on that week's frame (frames never change once in)
 function mval(m, i) {
   const f = FRAMES[i], c = (f._m ||= {}); if (m.key in c) return c[m.key];
@@ -805,7 +869,7 @@ function drawIndicators() {
   }
   for (const el of host.querySelectorAll('[data-metric]')) {
     const m = METRICS.find((x) => x.key === el.dataset.metric), d = metricSeries(m, at, at - 51), v = d[d.length - 1], on = SEL.type === 'metric' && SEL.key === m.key;
-    el.setAttribute('aria-pressed', String(on)); el.querySelector('[data-v]').textContent = v == null ? '–' : m.show(v);
+    el.setAttribute('aria-pressed', String(on)); el.querySelector('[data-v]').textContent = v == null ? (m.na ? 'n/a' : '–') : m.show(v);
     const w = d.slice(-52), r = spark(el.querySelector('canvas'), w, m.show, m.zero, on), c = el.querySelector('[data-c]');
     if (!r) { c.textContent = ''; continue; }
     const rel = r.first > 0 && !m.zero && !m.noPct, ch = rel ? r.last / r.first - 1 : r.last - r.first, flat = Math.abs(ch) < 1e-9;
@@ -827,7 +891,7 @@ function drawGroups() {
     for (const tr of body.rows) {
       const m = METRICS.find((x) => x.key === tr.dataset.metric), d = metricSeries(m, at), w = d.slice(-52), v = d[d.length - 1], on = SEL.type === 'metric' && SEL.key === m.key;
       tr.classList.toggle('on', on);
-      tr.querySelector('[data-v]').textContent = v == null ? '–' : m.show(v);
+      tr.querySelector('[data-v]').textContent = v == null ? (m.na ? 'n/a' : '–') : m.show(v);
       const prev = d[Math.max(0, d.length - 2)], f52 = w.find((x) => x != null);
       tr.querySelector('[data-c1]').innerHTML = chgHtml(m, chgOf(m, prev, v)); tr.querySelector('[data-c52]').innerHTML = chgHtml(m, chgOf(m, f52, v));
       const vals = w.filter((x) => x != null), lo = vals.length ? Math.min(...vals) : null, hi = vals.length ? Math.max(...vals) : null;
@@ -1299,7 +1363,7 @@ const HEALTH = {
     { key: 'coins', group: 'Activity', label: 'Coins changing hands', good: 'up', alarm: { rel52: 0.25 }, fmt: (v) => fmt(v), why: 'coins in trades and card auctions this week', get: (f) => (f.ord ? f.ord.coins || 0 : null) }, // ord.coins already includes card auction sales
     { key: 'sales', flat: 2, group: 'Activity', label: 'Sales', good: 'up', alarm: { rel52: 0.25 }, fmt: (v) => fmt(v), why: 'trades plus card auction sales this week', get: (f) => f.h?.trades ?? null },
     { key: 'bidask', flat: 0.005, group: 'Activity', label: 'Bids ÷ offers', good: 'up', alarm: { below: 0.05 }, healthy: [0.3, 3], fmt: (v) => v.toFixed(v < 0.1 ? 3 : 2), why: 'unfilled bids for every unfilled offer', get: (f) => (f.ord?.asks ? f.ord.bids / f.ord.asks : null) },
-    { key: 'fire', flat: 0.005, group: 'Prices', label: 'Fire sales', good: 'down', alarm: { above: 0.05 }, healthy: [0, 0.01], fmt: (v) => pct(v), why: 'card auctions sold for 1 coin or less, or under 10% of their top bid', get: (f) => (f.ord && 'aucSold' in f.ord ? ((f.ord.aucCardSold ?? f.ord.aucSold) ? f.ord.aucFree / (f.ord.aucCardSold ?? f.ord.aucSold) : 0) : null) },
+    { key: 'fire', flat: 0.005, group: 'Prices', label: 'Fire sales', good: 'down', alarm: { above: 0.05 }, healthy: [0, 0.01], fmt: (v) => pct(v), why: 'card auctions sold for under 30% (fireShare) of the card\'s mark the week before', get: (f) => (f.ord && 'aucSold' in f.ord ? ((f.ord.aucCardSold ?? f.ord.aucSold) ? f.ord.aucFree / (f.ord.aucCardSold ?? f.ord.aucSold) : 0) : null) },
     { key: 'vsmark', flat: 0.03, group: 'Prices', label: 'Sale vs quote', good: 'toward1', alarm: { below: 0.6 }, healthy: [0.85, 1.15], fmt: (v) => v.toFixed(2) + '×', why: 'median auction price ÷ the card’s mark the week before', get: (f) => f.ord?.aucVsMark ?? null },
     { key: 'pidx', group: 'Prices', label: 'Price index', good: 'up', alarm: { fall8: 0.3 }, fmt: (v) => v.toFixed(0), why: 'the Vault index (trades and auctions)', get: (f) => f.h?.p ?? null },
     { key: 'gap', flat: 0.03, group: 'Prices', label: 'Marks vs sales gap', good: 'toward1', alarm: { above: 1.5, below: 0.67 }, healthy: [0.9, 1.1], fmt: (v) => v.toFixed(2) + '×', why: 'marks index ÷ Vault index', get: (f) => (f.h?.pMark != null && f.h?.p ? f.h.pMark / f.h.p : null) },

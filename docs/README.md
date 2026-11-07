@@ -761,3 +761,215 @@ publication weeks.
   sales, cash shocks (0.5% a week, a tenth of worth), 1% of cards lost a year, newcomers after rallies, measured rookie
   arrivals, form over 2 seasons, games paid only from stakes. Numbers marked as assumptions in the Rules panel are not
   measured from the save.
+
+## Round 3: fixes, diagnostics and evolution settings
+
+**Fixes** (they change runs; every other change is a setting or a measurement):
+- **Marks fade** (`markHalfLife`): asks only pull a mark down and bids only push it up. With both sides standing, an
+  untraded mark that sits outside the bid and ask levels drifts toward their middle; one that sits between them holds.
+  With only asks, it drifts down
+  toward the lower of the ask level and the last trade. With only bids, it drifts up toward the higher of the bid level
+  and the last trade. With neither, it holds. The old rule drifted toward the asks, and asks are placed relative to the
+  mark, so marks compounded upward. `bookMark()` holds the rule; it has a unit check.
+- **Runaway marks with no orders behind them** (seed 11906, Realism): from week 5,600, single players' marks rose 4% to
+  9% a week for hundreds of weeks without a trade, and DB Justin Mahe reached 2.1e28 against a value of 36,238. That run
+  used the old fade. Bots ask about 37% above the mark, and the mark moved 16% of the way to the ask each week
+  (`markHalfLife` 4), so it rose ×1.059 a week. The asks then moved up with it. Nobody could buy at that price, so
+  nothing ever tested it. Comparable sales then copied the rise to the player's other cards, including copies the
+  liquidator held, which had no orders at all. The new fade already stops asks from lifting a mark. One leak was left: a
+  low bid and a high ask together pulled the mark toward their middle (about ×1.02 a week with a bid 10% below and an ask
+  37% above). Now a mark between the bid and the ask holds, because neither order could fill there. A mark moves only on
+  a sale or on a standing order that could fill at it. The unit check covers a card with no trades and no orders (10,000
+  weeks) and one with a bid below and an ask above (520 weeks); both keep their mark.
+- **Vault index drift** (repeat sales): sealed-auction sales clear well above order-book trades of the same card (a
+  median of about 40% on seed 12864). Pairing every sale with the previous one mixed the two levels. Rises came as
+  trade → auction pairs over longer gaps and falls as auction → trade pairs a week later. Least squares gives long-gap
+  pairs more weight, so the index climbed on flat prices (×1.5 per 200 weeks late in a run). Each card now has two
+  chains, one for order-book and dealer trades and one for auction sales. A sale pairs only with the last sale of its own
+  kind. Against a direct measure that doesn't chain (each card's price in the first and last 26 weeks of a 200-week
+  window), the index averaged 1.03× from week 400 on seed 12864, against 1.34× before.
+- **Fire sales** (`aucFree`; `fireShare`, default 0.3): a card auction sale below `fireShare` of the card's mark at the
+  start of that week. The old count (sold for 1 coin or less, or under 10% of the top bid) is kept as `aucFreeOld`.
+- **The money ledger** splits what bots paid to bots outside the economy: liquidator sales, the Vault store, and outside
+  sellers (budget-mode collectors). Dealers are their own net line, as before.
+- **Dealers switched off mid-run:** the cards they hold stay in their stock, out of circulation, and never return. They
+  resume with that stock if switched back on.
+
+**Diagnostics** (they record and change nothing; no `W.rand`, a private generator for sampling):
+- **`gen`** (per generation, on every frame until the next generation ends; shown under Indicators ▸ Evolution and
+  People):
+  - **Carry-over:** `persistMark` and `persistBid`, the rank correlation of returns at marks and at selling value between
+    two generations, whatever `fitnessValue` is.
+  - **Descent and lineages:** `fromTop`, the share of bots that got their networks from the previous generation's top 10%
+    (copied or inherited). `lineTop`, the largest lineage's share.
+  - **How alike the networks are:** `netDist`, the cosine distance between card-network weights on 50 bots, and
+    `netDistCopies` between copies and their sources. `respDist` and `respDistCopies`, the RMS distance between outputs
+    on 24 fixed sample cards.
+  - **Strategy clusters:** `clusters`, `clusterTop` and `clusterSil`, from k-means on those outputs, with k = 2–8 chosen
+    by silhouette.
+  - **Learning within a lifetime:** `adaptKept`, the share of trials kept. `adaptFollow`, the rank correlation of a kept
+    trial's score with the next period's. `adaptNextKept` and `adaptNextRejected`, the mean next-period score after a
+    kept and after a rejected trial.
+  - **The wish to leave:** `quitAll` and `quitNew`, the quit output's mean and 10th, 50th and 90th percentiles, for all
+    bots and for bots under 40 weeks in the market.
+  - **Population:** `exits`, `exitCause`, `exitAge` (weeks in the market) and `exitDecile` (worth decile at exit), plus
+    `entries`, `heirs` and `population`.
+- **`bookD`** (weekly; Indicators ▸ Bots' order book), for the bots' own orders:
+  - `gap`, the median best-bid to best-ask gap after the cross as a share of the mark, on cards with both sides;
+  - the shares of cards with both sides, only bids, only asks or neither;
+  - `bidDist` and `askDist`, the median distance from the mark in units of `priceRange`;
+  - `bidEdge` and `askEdge`, the share of orders whose price-offset output is beyond 90% of its range.
+
+**Evolution settings** (all off by default):
+- **`entrants`** (`'random'`, or `'offspring'`): an offspring newcomer is a mutated copy of a parent picked the way
+  evolution picks: at random from the top `evolveShare` by fitness, or by shared fitness when sharing is on. It comes
+  with a newcomer's cash.
+- **`fitnessSharing`** (strength, 0 = off) and **`sharingRadius`** (0.5): evolution ranks by fitness, shifted positive,
+  divided by (niche count)^strength. A bot's niche count is the sum of max(0, 1 − d ÷ radius) over the bots whose outputs
+  on the sample cards lie within the radius. On seed 31761 at week 60 a copy was 0.49 from its source, and two random bots
+  0.68 apart, so a radius of 0.3 never fired.
+- **`populationFloor`** (a share of the starting population, 0 = off): newcomers, random or offspring per `entrants`,
+  top the market back up to the floor in the week it falls below it.
+- **`practiceWorlds`** (1 = as before): one set of networks plays several private practice markets, each with a
+  different seed. Each generation it is scored by its fitness averaged over the worlds, and the worst copy the best once.
+  With more than one world, turnover, deaths, evolution inside each world and learning within a lifetime pause during
+  practice, so that every world keeps the same bots.
+
+## Round 4: a full league, maximum freedom, and the tactic tracker
+
+Three changes, each a setting or a measurement. With default settings a run is byte-identical to Round 3; the Realism
+preset switches on the full league and the widened limits, and the tactic tracker runs in every world (it records and
+changes nothing).
+
+### A full-size league (`leagueFill`, `rosterSize`, `dormantAfter`)
+
+The save on its own is a thin league: 203 players, of whom 66 played in Y88, spread
+unevenly across 32 clubs (one club has 12 card players, several have one). A real Retro Bowl club carries 10, and the save's
+own complete rosters show the shape (QB, RB, two WR, TE, OL, DL, LB, two DB). With `leagueFill: 'full'` (on in the Realism
+preset; the default `'save'` is the earlier world exactly) every club × position short of that shape (`rosterSize`) gets a
+generated veteran before the market opens, about 258 of them. Each is built the way the league builds a rookie (a measured
+early-career season at his position for his rates, a real NFL entry age, the median print run at his position) and then
+plays a burn-in of s seasons, s drawn from the seasons the save's active players have played, under the league's own season
+rules: injury spells at the measured rate by age, weekly games at his rates, Career Legacy growth per game, and a measured
+form swing after each season. He earns no awards or rings in the burn-in and cannot retire in it. His cards are dealt out at
+the open exactly like real cards. At every season's end, after retirements, each club × position is brought back up to the
+shape (a retiree's slot first, then any gap); no extra rookies arrive on top, and a club the save left above the shape is
+never topped up, so it drifts down as its players retire. Three rules keep the bigger league comparable with the save-only
+one. Values use a fixed reference: OVR (and the tier-scarcity term of the value formula) comes from rank within position
+among the save's own players and the game's legends only, so a real card is worth what it would have been worth, and a
+generated or new player is worth the place his score would take in that reference. Money follows the cards: the weekly
+allowance, the outside dealers' budget and the packs released each week are multiplied by copies in circulation at the open
+÷ the copies of the save's own players (about 2.0×), so coins per card stay about the same; starting cash is not scaled.
+Finally, growth is capped in cost, not in size: a retired player nobody holds (bots, the liquidator, outside dealers,
+one-of-a-kind items, loans, auctions) and whose cards drew no order or trade for `dormantAfter` weeks (52) is set aside, so
+the weekly per-card upkeep skips him; the moment anyone bids on, pulls or holds one of his cards he is back, with the
+unchanged history he would have had written in. Setting aside changes no outcome: values, pack odds and the pool are
+untouched, and a run with it off gives the same frames. The full league needs the latest-season start.
+
+### Limits the networks press against (frame.limits) and widening them
+
+A bot's networks produce unbounded numbers, and the world turns them into actions through fixed mappings: a price
+offset within ±60% of a base, a cash target up to 95% of worth, loan rates from 0.1% to 5% a week, and weekly counts
+of buy orders (10), auction listings (1, plus one for one-of-a-kind cards), short sales (3) and packs (3). Each week
+the engine now measures, without changing anything (`frame.limits`), how often a network sits at one of these walls:
+the share of bid and ask prices whose offset is beyond 90% of its range (or at the safety clamp, below), and the share
+beyond the default range's edges (×1.54 or ×0.46 of the base) whatever the mapping; the share of neural bots whose cash
+target, lending rate, borrowing rate, lending share or leverage output sits in the top 5% of its range; the share of
+borrowing and lending rates above 5% a week; and the share of acting bots that had one more buy order (one they could
+pay for), auction listing, item listing or short sale they wanted when the weekly count stopped them, or wanted more
+packs than allowed. The page shows them under "Limits the networks press".
+
+On Realism (seed 31761, 60 weeks) the walls that bound were the counts, above all short sales: 28.9% of bot-weeks were
+stopped by the 3-short limit, 10.4% wanted more packs than 3, 7.7% had another affordable buy order after the 10th,
+4.5% another auction listing and 4.6% another item listing. Prices pressed the ±60% wall on 3.9% of bids and 2.2% of
+asks, and the pack bid's ×0.37–×2.7 range on 5.5% of bids. The cash target and loan-rate outputs never reached their
+ceilings (0%).
+
+Two new mappings remove the price and rate walls without telling a bot where to go. `priceMap: 'log'` prices an order at
+base × e^(k × output) with k = 0.6 (`priceLogK`), the same response as the fixed range near the base, so output 0 is the
+base and ±1.8 gives ×3 or ÷3; the only bound is a numerical safety clamp of ×50 either way (`priceClamp`). The price anchor
+(toward the public guide, then toward the bot's own research) is unchanged, and the pack bid is freed the same way.
+`rateMap: 'log'` sets each loan rate to 2.5% × e^(output) (`rateLogMid`, about the old range's midpoint), with only a
+safety bound of 1,000% a week (`rateClamp`). Realism switches both on, lets the cash target reach 100% of worth, and
+raises the counts to 40 buy orders, 10 listings, 30 short sales and 8 packs a week (8 is every pack the pack outputs can
+ask for). No per-order or per-listing fee was needed: the wider counts cost about 5% more time per week, within the
+budget, so the only costs on more orders remain the market's own (the 1% fee, cash, the borrow fee and margin on
+shorts). Every default is unchanged; a run with default settings is byte-identical to before.
+
+With the widened limits (same seed and length) no wall binds much: 0% of prices at the clamp, 1.0% of bot-weeks with
+an unplaced buy order, 0% listings, 0.5% item listings, 1.6% shorts, 0% packs. The networks do use the new room: 6.4% of
+bids and 31% of asks sit beyond the old ±60% edges, and 13–15% of bots would borrow or lend at more than 5% a week.
+Trades rose from 466 to 498 a week (429 to 408 over the last 20 weeks) and the median card price ÷ value moved from
+1.076 to 1.033. These are single-seed observations, not tuned outcomes.
+
+### The tactic tracker (`frame.gen.tactics`, the Tactics panel, `sandbox/tactics_report.mjs`)
+
+The strategy clusters above describe how the networks answer 24 fixed sample cards. They say nothing about what the bots
+actually did, and they are not followed from one generation to the next. The tactic tracker measures behaviour. It
+records and changes nothing: no `W.rand`, and nothing a bot sees or does depends on it. With default settings, a run is
+identical week by week to one without it, apart from `gen`.
+
+**A behaviour profile per bot per generation.** While the market runs, every rule bot keeps a tally of what it does.
+At the generation end the tally becomes a profile of 23 features:
+- copies bought and sold, coins traded against its worth, and whether it is a net buyer or seller;
+- the average buy and sell price, each against the card's mark before the trade, against the public price guide (when
+  the guide is on), and against its own research note (when it holds a fresh one);
+- how long it holds a copy (copies sold and copies still held), the share of its worth in cash, and its top player's
+  share of its cards;
+- coins lent and borrowed against its worth, short sales, and cards lent to short sellers;
+- packs opened, auction listings and sealed bids;
+- the share of its trades made with other bots rather than dealers, outside collectors or the liquidator, the share made
+  at auction, and the forced selling it was asked for (margin calls, unpaid bills) against its worth.
+
+Hidden value never enters a profile: every price is compared with something the bot can see. Bots that were in the
+market for less than half the generation are not profiled, since a few weeks tell little.
+
+**Tactics.** The profiles are transformed (logs for counts and amounts, ±1 caps on price ratios) and z-scored. A missing
+value, such as a price ratio for a bot that never sold, sits at the mean. They are then clustered with k-means, with k
+from 2 to 8 (`tacticKMax`) chosen by silhouette and starts drawn from a private generator, so every run gives the same
+clusters. Each cluster is named after its three most distinctive features: the largest centroid deviations, one per
+group (activity, buy price, sell price), each stated in plain units from the members' raw values. Examples: "holds ~26
+weeks, sells little (~7 a gen)" or "borrows (93% of its worth a gen), forced to sell (38% of its worth a gen), sells into
+auctions (~24 listings a gen)".
+
+**Following tactics across generations.** The clusters are matched one to one, greedily by distance, to the last
+generation's tactics. The distance is the RMS difference between centroids, in this generation's standard deviations.
+A cluster within `tacticMatch` (default 1 sd) of a tactic keeps that tactic's id. Otherwise a new tactic is born, and
+the nearest old tactic is recorded as its parent. A tactic that nothing matches dies, and the nearest tactic still
+alive is recorded.
+
+For each tactic and generation, the tracker records:
+- its share and number of bots;
+- the mean and median return, at selling value (the fitness measure) and at marks, and the median fitness;
+- its age, birth and parent;
+- where its bots came from: stayed in it, switched in from another tactic, copied a member's networks through
+  evolution, inherited as heirs, or arrived new, with the top source tactics.
+
+**Two flags.** Each needs a trend that lasts `tacticWindow` generations in a row (default 2).
+- **Crowding:** the share rose and the mean return fell in every one of those generations.
+- **Cannibalization:** the share and the return both fell while the tactic with the nearest centroid rose. A tactic
+  born inside the window counts as rising from nothing.
+
+**Where to see it.**
+- `frame.gen.tactics` holds the full record, and `W.tacticHist` keeps a compact history.
+- The page's Tactics panel shows a share-over-time chart and a table of the current tactics, with their names,
+  returns, origins and flags.
+- `node sandbox/tactics_report.mjs <run.json> [--grid]` prints the history of any saved run as a timeline.
+
+Settings (Rules ▸ Population and learning):
+
+| Setting | Default | What it does |
+|---|---|---|
+| `tactics` | on | Turns the tracker on |
+| `tacticMatch` | 1 | Largest centroid distance, in sd, at which a cluster keeps a tactic's id |
+| `tacticWindow` | 2 | Generations a trend must last before a flag |
+| `tacticKMax` | 8 | Largest k tried |
+
+Realism keeps the defaults.
+
+**Caveats.**
+- Silhouettes are low (about 0.13 to 0.15 in early runs). Behaviour is a continuum more than a set of separate types.
+  Treat a tactic as a region of behaviour, not a species, and read births and deaths near the match threshold with that
+  in mind.
+- A tactic id stays the same while its centroid drifts slowly, so a long-lived tactic can end up some way from where it
+  started. The `dist` field records each generation's move.
