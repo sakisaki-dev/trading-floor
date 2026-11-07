@@ -725,3 +725,39 @@ for the same seed. None reads hidden value.
 - **Reporting:** a weekly money ledger (coins created and removed, by kind, with anything untagged shown as "other"),
   forced sales by cause, and the crash and rally detector on both indexes.
 - **Dealers' savings** (`collectorSaveWeeks`, 26): weeks of budget a value dealer can hold, so it can afford star cards.
+
+## The Realism preset and its last factors (the page's default)
+
+Spec: [realism-preset-spec.md](realism-preset-spec.md). Each new factor is off in the engine's defaults, and with all of
+them off a run matches the earlier engine for the same seed. Only the price guide reads value, and only past values, at
+publication weeks.
+
+- **Learning within a lifetime** (`adaptOn`, `adaptEvery` 10, `adaptSize` 0.05): every `adaptEvery` weeks a neural bot
+  scores its last period (its fitness return, `fitnessValue` applies, allowance, royalties and living costs excluded),
+  then runs a copy of its networks with every weight moved by `W.gauss() × adaptSize`. After the next period it keeps the
+  trial if it scored better, else restores the saved networks. Adopting another bot's networks resets its trial. The
+  frame logs trials kept ÷ run.
+- **Card loss** (`lossRate`, 0): at each season end, each copy in a bot's hands is lost with this chance (never by value;
+  never the unminted pool, dealer stock or one-of-a-kind cards). An assumption, not measured.
+- **Newcomers after rallies** (`entryHype`, 0): the weekly entry rate × (1 + entryHype × the Vault index's 20-week rise, if
+  positive). Only how many arrive changes, never what they do. An assumption.
+- **Games' difficulty minimum** (`gameFloor`): never applied by the engine (a leftover setting with no effect).
+- **Dealers' net flow:** the money ledger shows what dealers paid bots minus what bots paid them, as its own line.
+- **Public price guide** (`priceGuide` or the Rules panel's `guideOn`, `guideEvery` 4, `guideLag` 1): like Beckett in real
+  collecting. Every `guideEvery` weeks it re-publishes each player's value as it stood `guideLag` weeks earlier and holds
+  it in between. Every bot, dealer and the page see the same number. Dealers price from it instead of last week's value,
+  so their only edge is money; a player with no publication yet (a new rookie) is one they don't trade. Bots get two
+  card-network inputs (guide ÷ price as a log, weeks since the guide updated) and an output, "anchor to the guide": the
+  price base moves from the current price toward the guide by that output, then toward the bot's own fresh research
+  estimate by the research anchor. The network learns which to trust. Research is unchanged and is the only way to be
+  ahead of the guide. The extra inputs and output exist only in a world where the guide is or was on; networks from
+  before it was turned on get small random weights for them. The page shows the guide in the card header, the watchlist,
+  the tape and the top cards, and the last publication week in the status bar; the frame records the mean guide anchor
+  (`guideUse`).
+- **The Realism preset:** one season ≈ one real year. A stipend equal to the flat living cost (200), royalties of 5% of
+  value a year paid from each game (new money), 1% of worth a year in lifestyle, holding costs of 1% of price a year, a 2%
+  wealth tax above twice the median paid back equally, smaller value dealers (100,000 a week) with news, the price guide,
+  book marks, own-bid single bidders, fitness at selling value, learning within a lifetime, quitting by network, 40% estate
+  sales, cash shocks (0.5% a week, a tenth of worth), 1% of cards lost a year, newcomers after rallies, measured rookie
+  arrivals, form over 2 seasons, games paid only from stakes. Numbers marked as assumptions in the Rules panel are not
+  measured from the save.

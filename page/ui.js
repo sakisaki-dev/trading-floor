@@ -4,6 +4,15 @@
 
 // Presets change the laws of the world only. Strategies are never assigned: every bot starts with random networks.
 const PRESETS = {
+  realism: { label: 'Realism', set: { allowance: 200, livingCost: 200, lifestyle: 0.0005, royaltyFunding: 'minted', royaltyRate: 0.05, holdCost: 0.0005, wealthTax: 0.001, wealthTaxTo: 'equal', wealthTaxForced: true,
+    outsideCollectors: true, outsideMode: 'value', outsideBudget: 100000, outsideNews: true, guideOn: true, guideEvery: 4, guideLag: 1, fee: 0.01, centralBank: false, closedEconomy: false,
+    markRule: 'book', markHalfLife: 4, priceRule: 'comps', compsWeeks: 4, singleBidder: 'own', forcedSale: 'book', forcedOrder: 'network', liquidation: 'auction', vaultIndex: 'repeatSales',
+    priceAnchor: true, priceRange: 0.6, keepMax: 0.95, rateMax: 0.05, fitnessValue: 'bid', evolve: true, evolveShare: 0.1, nnFitnessGens: 6, practiceGens: 3, adaptOn: true, adaptEvery: 10, adaptSize: 0.05, quitRule: 'network',
+    mortality: true, lifespan: [6, 14], heirs: 1, estateSale: 0.4, cashShockChance: 0.005, cashShockSize: 0.1, lossRate: 0.01, turnover: true, entryRate: 0.25, entryHype: 1,
+    valueModel: 'league', valueBasis: 'form', formSeasons: 2, rookieRule: 'measured', injuries: true, injuryByAge: true, retirement: true, retirementByAge: true, awards: true, rookies: true, pressure: true, pressureStrength: 1, hypeInjury: 0, startSeason: 'latest',
+    games: true, prizeShare: 0, gameFloor: null, credit: true, maxLTV: 0.6, marginCall: 0.75, loanWeeks: 8, shorting: true,
+    fashion: false, store: false, priceLimit: 0, positionLimit: 0, capPoorest: false, leagueUpdates: false, lenderCycle: false },
+    hyp: '<b>Realism.</b> One season is about one real year. Income comes mostly from the football: royalties of 5% of a card\'s value a year, paid from each week\'s game, with a stipend that only covers the flat living cost. Costs balance it: 1% of worth a year in lifestyle, holding costs of 1% of a card\'s price a year, and a 2% wealth tax above twice the median, paid back to every bot alike. Real frictions: 40% of a dynasty\'s cards sold at each death, cash shocks, 1% of cards lost a year, and more newcomers after rallies. A public price guide, like real collecting, re-publishes every player\'s value every 4 weeks, a week old: everyone sees the same number, and research is how to be early. Dealers price from the guide too, so their only edge is money. Prices stay inside the bids and asks. Bots price on the guide and their own research, learn within their lifetimes, decide when to quit, and are judged on what they could actually sell for. Every number not measured from the save is an assumption, marked in Rules.' },
   laws: { label: 'Default laws', set: {}, hyp: '<b>Default laws.</b> 250 neural bots with random weights, the site\'s real prices and rarities, real seasons as news, credit between bots. Nothing tells them what to do: watch what they learn, who gets rich and whether bubbles form.' },
   loose: { label: 'Loose money', set: { allowance: 500 }, hyp: '<b>Loose money.</b> A 500-coin weekly allowance. More coins chasing the same cards.' },
   tight: { label: 'Tight money', set: { allowance: 0 }, hyp: '<b>Tight money.</b> No allowance: only trading, games and lending earn coins.' },
@@ -34,7 +43,7 @@ const FAMS = familyList(LIBRARY);
 
 /* ---------- State ---------- */
 const randSeed = () => 1 + Math.floor(Math.random() * 99999); // every new run gets a new seed (type one in Seed to replay a run)
-let opts = { seed: randSeed() }, presetKey = 'laws';
+let opts = { seed: randSeed() }, presetKey = 'realism'; // the page opens on the Realism preset; Default laws stays selectable
 let FRAMES = [], H = null, mode = 'live', RUN = null, cursor = 0;
 // The live world runs in a background worker (the same engine), so a slow week never freezes the page. The worker sends
 // each finished week as a frame, the world's settings, and details for whatever player and bot are selected.
@@ -127,7 +136,7 @@ function startLive() {
 function startReplay(run) {
   tell({ cmd: 'play', v: false }); mode = 'replay'; RUN = run; FRAMES = []; newHist();
   { // weeks a long run trimmed (older than two years) lack the bots and lists: borrow them from the nearest full week
-    const fr = run.frames || []; let next = null; for (let i = fr.length - 1; i >= 0; i--) { if (fr[i].bots) next = fr[i]; else if (next) { for (const k of THIN) if (fr[i][k] === undefined && next[k] !== undefined) fr[i][k] = k === 'events' || k === 'jn' || k === 'arcs' || k === 'aiLog' ? [] : next[k]; } } }
+    const fr = run.frames || [], next = {}; for (let i = fr.length - 1; i >= 0; i--) for (const k of THIN) { if (fr[i][k] !== undefined) next[k] = fr[i][k]; else if (next[k] !== undefined) fr[i][k] = k === 'events' || k === 'jn' || k === 'arcs' || k === 'aiLog' ? [] : next[k]; } }
   for (const f of run.frames) pushFrame(f);
   cursor = 0; $('liveBtn').hidden = false; setPlay(true);
   const ai = run.meta?.aiBots || [];
@@ -317,10 +326,11 @@ const avg = (xs) => { const v = xs.filter((y) => y != null && isFinite(y)); retu
 function grpWorth(f) { if (f._gw) return f._gw; const s = GROUPS.map(() => [0, 0]); for (const b of f.bots) { const g = s[b[17] ?? 2]; g[0] += b[3]; g[1]++; } return (f._gw = s.map(([w, k]) => (k ? w / k : null))); }
 function botMap(f) { if (f._bm) return f._bm; const ws = f.bots.map((b) => b[3]).sort((a, b) => a - b); f._med = ws[Math.floor(ws.length / 2)] || 1; return (f._bm = new Map(f.bots.map((b) => [b[0], b[3]]))); }
 const hmWidth = (id) => $(id).getBoundingClientRect().width - 132;
-const SENS_ROWS = CARD_IN.map((k, i) => [k, i]).filter(([, i]) => i > 0);
+const SENS_ALL = [...CARD_IN_BASE, ...GUIDE_IN].map((k, i) => [k, i]).filter(([, i]) => i > 0); let SENS_ROWS = SENS_ALL; // the guide's inputs only in runs with the price guide
 function drawHeatmaps() {
   const n = nNow(), f = cur();
   { // What the networks learned: how much each input pushes the richest 10% toward buying (red) or selling (blue)
+    SENS_ROWS = SENS_ALL.filter(([, i]) => i < CARD_IN_BASE.length || FRAMES[n - 1]?.guideT !== undefined);
     const { cols, range } = buckets(n, hmWidth('hmGene')), rows = SENS_ROWS.map(([k]) => ({ label: k }));
     // measured every 4 weeks: each column uses the latest measurement at or before its last week
     const sensAt = (k) => { if (FRAMES[k]._sens !== undefined) return FRAMES[k]._sens; let s = null; for (let i = k; i >= 0 && i > k - 8; i--) if (FRAMES[i].sens) { s = FRAMES[i].sens; break; } return (FRAMES[k]._sens = s); };
@@ -391,11 +401,21 @@ function drawFast() {
   $('kBub').textContent = f.h.bub.toFixed(2) + '×'; $('kBubS').html = pill(f.h.bub);
   $('kGini').textContent = f.h.gini.toFixed(3); $('kGiniS').textContent = `${f.h.gini >= H.gini[0] ? '▲' : '▼'} from ${H.gini[0].toFixed(3)}`;
   $('kTrades').textContent = f.h.trades.toLocaleString(); $('kTradesS').textContent = `${f.house.packs.toLocaleString()} packs bought`;
+  { const pk = f.pk, L = { standard: 'Std', premium: 'Prem', elite: 'Elite', holo: 'Holo' }; $('kPack').textContent = pk?.standard?.[0] ? fmt(pk.standard[0]) : '–';
+    $('kPackS').textContent = pk ? `${Object.entries(pk).filter(([t]) => t !== 'standard').map(([t, [p]]) => `${L[t] || t} ${fmt(p)}`).join(' · ')} · ${Object.values(pk).reduce((a, [, n]) => a + n, 0).toLocaleString()} sold` : 'not in this save'; $('kPack').parentElement.title = pk ? 'Standard pack price now; the other types after it, and packs sold this week' : ''; }
   $('kPass').textContent = f.h.pass == null ? '–' : f.h.pass.toFixed(2); $('kPassS').textContent = `coins · ${f.h.informed.toFixed(1)} notes/bot`;
   $('kTicket').textContent = f.tickets == null ? '–' : f.tickets.toFixed(2); $('kTicketS').textContent = f.gs ? `${Object.values(f.gs).reduce((x, g) => x + g[0], 0).toLocaleString()} game entries this wk` : 'games off';
   $('kWin').textContent = g4.skill[1] ? (g4.skill[0] / g4.skill[1]).toFixed(2) : '–'; $('kWinS').textContent = games ? `${games.toLocaleString()} entries · ${fmt(pots)} coins in pots` : 'no games';
   const ranked = f.bots.slice().sort((a, b) => b[3] - a[3]);
   $('kBank').textContent = f.mkt?.rate == null ? '–' : (f.mkt.rate * 100).toFixed(2) + '%'; $('kBankS').textContent = `per week · loans ${f.mkt?.mcap ? pct(f.mkt.debt / f.mkt.mcap) : '–'} of market · ${f.mkt?.defaults ?? 0} defaults`;
+  { // a slight tint on the tiles where higher or lower is better (not prices): green inside the health board's healthy band, red past its alarm line, amber between
+    const lv = (key, v) => { const L = HEALTH.lights.find((x) => x.key === key), A = L?.alarm || {}; if (v == null || !L) return null; if ((A.above != null && v > A.above) || (A.below != null && v < A.below)) return 'bad'; return L.healthy ? (v >= L.healthy[0] && v <= L.healthy[1] ? 'good' : 'fair') : null; };
+    const tone = (id, t, why) => { const el = $(id).parentElement; if (t) el.dataset.tone = t; else delete el.dataset.tone; el.title = t ? `${{ good: 'Healthy', fair: 'Watch', bad: 'Alarm' }[t]}: ${why}` : ''; };
+    tone('kGini', lv('gini', f.h.gini), 'healthy up to 0.35, alarm above 0.55 (the health board’s Inequality)');
+    { let s = 0, k = 0; for (let i = Math.max(0, n - 53); i < n - 1; i++) { s += FRAMES[i].h.trades; k++; } const r = k >= 8 && s > 0 ? f.h.trades / (s / k) : null;
+      tone('kTrades', r == null ? null : r < 0.25 ? 'bad' : r >= 0.75 ? 'good' : 'fair', `trades against the average of the last year: healthy from 75%, alarm under 25% (now ${r == null ? '–' : pct(r)})`); }
+    { const sk = g4.skill[1] ? g4.skill[0] / g4.skill[1] : null; tone('kWin', sk == null ? null : sk <= 0 ? 'bad' : sk >= 0.3 ? 'good' : 'fair', 'rank correlation of what entrants know with their scores: healthy from 0.30 (skill decides), alarm at 0 or below (luck)'); }
+  }
   const pctS = (v) => (v == null ? '–' : `<span class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${Math.round(v * 100)}%</span>`);
   patchRows($('lb').tBodies[0], (lbAll ? ranked : ranked.slice(0, 20)).map((b) => ({ key: b[0], val: b[3], html: `<tr data-bot="${b[0]}" title="${esc(b[2])} · ${kindOf(b)} · gen ${b[10]}${b[6] >= 5 ? ' · flagged' : ''}"><td><span class="sw" style="background:${grpColor(b)}"></span>${esc(b[2])}${b[9] ? ' <span class="pill pill--fair">AI</span>' : ''}${b[6] >= 5 ? ' <span class="pill pill--hot">flagged</span>' : ''}</td><td class="num">${fmt(b[3])}</td><td class="num">${pctS(b[16])}</td><td class="num">${pctS(b[13])}</td></tr>` })));
   drawWatch(); drawStatus(); drawIndicators(); drawGroups(); drawMvc(f);
@@ -423,7 +443,7 @@ function drawLeagueNews() {
 function drawMvc(f) {
   { // The most valuable card in circulation this week, and the next two
     const tops = f.top || [];
-    $('mvc').html = tops.map((x, i) => `<button type="button" class="${i ? '' : 'first'}" data-card="${x.pid}" data-lib="${x.pid}"><span>${i ? `No. ${i + 1}` : 'Most valuable card'}</span><b>${esc(x.label)}</b><small><span class="mono" style="font-size:inherit;color:var(--chalk);text-transform:none;letter-spacing:0">${fmt(x.P)}</span> coins · value ${fmt(x.F)} · ${x.owner ? (x.owner.startsWith('up for') ? esc(x.owner) : `held by ${esc(x.owner)}`) : 'no holder found'}${x.n > 1 ? ` · ${x.n} copies` : ''}</small></button>`).join('');
+    $('mvc').html = tops.map((x, i) => `<button type="button" class="${i ? '' : 'first'}" data-card="${x.pid}" data-lib="${x.pid}"><span>${i ? `No. ${i + 1}` : 'Most valuable card'}</span><b>${esc(x.label)}</b><small><span class="mono" style="font-size:inherit;color:var(--chalk);text-transform:none;letter-spacing:0">${fmt(x.P)}</span> coins · value ${fmt(x.F)}${x.G != null ? ` · guide ${fmt(x.G)}` : ''} · ${x.owner ? (x.owner.startsWith('up for') ? esc(x.owner) : `held by ${esc(x.owner)}`) : 'no holder found'}${x.n > 1 ? ` · ${x.n} copies` : ''}</small></button>`).join('');
   }
 }
 document.addEventListener('keydown', (e) => { const q = e.target.closest?.('.qt[data-metric]'); if (q && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); q.click(); } });
@@ -469,9 +489,9 @@ const GROUP = { credit: ['loan', 'marginCall', 'default'], shorts: ['short', 'co
 
 /* ---------- Controls ---------- */
 $('preset').innerHTML = Object.entries(PRESETS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
-const SLIDERS = { extraRookies: [1, (v) => String(v)], markDepth: [1, (v) => 'best ' + v + ' orders'], markHalfLife: [1, (v) => (v ? v + ' wk half-life' : 'off')], holdCost: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% of mark' : 'off')], estateSale: [0.01, (v) => (v ? v + '% of cards' : 'off')], cashShockChance: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% a week' : 'off')], cashShockSize: [0.01, (v) => v + '% of worth'], markWeeks: [1, (v) => v + ' wk'], collectorSaveWeeks: [1, (v) => v + ' wk of budget'], collectors: [1, (v) => String(v)], collectorError: [0.01, (v) => '±' + v + '%'], collectorStart: [0.01, (v) => v + '% of copies'], collectorPerCard: [1, (v) => v + ' copies'], collectorSpread: [0.01, (v) => v + '%'], royaltyRate: [0.01, (v) => v + '%'], nnFitnessGens: [1, (v) => v + ' gens'], practiceGens: [1, (v) => (v ? v + ' (on Restart)' : 'none')], compsWeeks: [1, (v) => v + ' wk'], formSeasons: [1, (v) => v + (v > 1 ? ' seasons' : ' season') + ` (${v * 17} games)`], hypeInjury: [0.01, (v) => (v ? '×' + (v / 100).toFixed(1) : 'off')], entryRate: [0.01, (v) => (v / 100).toFixed(2)], heirs: [1, (v) => String(v)], scarcity: [0.01, (v) => (v / 100).toFixed(2)], packsPerWeek: [1, (v) => String(v)], liqListings: [1, (v) => String(v)], outsideBudget: [1, (v) => v.toLocaleString()], outsideResale: [0.01, (v) => v + '%'], prizeShare: [0.01, (v) => v + '% of takings'], livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'], walkUp: [0.01, (v) => v + '%'], walkVolLow: [0.01, (v) => '±' + v + '%'], walkVolHigh: [0.01, (v) => '±' + v + '%'], riskPerDoubling: [1, (v) => '+' + v + ' pts'], flagWeeks: [1, (v) => (v ? v + ' wk clean' : 'forever')], cardLendFee: [0.0001, (v) => (v / 100).toFixed(2) + '%/wk'], shortMargin: [0.01, (v) => v + '%'], cardLoanWeeks: [1, (v) => v + ' wk'], nnMutation: [0.01, (v) => '±' + (v / 100).toFixed(2)], nnReset: [0.01, (v) => v.toFixed(1) + '%'], evolveShare: [0.01, (v) => v + '%'] };
-const SELECTS = ['wealthTaxTo', 'rookieRule', 'singleBidder', 'fitnessValue', 'markRule', 'royaltyFunding', 'vaultIndex', 'valueBasis', 'pastSave', 'valueModel', 'priceRule', 'outsideMode', 'liquidation', 'forcedSale', 'packSale'];
-const TOGGLES = ['wealthTaxForced', 'outsideNews', 'retirementByAge', 'injuryByAge', 'pressure', 'injuries', 'retirement', 'rookies', 'awards', 'capPoorest', 'turnover', 'twoSidedQuotes', 'shorting', 'credit', 'passesTradable', 'games', 'sharing', 'stealing', 'gossip', 'outsideCollectors', 'royalties', 'evolve', 'leagueUpdates', 'centralBank', 'store', 'closedEconomy'];
+const SLIDERS = { guideEvery: [1, (v) => v + ' wk'], guideLag: [1, (v) => v + ' wk old'], adaptEvery: [1, (v) => v + ' wk'], adaptSize: [0.01, (v) => '±' + (v / 100).toFixed(2)], lossRate: [0.001, (v) => (v ? (v / 10).toFixed(1) + '% a season' : 'off')], entryHype: [0.1, (v) => (v ? '×' + (v / 10).toFixed(1) : 'off')], cashShockChance: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% a week' : 'off')], priceRange: [0.01, (v) => '±' + v + '%'], keepMax: [0.01, (v) => v + '% of worth'], rateMax: [0.001, (v) => (v / 10).toFixed(1) + '%/wk'], deployOrders: [1, (v) => String(v)], maxOrderQty: [1, (v) => String(v)], maxListings: [1, (v) => String(v)], maxShorts: [1, (v) => String(v)], maxPacks: [1, (v) => String(v)], quitDrawdown: [0.01, (v) => v + '% of peak'], quitChance: [0.01, (v) => v + '%'], extraRookies: [1, (v) => String(v)], markDepth: [1, (v) => 'best ' + v + ' orders'], markHalfLife: [1, (v) => (v ? v + ' wk half-life' : 'off')], holdCost: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% of mark' : 'off')], estateSale: [0.01, (v) => (v ? v + '% of cards' : 'off')], cashShockChance: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% a week' : 'off')], cashShockSize: [0.01, (v) => v + '% of worth'], markWeeks: [1, (v) => v + ' wk'], collectorSaveWeeks: [1, (v) => v + ' wk of budget'], collectors: [1, (v) => String(v)], collectorError: [0.01, (v) => '±' + v + '%'], collectorStart: [0.01, (v) => v + '% of copies'], collectorPerCard: [1, (v) => v + ' copies'], collectorSpread: [0.01, (v) => v + '%'], royaltyRate: [0.01, (v) => v + '%'], nnFitnessGens: [1, (v) => v + ' gens'], practiceGens: [1, (v) => (v ? v + ' (on Restart)' : 'none')], compsWeeks: [1, (v) => v + ' wk'], formSeasons: [1, (v) => v + (v > 1 ? ' seasons' : ' season') + ` (${v * 17} games)`], hypeInjury: [0.01, (v) => (v ? '×' + (v / 100).toFixed(1) : 'off')], entryRate: [0.01, (v) => (v / 100).toFixed(2)], heirs: [1, (v) => String(v)], scarcity: [0.01, (v) => (v / 100).toFixed(2)], packsPerWeek: [1, (v) => String(v)], liqListings: [1, (v) => String(v)], outsideBudget: [1, (v) => v.toLocaleString()], outsideResale: [0.01, (v) => v + '%'], prizeShare: [0.01, (v) => v + '% of takings'], livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'], walkUp: [0.01, (v) => v + '%'], walkVolLow: [0.01, (v) => '±' + v + '%'], walkVolHigh: [0.01, (v) => '±' + v + '%'], riskPerDoubling: [1, (v) => '+' + v + ' pts'], flagWeeks: [1, (v) => (v ? v + ' wk clean' : 'forever')], cardLendFee: [0.0001, (v) => (v / 100).toFixed(2) + '%/wk'], shortMargin: [0.01, (v) => v + '%'], cardLoanWeeks: [1, (v) => v + ' wk'], nnMutation: [0.01, (v) => '±' + (v / 100).toFixed(2)], nnReset: [0.01, (v) => v.toFixed(1) + '%'], evolveShare: [0.01, (v) => v + '%'] };
+const SELECTS = ['quitRule', 'forcedOrder', 'wealthTaxTo', 'rookieRule', 'singleBidder', 'fitnessValue', 'markRule', 'royaltyFunding', 'vaultIndex', 'valueBasis', 'pastSave', 'valueModel', 'priceRule', 'outsideMode', 'liquidation', 'forcedSale', 'packSale'];
+const TOGGLES = ['guideOn', 'adaptOn', 'priceAnchor', 'wealthTaxForced', 'outsideNews', 'retirementByAge', 'injuryByAge', 'pressure', 'injuries', 'retirement', 'rookies', 'awards', 'capPoorest', 'turnover', 'twoSidedQuotes', 'shorting', 'credit', 'passesTradable', 'games', 'sharing', 'stealing', 'gossip', 'outsideCollectors', 'royalties', 'evolve', 'leagueUpdates', 'centralBank', 'store', 'closedEconomy'];
 function syncControls() {
   const c = cfgNow(); if (!c) return;
   for (const [k, [s, f]] of Object.entries(SLIDERS)) { $(k).value = Math.round((c[k] / s) * 100) / 100; $(k + 'V').textContent = f(+$(k).value); }
@@ -485,7 +505,7 @@ for (const k of TOGGLES) $(k).addEventListener('change', (e) => { opts[k] = e.ta
 $('rulesBtn').addEventListener('click', () => { const open = $('rules').hidden; $('rules').hidden = !open; $('rulesBtn').setAttribute('aria-expanded', String(open)); $('rulesBtn').textContent = open ? 'Rules ▴' : 'Rules ▾'; });
 function advance() {
   if (mode === 'live') { tell({ cmd: 'step' }); return false; }
-  if (cursor < FRAMES.length - 1) { cursor++; for (const [s, b] of FRAMES[cursor].arcs) arcs.push({ s, b, age: 0 }); return true; }
+  if (cursor < FRAMES.length - 1) { cursor++; for (const [s, b] of FRAMES[cursor].arcs || []) arcs.push({ s, b, age: 0 }); return true; }
   setPlay(false); return false;
 }
 // Keep what is under the top of the screen exactly where it is while panels redraw (Safari has no scroll anchoring
@@ -548,13 +568,16 @@ $('wfilter').addEventListener('input', (e) => { wq = e.target.value.trim().toLow
 
 // A player's state now (live: the world; replay: the frame's price vector). His price is what his cards trade for,
 // brought back to a Prizm Base equivalent; his value is his Prizm Base card's hidden value.
+// The public price guide as of a frame: the latest publication at or before it (null in runs without the guide)
+function guideAt(at) { const f = FRAMES[at]; if (!f || f.guideT == null) return null; if (f._g !== undefined) return f._g; let g = null; for (let i = at; i >= 0 && i >= at - 40; i--) if (FRAMES[i].guide) { g = { v: FRAMES[i].guide, t: FRAMES[i].t }; break; } return (f._g = g); }
 function cardNow(id) {
   const at = ix(), fr = FRAMES[at]; if (!fr) return { P: null };
   const P = fr.prices?.[id] ?? null, back = FRAMES[Math.max(0, at - 4)].prices?.[id];
   let F = null; for (let i = at; i >= 0; i--) if (FRAMES[i].values) { F = FRAMES[i].values[id]; break; }
   let vol4 = 0; for (let i = Math.max(0, at - 3); i <= at; i++) vol4 += FRAMES[i].vol?.[id] || 0;
   const spark = []; for (let i = Math.max(0, at - 23); i <= at; i++) spark.push(FRAMES[i].prices?.[id]);
-  return { P, F, circ: fr.circ?.[id] ?? null, pool: fr.pool?.[id] ?? null, chg: P != null && back ? P / back - 1 : 0, vol4, spark };
+  const g = guideAt(at);
+  return { P, F, G: g?.v[id] ?? null, GT: g?.t ?? null, circ: fr.circ?.[id] ?? null, pool: fr.pool?.[id] ?? null, chg: P != null && back ? P / back - 1 : 0, vol4, spark };
 }
 const ret4 = (h) => (h.length > 4 ? h[h.length - 1] / h[h.length - 5] - 1 : 0);
 const chgSpan = (x) => `<span class="${x >= 0 ? 'up' : 'down'}">${x >= 0 ? '▲' : '▼'} ${(Math.abs(x) * 100).toFixed(1)}%</span>`;
@@ -574,7 +597,8 @@ function marquee(view, a, b, html) {
 }
 function drawTape() {
   const m = cur().movers || { up: [], down: [] };
-  const item = ([id, P, r]) => { const p = LIBRARY.players[id]; return `<button type="button" class="tk" data-card="${id}"><b>${p.pos} ${esc(p.name)}</b><span>${fmt(P)} ${chgSpan(r)}</span></button>`; };
+  const g = guideAt(ix());
+  const item = ([id, P, r]) => { const p = LIBRARY.players[id]; return `<button type="button" class="tk" data-card="${id}"><b>${p.pos} ${esc(p.name)}</b><span>${fmt(P)} ${chgSpan(r)}${g?.v[id] != null ? ` <small>guide ${fmt(g.v[id])}</small>` : ''}</span></button>`; };
   const items = [...m.up.map(item), ...m.down.map(item)]; while (items.length < 14) items.push('<span class="tk" aria-hidden="true"></span>');
   marquee($('tape'), $('tapeTrack'), $('tapeTrack2'), items.join(''));
 }
@@ -585,7 +609,7 @@ function drawWatch() {
   $('watchMore').textContent = watchAll ? 'Show fewer' : `Show all ${rows.length} players`;
   const list = $('watch'); list.classList.toggle('all', watchAll);
   const rowH = list.firstElementChild?.offsetHeight || 43, fitN = Math.max(8, Math.floor((list.clientHeight || rowH * 14) / rowH));
-  patchRows(list, (watchAll ? rows : rows.slice(0, fitN)).map((r) => ({ key: r.id, val: r.P, html: `<button type="button" class="wrow" role="option" data-card="${r.id}" aria-selected="${SEL.type === 'card' && SEL.id === r.id}"><b>${r.p.pos} ${esc(r.p.name)}${cur()?.inj?.includes(r.id) ? ' <span class="pill pill--out">OUT</span>' : ''}</b><span class="px">${fmt(r.P)}</span><small>${esc(teamShort(r.p.team))} · OVR ${ovrOf(r.id)}${riskNow(r.id) != null ? ` · risk ${Math.round(riskNow(r.id))}` : ''} · ${r.vol4} trades · ${(r.P / r.F).toFixed(2)}×</small><span class="chg">${chgSpan(r.chg)}</span></button>` })));
+  patchRows(list, (watchAll ? rows : rows.slice(0, fitN)).map((r) => ({ key: r.id, val: r.P, html: `<button type="button" class="wrow" role="option" data-card="${r.id}" aria-selected="${SEL.type === 'card' && SEL.id === r.id}"><b>${r.p.pos} ${esc(r.p.name)}${cur()?.inj?.includes(r.id) ? ' <span class="pill pill--out">OUT</span>' : ''}</b><span class="px">${fmt(r.P)}</span><small>${esc(teamShort(r.p.team))} · OVR ${ovrOf(r.id)}${riskNow(r.id) != null ? ` · risk ${Math.round(riskNow(r.id))}` : ''} · ${r.vol4} trades · ${(r.P / r.F).toFixed(2)}×${r.G != null ? ` · guide ${fmt(r.G)}` : ''}</small><span class="chg">${chgSpan(r.chg)}</span></button>` })));
 }
 
 // Bars for the main chart: [{t, o, h, l, c, v, val}]
@@ -612,7 +636,7 @@ function drawMain() {
   // Header
   let name = 'Vault index', sub = 'repeat sales: from trades only · start = 100 · blue: every card\'s mark, bids and asks included', valLabel = 'Hidden value';
   const met = sel.type === 'metric' ? METRICS.find((x) => x.key === sel.key) : null; if (met) { name = met.label; sub = 'market stat over time · click its tile again to go back'; valLabel = met.refLabel || ''; }
-  if (sel.type === 'card') { const p = LIBRARY.players[sel.id]; name = `${p.pos} ${p.name}`; sub = `${teamShort(p.team)} · OVR ${ovrOf(sel.id)}${riskNow(sel.id) != null ? ` · ${riskText(sel.id)}` : ''} · price shown as Prizm Base`; }
+  if (sel.type === 'card') { const p = LIBRARY.players[sel.id]; name = `${p.pos} ${p.name}`; sub = `${teamShort(p.team)} · OVR ${ovrOf(sel.id)}${riskNow(sel.id) != null ? ` · ${riskText(sel.id)}` : ''} · price shown as Prizm Base${(() => { const c = cardNow(sel.id); return c.G != null ? ` · guide ${fmt(c.G)} (published wk ${c.GT})` : ''; })()}`; }
   if (sel.type === 'bot') { const b = cur().bots.find((b) => b[0] === sel.id); name = b ? b[2] : 'Bot'; sub = b ? `${kindOf(b)} · ${GROUPS[b[17] ?? 2].label} · worth` : 'not in the market now'; valLabel = 'Median bot'; }
   $('ch-name').textContent = name; $('chSub').textContent = sub;
   const last = bars[bars.length - 1], first = bars[0];
@@ -932,7 +956,7 @@ function drawStatus() {
   const p1 = FRAMES[Math.max(0, at - 1)]?.h.p ?? f.h.p, b = breadth(at) || {}, o = f.ord || {};
   $('statusBadge').html = mode === 'replay' ? `<span class="paused">REPLAY</span>` : playing ? `<span class="live">LIVE</span>` : `<span class="paused">PAUSED</span>`;
   const item = (k, v, w) => `<span style="width:${k.length + w + 4}ch">${k}<b>${v}</b></span>`; // w = the widest the value gets
-  marquee($('statusView'), $('statusSet'), $('statusSet2'), [item('WK', f.t, 4), item('SEASON', f.season || '–', 4), `<span style="width:20ch">VAULT<b>${f.h.p.toFixed(1)}</b> ${chgSpan(f.h.p / p1 - 1)}</span>`, item('PREMIUM', f.mkt?.vcap ? ((f.mkt.mcap / f.mkt.vcap - 1) * 100).toFixed(1) + '%' : '–', 7), `<span style="width:13ch">A/D<b><span class="up">${b.adv ?? 0}</span>/<span class="down">${b.dec ?? 0}</span></b></span>`, item('VOL', b.vix == null ? '–' : (b.vix * 100).toFixed(1) + '%', 6), item('TRADES', f.h.trades, 6), item('COINS TRADED', fmt(o.coins), 8), item('BUY PRESSURE', o.bids + o.asks ? pct(o.bids / (o.bids + o.asks)) : '–', 4), item('RATE', f.mkt?.rate == null ? '–' : (f.mkt.rate * 100).toFixed(2) + '%', 6), item('BOTS', f.bots.length, 4), item('NEW COINS', f.money ? (f.money.net >= 0 ? '+' : '−') + fmt(Math.abs(f.money.net)) : '–', 9), `<span style="width:58ch">TOP CARD<b>${f.top?.[0] ? `${esc(f.top[0].label)} ${fmt(f.top[0].P)}` : '–'}</b></span>`].join(''));
+  marquee($('statusView'), $('statusSet'), $('statusSet2'), [item('WK', f.t, 4), item('SEASON', f.season || '–', 4), `<span style="width:20ch">VAULT<b>${f.h.p.toFixed(1)}</b> ${chgSpan(f.h.p / p1 - 1)}</span>`, item('PREMIUM', f.mkt?.vcap ? ((f.mkt.mcap / f.mkt.vcap - 1) * 100).toFixed(1) + '%' : '–', 7), `<span style="width:13ch">A/D<b><span class="up">${b.adv ?? 0}</span>/<span class="down">${b.dec ?? 0}</span></b></span>`, item('VOL', b.vix == null ? '–' : (b.vix * 100).toFixed(1) + '%', 6), item('TRADES', f.h.trades, 6), item('COINS TRADED', fmt(o.coins), 8), item('BUY PRESSURE', o.bids + o.asks ? pct(o.bids / (o.bids + o.asks)) : '–', 4), item('RATE', f.mkt?.rate == null ? '–' : (f.mkt.rate * 100).toFixed(2) + '%', 6), item('BOTS', f.bots.length, 4), ...(f.guideT != null ? [item('GUIDE', 'wk ' + f.guideT, 6)] : []), item('NEW COINS', f.money ? (f.money.net >= 0 ? '+' : '−') + fmt(Math.abs(f.money.net)) : '–', 9), `<span style="width:58ch">TOP CARD<b>${f.top?.[0] ? `${esc(f.top[0].label)} ${fmt(f.top[0].P)}` : '–'}</b></span>`].join(''));
 }
 // Squarified treemap: rectangles close to square, biggest first
 function squarify(items, x, y, w, h) {
@@ -1272,10 +1296,10 @@ const HEALTH = {
   minWeeks: 12,
   alertCooldown: 8, // weeks before the same light can raise another alert
   lights: [
-    { key: 'coins', group: 'Activity', label: 'Coins changing hands', good: 'up', alarm: { rel52: 0.25 }, fmt: (v) => fmt(v), why: 'coins in trades and card auctions this week', get: (f) => (f.ord ? (f.ord.coins || 0) + (f.ord.aucCoins || 0) : null) },
+    { key: 'coins', group: 'Activity', label: 'Coins changing hands', good: 'up', alarm: { rel52: 0.25 }, fmt: (v) => fmt(v), why: 'coins in trades and card auctions this week', get: (f) => (f.ord ? f.ord.coins || 0 : null) }, // ord.coins already includes card auction sales
     { key: 'sales', flat: 2, group: 'Activity', label: 'Sales', good: 'up', alarm: { rel52: 0.25 }, fmt: (v) => fmt(v), why: 'trades plus card auction sales this week', get: (f) => f.h?.trades ?? null },
     { key: 'bidask', flat: 0.005, group: 'Activity', label: 'Bids ÷ offers', good: 'up', alarm: { below: 0.05 }, healthy: [0.3, 3], fmt: (v) => v.toFixed(v < 0.1 ? 3 : 2), why: 'unfilled bids for every unfilled offer', get: (f) => (f.ord?.asks ? f.ord.bids / f.ord.asks : null) },
-    { key: 'fire', flat: 0.005, group: 'Prices', label: 'Fire sales', good: 'down', alarm: { above: 0.05 }, healthy: [0, 0.01], fmt: (v) => pct(v), why: 'card auctions sold for 1 coin or less, or under 10% of their top bid', get: (f) => (f.ord && 'aucSold' in f.ord ? (f.ord.aucSold ? f.ord.aucFree / f.ord.aucSold : 0) : null) },
+    { key: 'fire', flat: 0.005, group: 'Prices', label: 'Fire sales', good: 'down', alarm: { above: 0.05 }, healthy: [0, 0.01], fmt: (v) => pct(v), why: 'card auctions sold for 1 coin or less, or under 10% of their top bid', get: (f) => (f.ord && 'aucSold' in f.ord ? ((f.ord.aucCardSold ?? f.ord.aucSold) ? f.ord.aucFree / (f.ord.aucCardSold ?? f.ord.aucSold) : 0) : null) },
     { key: 'vsmark', flat: 0.03, group: 'Prices', label: 'Sale vs quote', good: 'toward1', alarm: { below: 0.6 }, healthy: [0.85, 1.15], fmt: (v) => v.toFixed(2) + '×', why: 'median auction price ÷ the card’s mark the week before', get: (f) => f.ord?.aucVsMark ?? null },
     { key: 'pidx', group: 'Prices', label: 'Price index', good: 'up', alarm: { fall8: 0.3 }, fmt: (v) => v.toFixed(0), why: 'the Vault index (trades and auctions)', get: (f) => f.h?.p ?? null },
     { key: 'gap', flat: 0.03, group: 'Prices', label: 'Marks vs sales gap', good: 'toward1', alarm: { above: 1.5, below: 0.67 }, healthy: [0.9, 1.1], fmt: (v) => v.toFixed(2) + '×', why: 'marks index ÷ Vault index', get: (f) => (f.h?.pMark != null && f.h?.p ? f.h.pMark / f.h.p : null) },
