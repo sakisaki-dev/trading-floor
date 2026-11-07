@@ -705,3 +705,23 @@ After the save's last real season (Y88) a simulated league plays on and sets eve
   toward it (the trade log in each account, and the chart's market internals).
 - **Prices:** an untraded card is marked from its player's other cards' trades (comparable sales); the Vault index is a
   repeat-sales index fitted over the last 104 weeks from all pairs of trades of the same card.
+
+## Real-world frictions (Rules ▸ Money and Values and prices; all off by default)
+
+Spec: [realism-factors-spec.md](realism-factors-spec.md). With every one at its default a run matches the earlier engine
+for the same seed. None reads hidden value.
+
+- **Auction sales are trades.** A card sold at auction (including the liquidator's and forced sales) sets its price,
+  feeds comparable sales and the Vault index, and counts in trades. One-of-a-kind cards keep their own last sale.
+- **Marks** (`markRule`): 'trades' (default) or 'book', the last trade kept inside the standing book. The median of the
+  `markDepth` (3) best asks pulls a mark down, of the best bids up, once it has held `markWeeks` (2) weeks running.
+  `markHalfLife` (0 = off): an untraded mark drifts toward the book. The chart shows the trade-only Vault index and a
+  marks index side by side.
+- **Holding cost** (`holdCost`, 0): a share of each card's mark its holder pays the house each week; a shortfall is a forced
+  sale. `wealthTaxForced`: the unpaid wealth tax becomes a forced sale too.
+- **Forced sellers:** `estateSale` (0), the share of a dying bot's cards sold (best bids, then auction) before the heirs
+  inherit; `cashShocks` (chance and size, 0), a weekly chance of a cash need of size × worth, each one logged. Both are
+  the owner's assumptions, not measured.
+- **Reporting:** a weekly money ledger (coins created and removed, by kind, with anything untagged shown as "other"),
+  forced sales by cause, and the crash and rally detector on both indexes.
+- **Dealers' savings** (`collectorSaveWeeks`, 26): weeks of budget a value dealer can hold, so it can afford star cards.
