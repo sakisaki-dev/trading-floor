@@ -539,9 +539,9 @@ For each regulated run, against the same seed with fixed settings:
 | Step | Needs | What |
 |---|---|---|
 | 1 | — | Current build: speed-up, attention, scaled bots, market-driven entry, page redesign |
-| 2 | 1 | Engine changes in section 9: treasury lines, grants, liquidator buying, royalty cap, opening balance, `applyControls`, treasury accounting |
+| 2 | 1 | Engine changes in section 9: treasury lines, grants, liquidator buying, royalty cap, opening balance, `applyControls`, treasury accounting; the personal account and the record of governments (4d); the money printers closed (16.1) |
 | 3 | 2 | The board: parsing, network inputs, credibility measures |
-| 4 | 2 | The driver: clock, state files, controls, wake rules, decision log, replay |
+| 4 | 2 | The driver: clock, state files, controls, wake rules, decision log, replay, world snapshot and restore, checkpoints and resume (17) |
 | 5 | 4 | The session: brief, tools, CLI wiring, notebook |
 | 6 | 2–5 and the redesign | The page: government panel, treasury, commentary, board, notebook, dials timeline |
 | 7 | all | The plumbing test, then run 1 |
