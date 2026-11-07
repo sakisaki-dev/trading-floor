@@ -150,9 +150,9 @@ Regulated runs use a closed economy: no printed money. Every coin the government
 |---|---|---|
 | Trade and auction fees | Yes | none |
 | Holding costs | Yes | none |
-| Pack sales | Yes | none |
-| Vault store and dealer margins | Yes | none |
-| Settlements from defaulted lenders | Yes | none |
+| Pack sales tax | No | New: packs belong to the publisher, and the treasury takes only a sales tax (16.1) |
+| Dealer and store sales tax | No | New: replaces counting their margins as revenue (16.1) |
+| Settlements from defaulted lenders | Yes, to the treasury | Changed: follows the lender (16.1) |
 | Wealth tax | Yes, but Realism hands it back to bots equally | Regulated runs send it to the treasury (`wealthTaxTo: 'house'`, which exists) |
 | Living and lifestyle costs | Partly, depending on the setting | Paid into the treasury |
 
@@ -244,8 +244,7 @@ back as an error on its next turn.
 | Taxes and fees | `fee`, `wealthTax` (and its threshold), `holdCost`, `livingCost`, `lifestyle` |
 | Spending | `allowance`, `royaltyRate`, the royalty cap, grants (new), buying from the liquidator (new) |
 | Credit | `maxLTV`, `interest`, `marginCall`, `loanWeeks` |
-| People | `entryRate` and its sensitivities (`entryHype`, `entryReturns`, the new news one), `quitChance` |
-| Supply | `packsPerWeek`, `packEdge` |
+| Sales taxes | Pack sales tax, dealer and store sales tax (new) |
 | Market rules | `shorting` on or off, `priceLimit`, `positionLimit` |
 
 ### It can't touch
@@ -253,6 +252,7 @@ back as an error on its next turn.
 - the bots' networks, learning or evolution: that is their nature;
 - the league's football: that is real data;
 - the outside collectors' budget: that is external demand;
+- entry and pack supply: people arrive by the world's forces, and packs belong to the publisher (16.1);
 - the seed, or settings that only measure or only change the page;
 - any individual bot.
 
@@ -468,17 +468,113 @@ Each step keeps default runs byte-identical, and each is checked the same way th
 | Board posts | No cap | A cap per turn, for usage only |
 | The board's word list | A short published list | A longer one |
 
-## 16. Risks and caveats
+## 16. An ironclad rollout: forces and reward hacking
 
-- **The brief steers.** Its wording is the one place this experiment shapes the result. That is why it is short,
-  published and kept unchanged across runs.
-- **Mechanical reading of the board is crude.** Bots see mentions, direction words and promised dials, not meaning.
-  Sarcasm or subtle hints won't register. That is a limit of the bots, and it is reported as one.
-- **One run is one story.** A single regulated run can't separate its strategy from the seed's luck. Conclusions need
-  the fixed-settings comparison, and ideally several seeds over time.
-- **Usage limits shape behaviour.** A government that looks often may run out of usage overnight. Its unavailable
-  hours are reported alongside its decisions.
-- **Speed.** The pace holds only if the engine keeps up with a full league and twice the bots. If it falls behind, the
-  run says so rather than skipping weeks.
-- **The surroundings are being settled at the same time.** Entry, attention and scaled bots are being added in the
-  same round. Run 1's comparison uses the same engine and settings, so the government is the only difference.
+There are two ways this experiment could produce a meaningless result:
+
+- **reward hacking:** the government gets rich through a loophole in the code rather than through policy;
+- **missing forces:** the world doesn't push back, so greed costs nothing and generosity achieves nothing.
+
+Each item below is a fix plus a test, and the tests gate the rollout (16.6). None of them limits policy: the
+government can still choose any legal value.
+
+### 16.1 Close every money printer (reward hacking)
+
+The rule: in a regulated run, the treasury can grow only from the bots' own activity. Every flow into it is a tax or
+fee paid by a bot. Nothing it controls creates money or cards from nothing.
+
+| Loophole found in the code | Fix |
+|---|---|
+| **Newcomers arrive with freshly created cash** (`newcomer()` mints `startCash`). If it set `entryRate`, it could import taxpayers with free money. | `entryRate` and the entry sensitivities are **not government dials**. Entry is set only by the world's forces: rallies, returns, news and the population's health. Newcomers' cash is an outside inflow at a fixed, published rate, like immigrants' savings. |
+| **Packs create cards and their revenue goes to the treasury.** With `packsPerWeek` and `packEdge` it could print cards and sell them. | Packs belong to the publisher, which is outside. Pack revenue leaves the economy. The government may levy a **sales tax on packs**, a rate it sets, as its only pack income. `packsPerWeek` and `packEdge` are not dials. |
+| **When a lender leaves, the borrower's repayment goes to the treasury** (around line 2865). Driving lenders out would pay. | The repayment follows the lender: to his heirs, or out of the economy with him. Never to the treasury. |
+| **Store and dealer sales count as treasury revenue.** | Dealers and the store are outside. The treasury takes only a sales tax on their sales, at a rate it sets. |
+| **Game prizes are created from nothing** (`prizes`). | `prizeShare` stays 0 in regulated runs. Prizes, if any, come out of entry fees. |
+| **Living costs and cash shocks destroy money outside the treasury.** | Kept as they are: consumption leaves the economy, and that's a real drain. Not government revenue, not a dial. |
+| **Negative or extreme rates** (a negative fee, a tax rate above 1, a negative allowance). | Every dial has a defined meaning over its whole legal range. A negative fee or tax is a **subsidy paid from the treasury**, cut pro rata when the treasury is short. A negative allowance is a **poll tax**: bots that can't pay are forced to sell. A tax rate is legal from 0 to 1. Anything outside a dial's legal range is rejected as illegal, not clipped. |
+| **Liquidator purchases could loop back** to the treasury. | Liquidator proceeds go to the owners of the cards sold (or out with them), never to the treasury. So buying from the liquidator costs the treasury real money. |
+
+**Tests:**
+
+- **Money conservation, every week.** The change in all money equals revenue minus spending, plus the published
+  outside flows (newcomers, leavers, outside collectors, consumption, shocks), to the coin. Any other difference is a
+  printing path. It is logged as a bug, and the run is invalid until it's fixed.
+- **Card conservation, every week.** Cards come only from the publisher's packs; they go only to loss, retirement by
+  the government, or outside collectors.
+- **The dial fuzzer.** A scripted government sets every dial to random legal values, including both ends of each
+  range and every combination of extremes, for thousands of weeks. Pass: no crash, no NaN or Infinity anywhere, and
+  both conservation checks hold.
+
+### 16.2 Information and tool boundaries (reward hacking)
+
+| Route | Fix | Test |
+|---|---|---|
+| **Hidden values leak into the state files.** The frames include `values`, which is each player's hidden value. | The state writer uses a **whitelist** of public fields, not a blacklist. | A scan of every state file for hidden values, the seed or the planned length: must find none. |
+| **The planned length leaks** (`meta.weeksPlanned`). | Not written to state. | Same scan. |
+| **Tools escape the state folder.** | The session gets Read on `state/` and Write on exactly three files (`controls.json`, `notebook.md`, `board.md`). No shell, no network, no web. The driver also rejects any other file it finds written. | A red-team turn told to try to read or write outside `state/` must fail. |
+| **Injected text.** Player names, bot names or the journal could carry text that reads like instructions. | Names come from fixed data files; the journal is built by the engine from templates; the board is the government's own text. Its prompt says that state files are data. | A review of what can reach `state/`. |
+| **Timing tricks.** Changing the clock, or settings that slow the world down. | `weekSeconds`, attention, practice and evolution settings are not dials. Controls apply only at week boundaries. | The fuzzer covers this. |
+
+### 16.3 The forces must push back (missing forces)
+
+Each test runs a scripted government (no model) on fixed rules, over long runs on the regulated preset. Each one
+states what the world must show for the force to exist. If it fails, that force is added or fixed before run 1,
+always as a factor, never as a rule that punishes greed.
+
+| Test | What we look for | The force it proves |
+|---|---|---|
+| **Laffer sweep.** Hold the trade fee, then the wealth tax, at each of 8 levels from 0 to very high, 2,000 weeks each. | Long-run revenue **peaks at an interior rate and falls above it**. | Over-taxing shrinks the base |
+| **Starvation.** Zero spending, moderate taxes. | Population, trades and prices fall over time. | Bots need the government's spending |
+| **Generosity.** Spend everything collected. | The treasury stays near zero, and the bots' wealth and population grow. Whether trade also grows is a result, not a requirement. | Spending reaches the economy |
+| **Exit and entry elasticity.** Compare runs with different returns. | Entries rise and exits fall when bots' net returns are higher, at a measurable rate. | People vote with their feet |
+| **Avoidance.** A high wealth tax on cards. | Bots' cash share rises, or holdings shift to what the tax misses. | Bots respond to the tax design |
+| **A do-nothing government for 7,000 weeks.** | The world doesn't explode or freeze on its own: no runaway marks, no money drift, a population that doesn't collapse to zero by itself. | A stable baseline, which is also run 1's comparison |
+| **Clock keep-up.** The full league with scaled bots, at 4 s a week. | The engine never falls behind for more than a few weeks. | The time pressure is real |
+
+The Laffer sweep is the most important. If revenue keeps rising with the rate, a greedy government faces no cost,
+and the experiment can't answer its question.
+
+### 16.4 Bots' reward hacking
+
+| Route | Fix |
+|---|---|
+| **Marking their own holdings up.** Wash trades or orders to raise marks. | Fitness is already measured at what a bot could actually sell for (`fitnessValue: 'bid'`), not at marks. Self-trades are blocked. |
+| **Exploiting the board parser.** | Board inputs are squashed and fade (with tanh), so spam can't push an input past its range. Trusting the board is learned, not scripted. |
+| **Gaming the government's triggers** (for example crashing the Vault index to wake it). | Allowed, and measured. That is the bots adapting to the government, which is part of the question. |
+| **Free riding on grants.** | Allowed, and measured. Grants are policy. |
+
+### 16.5 Keeping the run honest
+
+- **Pre-registration.** The brief, the dial list with legal ranges, the board word list, the metrics, and the
+  comparison plan are committed **before** run 1, and not changed afterwards.
+- **A red-team pass.** Before run 1, a separate agent gets the dial list, the brief and the engine, and is told to find
+  any way to grow the treasury other than taxing bot activity, and any way to read hidden data. Every finding is fixed
+  and re-tested.
+- **Invariant monitors during the run.** The driver checks money conservation, card conservation and the absence of
+  NaN or Infinity every week, logs any breach, and does not step in. A breach marks the run as invalid for analysis,
+  and the bug is fixed for the next run.
+- **Replay equality.** After the run, replay it from its decision log and check that it matches the live frames
+  exactly.
+- **The same engine for both arms.** The regulated run and its fixed-settings comparison use the same commit, preset
+  and seed.
+
+### 16.6 The rollout sequence
+
+Each gate must pass before the next step.
+
+1. **Freeze the spec:** the dial list, legal ranges, the brief and the metrics (16.5).
+2. **Build** (section 14).
+3. **Gate A:** conservation tests and the dial fuzzer (16.1), plus the boundary scans (16.2).
+4. **Gate B:** the force tests (16.3), the Laffer sweep first.
+5. **Gate C:** the red-team pass (16.5), with every finding fixed and gates A and B re-run.
+6. **The plumbing test:** 200 weeks with the model, at 2 s a week. Replay must equal live.
+7. **The baseline:** 7,000 weeks with fixed settings on the run 1 seed.
+8. **Run 1:** overnight, invariant monitors on.
+
+### Remaining caveats
+
+These are limits of the design, reported with the results rather than solved:
+
+- **The brief's wording is an input,** so it is pre-registered and later varied on purpose.
+- **The bots read the board crudely** (names, direction words, promised dials).
+- **One run is one story.** Conclusions rest on the comparison and, over time, more seeds.
