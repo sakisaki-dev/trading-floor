@@ -387,7 +387,7 @@ site's card value ÷ 20, in coins) that no bot ever sees.
 | `engine.mjs` | The world. Plain JS, no dependencies, deterministic for a seed. The page and the AI runner both use it, so a replay is exactly what ran. |
 | `build_library.py` → `data/library.json` | Every player's research page (all stats, career rates, awards, OVR, skill, grade, Career Legacy, three "plays like" comparisons), plus the hidden value, which only the engine reads. Rebuild after a site update: `npm run library`. |
 | `run.mjs`, `configs/pilot.json`, `prompts/system.md` | The AI runner: one model call per AI bot per week, structured JSON output, a dollar cap, and replayable logs. |
-| `build_page.mjs` → [`docs/sandbox/trading-floor.html`](trading-floor.html) | The page: live rule bots, or replay of an AI run. Published as [The Trading Floor](https://claude.ai/artifact/NDU1spHL5uiHtUyo5BDmzF). |
+| `build_page.mjs` → [`docs/trading-floor.html`](trading-floor.html) | The page: live rule bots, or replay of an AI run. Published as [The Trading Floor](https://claude.ai/artifact/NDU1spHL5uiHtUyo5BDmzF). |
 
 ### What every bot can do (each one is logged)
 

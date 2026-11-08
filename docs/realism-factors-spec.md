@@ -1,6 +1,6 @@
 # Spec: real-world frictions, round 2
 
-For the agent working in `sandbox/`. Read `docs/sandbox/README.md` and the top of `sandbox/engine.mjs` first.
+For the agent working in `sandbox/`. Read `docs/DEVLOG.md` and the top of `engine.mjs` first.
 
 The owner's rule: **set factors, not behaviors.** Every item here is either a bug fix, a measurement fix, or a setting the
 owner sizes. Nothing may decide which way prices, wealth or crashes go. Report outcomes as results; never tune toward one.

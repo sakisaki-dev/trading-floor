@@ -179,7 +179,7 @@ const meta = () => ({ id: ID, created: new Date().toISOString(), dry: DRY, weeks
 let LIVE = null;
 if (opt('serve')) {
   const http = await import('node:http');
-  const port = Number(opt('serve')) || 4321, pagePath = path.join(here, '..', 'docs', 'sandbox', 'trading-floor.html');
+  const port = Number(opt('serve')) || 4321, pagePath = path.join(here, 'docs', 'trading-floor.html');
   const shell = (body) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body><script>window.LIVE_RUN = '/frames';</script>${body}</body></html>`;
   const server = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://x');

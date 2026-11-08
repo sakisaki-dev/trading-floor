@@ -1,11 +1,11 @@
 # Scientific audit of the Trading Floor engine and the AI-government design
 
-Date: 2026-11-07. Engine audited: `sandbox/engine.mjs` at commit `e834845` (the last commit touching the file). Line numbers refer to the file as audited; later merges may shift them. Every real finding below is **Open** until the code change or spec revision that closes it is committed.
+Date: 2026-11-07. Engine audited: `engine.mjs` at commit `e834845` (the last commit touching the file). Line numbers refer to the file as audited; later merges may shift them. Every real finding below is **Open** until the code change or spec revision that closes it is committed.
 
 ## 1. What was audited and how
 
-- **Forces inventory.** Six code auditors each read one slice of `sandbox/engine.mjs` and listed every force in it: anything that moves money, cards, prices, information or decisions. Each force was given a kind, a basis (where its numbers come from), the settings that control it, any route by which the planned AI government could reach it, and, where there was one, a problem and a proposed fix. Result: 271 forces.
-- **Methods audit.** A methods auditor read `docs/sandbox/regulator-spec.md`, the README sections on the Realism preset and Rounds 3 and 4, `realism-factors-spec.md`, `realism-preset-spec.md` and `health-board-spec.md`, and spot-checked the engine wherever the spec makes a claim about the code. Result: 32 findings (numbered 0–31).
+- **Forces inventory.** Six code auditors each read one slice of `engine.mjs` and listed every force in it: anything that moves money, cards, prices, information or decisions. Each force was given a kind, a basis (where its numbers come from), the settings that control it, any route by which the planned AI government could reach it, and, where there was one, a problem and a proposed fix. Result: 271 forces.
+- **Methods audit.** A methods auditor read `docs/regulator-spec.md`, the README sections on the Realism preset and Rounds 3 and 4, `realism-factors-spec.md`, `realism-preset-spec.md` and `health-board-spec.md`, and spot-checked the engine wherever the spec makes a claim about the code. Result: 32 findings (numbered 0–31).
 - **Skeptic check.** The 202 forces the auditors flagged as possible problems went to a separate verifier, who re-read the cited code and gave a verdict: real or not, a severity, a reason and a fix. Where the verifier corrected the original finding, this report follows the verifier.
 
 Severity, as used by both auditors:

@@ -1,4 +1,4 @@
-// Phase 0 of the league simulation (docs/sandbox/league-sim-spec.md): measure every rate from the save's real seasons.
+// Phase 0 of the league simulation (docs/league-sim-spec.md): measure every rate from the save's real seasons.
 // Reads sandbox/data/timeline.json (10 season snapshots, Y79–Y88, career totals per player), writes
 // sandbox/data/league_rates.json and prints a summary. Nothing here is chosen: each number is counted from the data.
 // Run: node sandbox/measure_league.mjs

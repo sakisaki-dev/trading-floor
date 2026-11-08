@@ -11,7 +11,7 @@ Status: spec only, nothing built. Revised on 2026-11-07 to resolve the scientifi
 
 ## Audit status
 
-The scientific audit of 2026-11-07 is in [AUDIT.md](AUDIT.md). It inventoried 271 forces in `sandbox/engine.mjs`,
+The scientific audit of 2026-11-07 is in [AUDIT.md](AUDIT.md). It inventoried 271 forces in `engine.mjs`,
 verified 202 flagged code findings (141 real, 61 not) and reviewed this design (32 methods findings: 7 blockers, 18
 important, 7 minor).
 
@@ -1045,7 +1045,7 @@ Limits of the design, reported with the results rather than solved:
 
 ## 23. The repo record for each run
 
-`docs/sandbox/runs/<run-id>/` holds:
+`docs/runs/<run-id>/` holds:
 
 - `README.md`: the title with model and brief version, the question, the fingerprint, the settings, the
   pre-registration links and hashes, the findings, the deviations, and the limits;

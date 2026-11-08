@@ -1,4 +1,4 @@
-// Builds docs/sandbox/trading-floor.html: page/style.css + page/body.html + engine.mjs (inlined) + data/library.json
+// Builds docs/trading-floor.html: page/style.css + page/body.html + engine.mjs (inlined) + data/library.json
 // + page/ui.js. The output is an artifact page (no <html>/<head>; the artifact host wraps it) that also opens fine
 // from disk. Run: node sandbox/build_page.mjs
 import fs from 'node:fs';
@@ -19,6 +19,6 @@ const asStr = (x) => JSON.stringify(x).replace(/<\//g, '<\\/');
 const html = head + read('page/style.css') + '\n' + read('page/body.html') + '\n<script>\nconst LIBRARY = ' + library + ';\nconst ENGINE_SRC = ' + asStr(engine) + ';\nconst WORKER_SRC = ' + asStr(read('page/worker.js')) + ';\n' + engine + '\n' + read('page/ui.js') + '\n</script>\n';
 // The page's script must parse as one script (the engine and ui.js share one scope: a name declared twice breaks it)
 { const script = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>')); try { new Function(script); } catch (e) { console.error('page script does not parse:', e.message); process.exit(1); } }
-const out = path.join(here, '..', 'docs', 'sandbox', 'trading-floor.html');
+const out = path.join(here, 'docs', 'trading-floor.html');
 fs.writeFileSync(out, html);
 console.log(`page: ${path.relative(path.join(here, '..'), out)} (${html.length.toLocaleString()} bytes)`);

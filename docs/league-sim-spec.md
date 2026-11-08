@@ -1,6 +1,6 @@
 # Spec: a simulated league that drives hidden value
 
-For the agent building it in `sandbox/`. Read `docs/sandbox/README.md` and the top of `sandbox/engine.mjs` first.
+For the agent building it in `sandbox/`. Read `docs/DEVLOG.md` and the top of `engine.mjs` first.
 
 ## Goal
 
@@ -154,4 +154,4 @@ Every rate is read from `league_rates.json`; there are no sliders for measured r
 ## Report back to the owner
 
 The phase 0 rate table (with thin cells flagged), the assumptions you made and their settings, and checks 1–7 with
-numbers. Update `docs/sandbox/README.md` with the new model.
+numbers. Update `docs/DEVLOG.md` with the new model.

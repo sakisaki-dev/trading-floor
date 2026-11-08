@@ -1,7 +1,7 @@
 # Spec: the health board (a warning light panel)
 
-For the agent working on the sandbox page (`sandbox/page/`, built into `docs/sandbox/trading-floor.html`). Read
-`docs/sandbox/README.md` first.
+For the agent working on the sandbox page (`page/`, built into `docs/trading-floor.html`). Read
+`docs/DEVLOG.md` first.
 
 ## Goal
 

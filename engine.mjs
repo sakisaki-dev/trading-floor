@@ -1,4 +1,4 @@
-// Retro Vault Sandbox engine: one world, run by the browser prototype (docs/sandbox/trading-floor.html) and by the
+// Retro Vault Sandbox engine: one world, run by the browser prototype (docs/trading-floor.html) and by the
 // Node runner with AI bots (sandbox/run.mjs). Plain JS, no dependencies, deterministic for a seed (AI bots aside).
 //
 // The world: a fixed pool of cards for the 203 real league players. Nothing is simulated about the players: their

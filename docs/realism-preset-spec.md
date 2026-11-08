@@ -1,6 +1,6 @@
 # Spec: the last realism gaps, and a "Realism" preset
 
-For the agent working in `sandbox/`. Read `docs/sandbox/README.md`, the top of `sandbox/engine.mjs`, and the earlier specs
+For the agent working in `sandbox/`. Read `docs/DEVLOG.md`, the top of `engine.mjs`, and the earlier specs
 (`league-sim-spec.md`, `realism-factors-spec.md`, `health-board-spec.md`).
 
 The owner's rule throughout: **set factors, not behaviors.** Every new item is a quantity the world provides or a choice

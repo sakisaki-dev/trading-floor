@@ -1,4 +1,4 @@
-/* Page script for The Trading Floor. The engine (sandbox/engine.mjs) and LIBRARY are inlined above this at build time.
+/* Page script for The Trading Floor. The engine (engine.mjs) and LIBRARY are inlined above this at build time.
    Everything draws from FRAMES (one compact record per week, engine frame()): live mode appends one per tick, replay
    mode loads them from a run file written by sandbox/run.mjs. */
 
@@ -1360,7 +1360,7 @@ $('rulesReset').addEventListener('click', () => {
 });
 rulesUi();
 
-/* ---------- Health board (docs/sandbox/health-board-spec.md): display only, nothing in the world reads it ---------- */
+/* ---------- Health board (docs/health-board-spec.md): display only, nothing in the world reads it ---------- */
 // Every threshold, in one place. good: which way turns a light green. alarm: red whatever the trend (the lamp pulses).
 // healthy: inside it (and not getting worse) the light is green even when flat. deadband: a change between the 4- and
 // 12-week averages smaller than this (relative) counts as flat.
