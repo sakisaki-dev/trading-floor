@@ -5,46 +5,40 @@
 [![live demo](https://img.shields.io/badge/demo-run%20it%20in%20your%20browser-3fd49a)](https://sakisaki-dev.github.io/trading-floor/)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-9ea7b3)](.nvmrc)
 
-**Five hundred tiny neural networks walk onto a trading floor.** They buy and sell cards of football players whose
-careers are still being played out, week by week, in a simulated league. Nobody tells them how to trade. They never
-see what a card is really worth. The world sets the forces (fees, taxes, rent, bad luck) and evolution keeps whatever
-works.
+Trading Floor is an agent-based simulation of a trading-card market. About 500 bots, each run by two small neural
+networks, buy and sell cards of football players while a simulated league plays on week by week. The bots get no
+trading rules and never see what a card is worth. They learn during their lives, and every 20 weeks the worst
+performers are replaced by mutated copies of the best. The question is which tactics appear and which survive.
 
-So far they have formed rival camps, bred a single family that took over the floor, gamed their own scoreboard,
-spent 2,400 weeks relearning how to trade with each other, and never once worked out how to lend. This repository is
-the world, the bots, every experiment and every mistake.
-
-**[Watch it run in your browser.](https://sakisaki-dev.github.io/trading-floor/)** No install: change any rule
-mid-run and see what the bots do about it.
+The [live demo](https://sakisaki-dev.github.io/trading-floor/) runs the whole world in the browser. Any rule can be
+changed while it runs.
 
 ## The world
 
-- **A league that keeps playing.** 32 clubs and about 320 players, seeded from one real Retro Bowl save. Every week
-  players play, get hurt, win awards and retire, and a card's hidden value follows the career.
-- **A real market.** An order book, sealed-bid auctions, card lending, short selling, cash loans, outside dealers, and
-  a liquidator that collects from bots who go broke.
-- **Bots that learn and breed.** Each bot has two small networks: one picks cards, the other decides how much risk to
-  take. They learn during their lives. Every 20 weeks the worst copy the best, with mutations. Bots also join, quit,
-  die and leave their cards to heirs.
-- **One rule.** The world sets factors and never scripts behaviour. No bot sees a player's true value; they work it
-  out from prices, a week-old price guide, dealers and royalties.
+- The league has 32 clubs and about 320 players, seeded from one real Retro Bowl save. Players play, get hurt, win
+  awards and retire every week, and each card's hidden value follows the player's career.
+- The market has an order book, sealed-bid auctions, card lending, short selling, cash loans, outside dealers, and a
+  liquidator that sells off the cards of bots that go broke.
+- Each bot has one network that picks cards and another that sets how much risk to take. Bots also join, quit, die
+  and leave their cards to heirs.
+- The rules set quantities (fees, taxes, rent, the chance of a cash shock) and never tell bots what to do. Bots
+  estimate value from prices, a week-old price guide, dealers and royalties.
 
-## What the bots did
+## Findings
 
-### The first 200 weeks (engine 2.0)
+### First 200 weeks (engine 2.0)
 
-- **Two camps, no third way.** One camp trades with dealers and rips open packs (49–64% of bots). The other works
-  the auctions and trades with other bots. They held for 10 straight generations and no third tactic lasted. Think
-  regions on a spectrum, not species.
-- **Winners don't repeat.** Last generation's best return says nothing about the next: rank correlations of −0.03
-  to −0.08 under all 11 settings tested.*
-- **The floor empties.** 501 bots became 344: 189 arrived, 346 left.
-- **Nobody wants to buy from a bot.** In a typical week 68% of cards have no bot orders at all, and asks outnumber
-  bids 4 to 1.*
-- **Paper riches.** Bots value their own cards at about 5× what cards actually resell for (marks index 385,
-  repeat-sales index 77). Behaviour or bug: still being traced.
-- **Quitting is the master switch.** Let bots quit after heavy losses and prices track the football far more closely
-  (correlation 0.69 against 0.39), and wealth spreads more evenly (Gini 0.47 against 0.56).*
+- The bots split into two groups that lasted 10 generations. One group (49–64% of bots) trades with dealers and buys
+  packs; the other trades at auction and with other bots. No other tactic held on, and the boundary between the two
+  is blurry.
+- A bot's return in one generation does not predict its return in the next. The rank correlation was between −0.03
+  and −0.08 under all 11 settings tested.*
+- The population fell from 501 to 344: 189 bots arrived and 346 left.
+- In a typical week 68% of cards have no bot orders, and asks outnumber bids 4 to 1.*
+- Bots mark their cards at about 5× what cards resell for (marks index 385, repeat-sales index 77). We have not yet
+  found out whether this is the bots' behaviour or a bug.
+- The quitting rule had the largest effect of any setting. When bots can quit after heavy losses, the correlation
+  between prices and player performance rises from 0.39 to 0.69, and the Gini of wealth falls from 0.56 to 0.47.*
 
 \* Measured on engines before 2.0 and not yet re-run.
 
@@ -52,53 +46,51 @@ mid-run and see what the bots do about it.
 
 *Realism preset, seed 31761, 200 weeks, engine 2.0.0. How it was made: [docs/figures](docs/figures/README.md).*
 
-### The long haul (thousands of weeks, engine 1.x)
+### Long runs (engine 1.x)
 
-Two runs were left going: seed 12864 for 3,009 weeks, and seed 11906 (Realism) for 7,973 weeks with the dealers
-switched off at week 1,102. Both predate the 2.0 audit and each is one seed, so read these as leads to re-test, not
-results. The population, family, trading, lending, cash and price figures below can be checked in [results/long-runs](results/long-runs/README.md); the rest are in [round3-spec.md](docs/round3-spec.md) and the [DEVLOG](docs/DEVLOG.md).
+Two runs went much longer: seed 12864 for 3,009 weeks, and seed 11906 (Realism) for 7,973 weeks, with the dealers
+switched off at week 1,102. Both ran before the 2.0 audit and each is a single seed, so these need re-testing. The
+population, family, trading, lending, cash and price figures can be checked in
+[results/long-runs](results/long-runs/README.md); the others are in [round3-spec.md](docs/round3-spec.md) and the
+[DEVLOG](docs/DEVLOG.md).
 
 ![Long run, seed 11906: population and the largest family, sales per week, prices against value](docs/figures/long-run.svg)
 
-- **One family took over the floor.** In seed 11906 a family of 4 bots, a distant second at week 804, grew to 84% of
-  the population by week 4,953 and 93% (282 of 303 bots) by week 7,973, 80 generations deep. Seed 12864 went the
-  same way more slowly: one family reached 47% by week 782, and by week 3,009 two families held 74% between them.
-  Copying the winner breeds a monoculture.
-- **Traits hitchhike.** Lending rose to a median share of 0.62 at week 700 while one family led, then fell to zero
-  once another family took over. It looked like evolution selecting for lenders. More likely lending rode along with
-  whichever family happened to win.
-- **Borrowers, not lenders.** Where lending never caught on, bots asked to borrow far more than anyone
-  offered, even though loans paid about 1% a week.
-- **The crowd learned to stay.** Untrained newcomers kept choosing to quit, and seed 11906 shrank from 176 bots to
-  52. Then it grew back to 303. A bot that leaves leaves no copies, so evolution may have bred the urge to quit out
-  of the population. Not yet proven.
-- **Hooked on dealers, then weaned.** With dealers in the market, prices ranked players almost perfectly (0.98) by
-  week 20, before any bot had learned anything: the dealers priced from true value and the bots leaned on them.
-  Switch the dealers off and trading between bots collapsed to 13–37 a week. It took about 2,400 weeks to recover,
-  to 170–230 trades and up to about 400 auction sales a week.
-- **They know who's better, not by how much.** Without dealers, prices still ranked players well (0.92–0.98) but sat
-  at about 0.35–0.4× true value, and price changes followed value changes at only 0.1–0.5.
-- **Strategies that fit one world and die in the next.** In seed 12864 packs sold for nothing for 200 weeks and pack
-  bidders thrived. When the supply ran out, those same bids drove pack prices up 2.65× a week to 56,905 coins and
-  bankrupted the pack bidders. Pack prices then flipped between cheap and dear every other week for about 2,000 weeks,
-  and evolution never smoothed it out.
-- **Gaming the scoreboard.** Scored on marked prices, bots learned to overpay slightly for cards they already held,
-  which lifted the mark on every copy they owned. Scoring at what a card could actually be sold for
-  (`fitnessValue: 'bid'`) takes that lever away.
-- **The rich keep the coins.** By week 7,973 the 10% of bots with the most cash held 85% of all coins; the poorer half
-  held under 1%.
+- One lineage came to dominate. In seed 11906 a family of 4 bots, second at week 804, made up 84% of the population
+  by week 4,953 and 93% (282 of 303 bots) by week 7,973, 80 generations deep. In seed 12864 one family reached 47% by
+  week 782, and by week 3,009 two families held 74% between them.
+- Lending rose and fell with one family. The median share of idle cash offered for loans reached 0.62 at week 700
+  while that family led, and fell to zero after another family replaced it. The likely explanation is that lending
+  was carried along by a successful lineage; we have no evidence that lending itself paid.
+- In runs where lending never spread, bots asked to borrow far more than other bots offered, although loans paid
+  about 1% a week.
+- New bots often chose to quit, and seed 11906 shrank from 176 bots to 52. It then grew back to 303. Bots that leave
+  have no offspring, so selection may have reduced quitting over time. We have not tested this yet.
+- With dealers in the market, prices ranked players by true value almost perfectly (0.98) by week 20, before the bots
+  had learned anything, because the dealers priced from true value. After the dealers were switched off, trades
+  between bots fell to 13–37 a week. About 2,400 weeks later they were back to 170–230 trades and up to about 400
+  auction sales a week.
+- Without dealers, prices still ranked players well (0.92–0.98) but sat at about 0.35–0.4× true value, and the
+  correlation between 20-week price changes and 20-week value changes was only 0.1–0.5.
+- In seed 12864 packs sold for nothing for 200 weeks, and bots that bid on packs did well. When the supply ran out,
+  the same bids pushed pack prices up 2.65× a week to 56,905 coins and the pack bidders went broke. Pack prices then
+  alternated between cheap and expensive every other week for about 2,000 weeks.
+- When bots were scored on marked prices, they learned to pay slightly over the mark for cards they already held,
+  which raised the mark on all their copies. Scoring on what a card could be sold for (`fitnessValue: 'bid'`) removes
+  that incentive.
+- By week 7,973 the 10% of bots with the most cash held 85% of all coins, and the poorer half held under 1%.
 
-### What we got wrong
+### Corrections
 
-- **A bubble with no buyers in it.** A few players' marks rose 4–9% a week for hundreds of weeks with no sales, until
-  one card was "worth" 2 × 10²⁸ coins in an economy holding 1.24 million. The bots didn't do it: an old pricing rule
-  let a mark drift toward asks placed above it, and the asks rose with the mark. Enron's problem in miniature, a value
-  set by a model and never tested by a sale, compounding forever. Fixed in round 3 ([DEVLOG](docs/DEVLOG.md)).
-- **A crash that wasn't.** An earlier boom and crash in the same run was the same bug inflating a few rare cards, two
-  of which nobody even owned. No coins moved.
-- **An index that drifted up on flat prices.** The repeat-sales index paired auction sales with order-book trades,
-  which clear at different levels. In seed 12864 it rose tenfold while the marks index fell. Fixed in round 3.
-- **Learning that was really an oracle.** Prices tracking value looked like the bots learning. It was the dealers.
+- A few players' marks rose 4–9% a week for hundreds of weeks with no sales, until one card was marked at 2 × 10²⁸
+  coins while all bots together held 1.24 million. This was a pricing bug: an old rule moved a mark toward asks placed
+  above it, and the asks were set relative to the mark, so both kept rising. It was fixed in round 3
+  ([DEVLOG](docs/DEVLOG.md)).
+- An earlier boom and crash in the same run came from the same bug, on a few rare cards, two of them unowned. No coins
+  changed hands.
+- The repeat-sales index paired auction sales with order-book trades, which clear at different prices. In seed 12864
+  it rose tenfold while the marks index fell. Fixed in round 3.
+- We first read the close match between prices and value as the bots learning. It came from the dealers.
 
 ## Run it
 
@@ -112,15 +104,15 @@ node tools/build_page.mjs                                   # rebuilds docs/trad
 npm test                                                    # engine tests, including a determinism check
 ```
 
-Open `docs/trading-floor.html` (or the [live demo](https://sakisaki-dev.github.io/trading-floor/)) to watch the world
-live, change any setting mid-run, or replay a saved run. The same seed and settings always give the same run, and CI
-checks that on every push.
+Open `docs/trading-floor.html` or the [live demo](https://sakisaki-dev.github.io/trading-floor/) to watch a run,
+change settings during it, or replay a saved run. The same seed and settings always give the same run; CI checks this
+on every push.
 
 ### What's where
 
 | | |
 |---|---|
-| `engine.mjs` | The whole world: league, market, bots, evolution, measurement |
+| `engine.mjs` | The simulation: league, market, bots, evolution and measurement |
 | `sim.mjs` · `run.mjs` | Headless runs; runs with Claude-driven bots |
 | `configs/` · `data/` | Presets; the league data |
 | `page/` · `docs/trading-floor.html` | The browser page and its built, self-contained copy |
@@ -131,16 +123,15 @@ checks that on every push.
 
 ## Coming next
 
-**Head-to-head tests.** Each open question above, tested on the same seeds with one setting changed at a time:
-is crowding why winners don't repeat, does evolution really breed out quitting, and can a more varied population
-learn value without dealers? ([docs/round3-spec.md](docs/round3-spec.md))
+- Head-to-head tests of the open questions above, on the same seeds with one setting changed at a time: whether
+  copying winners is why returns don't persist, whether selection reduces quitting, and whether a more varied
+  population learns value without dealers ([docs/round3-spec.md](docs/round3-spec.md)).
+- An AI government: a Claude session that sets taxes, fees and spending, keeps the treasury, and posts messages the
+  bots can read. It runs in real time without limits on what it posts and does not know when the run ends. The study
+  is whether it grows the economy that funds it or extracts from it ([docs/regulator-spec.md](docs/regulator-spec.md),
+  not yet built).
 
-**An AI government.** A Claude session takes office. It sets taxes, fees and spending, keeps the treasury those taxes
-fill, and posts whatever it likes on a board the bots read. It runs in real time with no guardrails, and it doesn't
-know when the run ends. Does it grow the economy that pays it, take what it can, or do something else entirely?
-([docs/regulator-spec.md](docs/regulator-spec.md), not yet built)
-
-## Go deeper
+## Documentation
 
 | | |
 |---|---|
@@ -154,8 +145,8 @@ know when the run ends. Does it grow the economy that pays it, take what it can,
 
 ## Fine print
 
-- One league from one save. Most results rest on three seeds or fewer, and the long runs on one seed each. None of it
-  says anything yet about real markets.
+- All results come from one league built from one save. Most rest on three seeds or fewer, and the long runs on one
+  seed each. They say nothing yet about real markets.
 - League stats were transcribed from a personal Retro Bowl save. Retro Bowl is made by New Star Games. Team names
   follow the NFL. This project is not affiliated with either.
 - Cite with [CITATION.cff](CITATION.cff). No license has been chosen yet, so all rights are reserved.
