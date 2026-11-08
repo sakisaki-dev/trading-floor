@@ -8,7 +8,7 @@ const PRESETS = {
     outsideCollectors: true, outsideMode: 'value', outsideBudget: 100000, outsideNews: true, guideOn: true, guideEvery: 4, guideLag: 1, fee: 0.01, centralBank: false, closedEconomy: false,
     markRule: 'book', markHalfLife: 4, priceRule: 'comps', compsWeeks: 4, singleBidder: 'own', forcedSale: 'book', forcedOrder: 'network', liquidation: 'auction', vaultIndex: 'repeatSales',
     priceAnchor: true, priceRange: 0.6, keepMax: 1, rateMax: 0.05, priceMap: 'log', priceLogK: 0.6, priceClamp: 50, rateMap: 'log', rateLogMid: 0.025, rateClamp: 10, deployOrders: 40, maxListings: 10, maxShorts: 30, maxPacks: 8, fitnessValue: 'bid', evolve: true, evolveShare: 0.1, nnFitnessGens: 6, practiceGens: 3, adaptOn: true, adaptEvery: 10, adaptSize: 0.05, quitRule: 'network',
-    mortality: true, lifespan: [6, 14], heirs: 1, estateSale: 0.4, cashShockChance: 0.005, cashShockSize: 0.1, lossRate: 0.01, turnover: true, entryRate: 0.25, entryHype: 1,
+    mortality: true, lifespan: [6, 14], heirs: 1, estateSale: 0.4, cashShockChance: 0.005, cashShockSize: 0.1, lossRate: 0.01, turnover: true, entryRate: 0.25, entryHype: 1, entryReturns: 1, entryNews: 1, botScale: 'cards',
     valueModel: 'league', valueBasis: 'form', formSeasons: 2, rookieRule: 'measured', injuries: true, injuryByAge: true, retirement: true, retirementByAge: true, awards: true, rookies: true, pressure: true, pressureStrength: 1, hypeInjury: 0, startSeason: 'latest', leagueFill: 'full',
     games: true, prizeShare: 0, gameFloor: null, credit: true, maxLTV: 0.6, marginCall: 0.75, loanWeeks: 8, shorting: true,
     fashion: false, store: false, priceLimit: 0, positionLimit: 0, capPoorest: false, leagueUpdates: false, lenderCycle: false },
@@ -33,6 +33,7 @@ const $ = (id) => document.getElementById(id);
 Object.defineProperty(HTMLElement.prototype, 'html', { set(v) { if (this._html !== v) { this._html = v; this.innerHTML = v; } }, get() { return this.innerHTML; } });
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const COL = {};
+const ink = (a) => `rgba(${COL.ink || '255,255,255'},${a})`; // hairlines and gridlines in the label colour, so they work in light and dark mode
 const L = (a, b, t) => a + (b - a) * t, C = (x, a, b) => Math.max(a, Math.min(b, x));
 const fmt = (x) => (x == null || !isFinite(x) ? '–' : Math.abs(x) >= 1000 ? Math.round(x).toLocaleString() : Math.abs(x) >= 100 ? Math.round(x).toString() : x.toFixed(1));
 const pct = (x) => (x == null || !isFinite(x) ? '–' : `${Math.round(x * 100)}%`);
@@ -67,7 +68,7 @@ function startWorker() {
     if (m.type === 'frame' || m.type === 'reset') { if (mode !== 'live') return; for (const f of m.frames || []) { pushFrame(f); for (const [s2, b2] of f.arcs || []) arcs.push({ s: s2, b: b2, age: 0 }); } if (m.type === 'reset') { syncControls(); redrawAll(); } dirty = true; }
     if (m.type === 'detail' && mode === 'live') { const k = anchorNow(); drawDetail(); drawAcct(); anchorFix(k); }
     if (m.type === 'log' && logWait) { logWait(m.log); logWait = null; }
-    if (m.type === 'practice' && mode === 'live') { const b = $('statusBadge'); if (b) b.html = `<span class="paused">PRACTICE ${Math.round((m.t / m.T) * 100)}%</span>`; const h = $('hyp'); if (h) h.html = `<b>Practice generations.</b> The bots are evolving in a private market before this one opens: week ${m.t} of ${m.T}.`; }
+    if (m.type === 'practice' && mode === 'live') { const b = $('statusBadge'); if (b) b.html = `<span class="paused">Practice ${Math.round((m.t / m.T) * 100)}%</span>`; const h = $('hyp'); if (h) h.html = `<b>Practice generations.</b> The bots are evolving in a private market before this one opens: week ${m.t} of ${m.T}.`; }
   };
   worker.onmessage = onmsg;
   worker.postMessage({ cmd: 'init', lib: LIBRARY });
@@ -172,9 +173,9 @@ function drawFloor() {
   const Y = (o) => pad.t + (1 - ((o ?? oDom[0]) - oDom[0]) / Math.max(1, oDom[1] - oDom[0])) * (Ht - pad.t - pad.b);
   x.font = `500 10px ${css('--mono')}`;
   x.fillStyle = COL.faint; x.textBaseline = 'bottom';
-  for (let e = Math.ceil(dom[0] * 2) / 2; e <= dom[1]; e += 0.5) { const v = 10 ** e, px = X(v); if (px < pad.l + 20 || px > Wd - 30) continue; x.fillStyle = 'rgba(255,255,255,0.05)'; x.fillRect(px, pad.t, 1, Ht - pad.t - pad.b); x.fillStyle = COL.faint; x.fillText(fmt(v), px + 3, Ht - 1); }
+  for (let e = Math.ceil(dom[0] * 2) / 2; e <= dom[1]; e += 0.5) { const v = 10 ** e, px = X(v); if (px < pad.l + 20 || px > Wd - 30) continue; x.fillStyle = ink(0.05); x.fillRect(px, pad.t, 1, Ht - pad.t - pad.b); x.fillStyle = COL.faint; x.fillText(fmt(v), px + 3, Ht - 1); }
   x.textBaseline = 'middle'; x.textAlign = 'right';
-  for (let o = Math.ceil(oDom[0] / 5) * 5; o <= oDom[1]; o += 5) { const py = Y(o); x.fillStyle = 'rgba(255,255,255,0.05)'; x.fillRect(pad.l, py, Wd - pad.l - pad.r, 1); x.fillStyle = COL.faint; x.fillText(String(o), pad.l - 4, py); }
+  for (let o = Math.ceil(oDom[0] / 5) * 5; o <= oDom[1]; o += 5) { const py = Y(o); x.fillStyle = ink(0.05); x.fillRect(pad.l, py, Wd - pad.l - pad.r, 1); x.fillStyle = COL.faint; x.fillText(String(o), pad.l - 4, py); }
   x.textAlign = 'left'; x.fillStyle = COL.faint; x.textBaseline = 'top'; x.fillText('OVR held ↑', pad.l + 4, pad.t); x.textBaseline = 'bottom'; x.textAlign = 'right'; x.fillText('worth →', Wd - pad.r, Ht - pad.b - 2); x.textAlign = 'left';
   const ids = new Set();
   for (const b of f.bots) {
@@ -186,14 +187,14 @@ function drawFloor() {
   }
   for (const id of [...pos.keys()]) if (!ids.has(id)) pos.delete(id);
   arcs = arcs.filter((a) => a.age < 30); x.lineWidth = 1;
-  for (const a of arcs) { const s = pos.get(a.s), b = pos.get(a.b); a.age++; if (!s || !b) continue; x.strokeStyle = `rgba(238,241,250,${0.24 * (1 - a.age / 30)})`; x.beginPath(); x.moveTo(s.x, s.y); x.quadraticCurveTo((s.x + b.x) / 2, Math.min(s.y, b.y) - 30, b.x, b.y); x.stroke(); }
+  for (const a of arcs) { const s = pos.get(a.s), b = pos.get(a.b); a.age++; if (!s || !b) continue; x.strokeStyle = ink(0.24 * (1 - a.age / 30)); x.beginPath(); x.moveTo(s.x, s.y); x.quadraticCurveTo((s.x + b.x) / 2, Math.min(s.y, b.y) - 30, b.x, b.y); x.stroke(); }
   for (const [id, p] of pos) {
     const b = p.b, col = retColor(b[16]);
     x.beginPath(); x.arc(p.x, p.y, p.r + 1.2, 0, Math.PI * 2); x.fillStyle = COL.panel; x.fill();
     x.beginPath(); x.arc(p.x, p.y, p.r, 0, Math.PI * 2); x.fillStyle = hover && hover !== id ? 'rgba(120,130,160,0.35)' : col; x.fill();
-    if (b[9]) { x.strokeStyle = COL.gold; x.lineWidth = 1.6; x.beginPath(); x.arc(p.x, p.y, p.r + 2.5, 0, Math.PI * 2); x.stroke(); }
+    if (b[9]) { x.strokeStyle = COL.mark; x.lineWidth = 1.6; x.beginPath(); x.arc(p.x, p.y, p.r + 2.5, 0, Math.PI * 2); x.stroke(); }
     if (b[5] === 2) { x.setLineDash([2, 2]); x.strokeStyle = COL.chalk; x.lineWidth = 1; x.beginPath(); x.arc(p.x, p.y, p.r + 2.5, 0, Math.PI * 2); x.stroke(); x.setLineDash([]); }
-    if (b[6] >= 5) { x.strokeStyle = 'rgba(238,241,250,0.28)'; x.lineWidth = 1; x.beginPath(); x.arc(p.x, p.y, p.r + 4, 0, Math.PI * 2); x.stroke(); }
+    if (b[6] >= 5) { x.strokeStyle = ink(0.28); x.lineWidth = 1; x.beginPath(); x.arc(p.x, p.y, p.r + 4, 0, Math.PI * 2); x.stroke(); }
     if (hover === id) { x.strokeStyle = COL.gold; x.lineWidth = 2; x.beginPath(); x.arc(p.x, p.y, p.r + 6, 0, Math.PI * 2); x.stroke(); }
   }
 }
@@ -225,10 +226,10 @@ const charts = {};
 function axes(x, Wd, Ht, pad, lo, hi, fy, n) {
   x.font = `500 10px ${css('--mono')}`; x.textBaseline = 'middle'; x.textAlign = 'left';
   x.setLineDash([2, 4]); x.lineWidth = 1;
-  for (let i = 0; i <= 3; i++) { const v = lo + ((hi - lo) * i) / 3, y = Math.round(pad.t + (Ht - pad.t - pad.b) * (1 - i / 3)) + 0.5; x.strokeStyle = 'rgba(255,255,255,0.08)'; x.beginPath(); x.moveTo(pad.l, y); x.lineTo(Wd - pad.r, y); x.stroke(); x.fillStyle = COL.faint; x.fillText(fy(v), Wd - pad.r + 6, y); }
+  for (let i = 0; i <= 3; i++) { const v = lo + ((hi - lo) * i) / 3, y = Math.round(pad.t + (Ht - pad.t - pad.b) * (1 - i / 3)) + 0.5; x.strokeStyle = ink(0.08); x.beginPath(); x.moveTo(pad.l, y); x.lineTo(Wd - pad.r, y); x.stroke(); x.fillStyle = COL.faint; x.fillText(fy(v), Wd - pad.r + 6, y); }
   x.setLineDash([]); x.textBaseline = 'alphabetic';
-  for (let t = gpw(); t < n; t += gpw()) { const px = Math.round(pad.l + ((Wd - pad.l - pad.r) * t) / Math.max(1, n - 1)); x.fillStyle = 'rgba(255,255,255,0.04)'; x.fillRect(px, pad.t, 1, Ht - pad.t - pad.b); }
-  x.fillStyle = 'rgba(255,255,255,0.14)'; x.fillRect(pad.l, Ht - pad.b, Wd - pad.l - pad.r, 1);
+  for (let t = gpw(); t < n; t += gpw()) { const px = Math.round(pad.l + ((Wd - pad.l - pad.r) * t) / Math.max(1, n - 1)); x.fillStyle = ink(0.04); x.fillRect(px, pad.t, 1, Ht - pad.t - pad.b); }
+  x.fillStyle = ink(0.14); x.fillRect(pad.l, Ht - pad.b, Wd - pad.l - pad.r, 1);
   if (n > 1) { x.fillStyle = COL.faint; x.fillText('W0', pad.l, Ht - 2); x.textAlign = 'right'; x.fillText(`W${FRAMES[n - 1].t}`, Wd - pad.r, Ht - 2); x.textAlign = 'left'; }
 }
 function line(id, series, o) {
@@ -241,7 +242,7 @@ function line(id, series, o) {
   const sp = hi - lo || 1; lo -= sp * 0.06; hi += sp * 0.06; if (o.min !== undefined) lo = o.min; if (o.max !== undefined) hi = Math.max(o.max, hi);
   const X = (i) => pad.l + ((Wd - pad.l - pad.r) * i) / Math.max(1, n - 1), Y = (v) => pad.t + (Ht - pad.t - pad.b) * (1 - (v - lo) / (hi - lo));
   axes(x, Wd, Ht, pad, lo, hi, o.fy, n);
-  if (o.ref !== undefined) { x.fillStyle = 'rgba(255,255,255,0.18)'; x.fillRect(pad.l, Math.round(Y(o.ref)), Wd - pad.l - pad.r, 1); }
+  if (o.ref !== undefined) { x.fillStyle = ink(0.18); x.fillRect(pad.l, Math.round(Y(o.ref)), Wd - pad.l - pad.r, 1); }
   series.forEach((s, k) => {
     const d = data[k];
     const path = () => { x.beginPath(); let on = false; d.forEach((v, i) => { if (v == null) { on = false; return; } on ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)); on = true; }); };
@@ -250,7 +251,7 @@ function line(id, series, o) {
     const lv = d[n - 1]; if (lv != null) { const ly = Y(lv); x.beginPath(); x.arc(X(n - 1), ly, 2.6, 0, Math.PI * 2); x.fillStyle = s.color; x.fill(); x.fillStyle = COL.panel; x.fillRect(Wd - pad.r + 1, ly - 10, pad.r, 20); x.fillStyle = s.color; x.fillRect(Wd - pad.r + 2, ly - 7, pad.r - 3, 14); x.fillStyle = '#000'; x.font = `700 9.5px ${css('--mono')}`; x.textBaseline = 'middle'; x.fillText(o.fy(lv), Wd - pad.r + 5, ly); x.textBaseline = 'alphabetic'; }
   });
   const c = (charts[id] ||= {}); Object.assign(c, { X, n, pad, Wd });
-  if (c.hi !== undefined && c.hi < n) { x.fillStyle = 'rgba(238,241,250,0.35)'; x.fillRect(Math.round(X(c.hi)), pad.t, 1, Ht - pad.t - pad.b); series.forEach((s, k) => { const v = data[k][c.hi]; if (v == null) return; x.beginPath(); x.arc(X(c.hi), Y(v), 4, 0, Math.PI * 2); x.fillStyle = s.color; x.fill(); x.strokeStyle = COL.panel; x.lineWidth = 2; x.stroke(); }); }
+  if (c.hi !== undefined && c.hi < n) { x.fillStyle = ink(0.35); x.fillRect(Math.round(X(c.hi)), pad.t, 1, Ht - pad.t - pad.b); series.forEach((s, k) => { const v = data[k][c.hi]; if (v == null) return; x.beginPath(); x.arc(X(c.hi), Y(v), 4, 0, Math.PI * 2); x.fillStyle = s.color; x.fill(); x.strokeStyle = COL.panel; x.lineWidth = 2; x.stroke(); }); }
 }
 function stack(id, layers, groups = GROUPS) {
   const cv = $(id), [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
@@ -265,7 +266,7 @@ function stack(id, layers, groups = GROUPS) {
     top.forEach((v, i) => (base[i] = v));
   });
   const c = (charts[id] ||= {}); Object.assign(c, { X, n, pad, Wd });
-  if (c.hi !== undefined && c.hi < n) { x.fillStyle = 'rgba(238,241,250,0.6)'; x.fillRect(Math.round(X(c.hi)), pad.t, 1, Ht - pad.t - pad.b); }
+  if (c.hi !== undefined && c.hi < n) { x.fillStyle = ink(0.6); x.fillRect(Math.round(X(c.hi)), pad.t, 1, Ht - pad.t - pad.b); }
 }
 function crosshair(id, render) {
   const cv = $(id), tip = $(id + 'Tip');
@@ -327,7 +328,7 @@ function heatmap(id, rows, cols, cell, color, tip, colLabel) {
   x.font = `500 ${rh < 13 ? 9.5 : 11}px ${css('--body')}`; x.textBaseline = 'middle';
   rows.forEach((r, i) => {
     x.fillStyle = r.color || COL.muted; x.fillText(r.label.length > max ? r.label.slice(0, max - 1) + '…' : r.label, 2, top + i * rh + rh / 2);
-    for (let j = 0; j < cols; j++) { const v = cell(i, j); x.fillStyle = v == null ? 'rgba(255,255,255,0.03)' : color(v); x.fillRect(LW + j * cw + 0.5, top + i * rh + 0.5, Math.max(1, cw - 1), Math.max(1, rh - 1)); }
+    for (let j = 0; j < cols; j++) { const v = cell(i, j); x.fillStyle = v == null ? ink(0.03) : color(v); x.fillRect(LW + j * cw + 0.5, top + i * rh + 0.5, Math.max(1, cw - 1), Math.max(1, rh - 1)); }
   });
   if (colLabel) {
     x.fillStyle = COL.faint; x.font = `500 10px ${css('--mono')}`; x.textBaseline = 'bottom';
@@ -378,17 +379,20 @@ function drawHeatmaps() {
   }
   { // Top 20 bots now: worth vs the median bot, over time
     const top = f.bots.slice().sort((a, b) => b[3] - a[3]).slice(0, 20), { cols, range } = buckets(n, hmWidth('hmBots'));
-    const rows = top.map((b) => ({ label: b[2], color: b[9] ? COL.gold : COL.muted }));
+    const rows = top.map((b) => ({ label: b[2], color: b[9] ? COL.mark : COL.muted }));
     const val = (i, j) => { const fr = FRAMES[range(j)[1]], m = botMap(fr).get(top[i][0]); return m == null ? null : m / fr._med; };
     heatmap('hmBots', rows, cols, val, (v) => divergeInv(Math.log(v) / Math.log(4)), (i, j) => { const fr = FRAMES[range(j)[1]], v = val(i, j); return `<b>${esc(top[i][2])}</b> · ${kindOf(top[i])}<br>Week ${fr.t}<br>${v == null ? 'not born yet' : `Worth <span class="mono">${fmt(botMap(fr).get(top[i][0]))}</span> · ${v.toFixed(2)}× median`}`; }, (j) => `W${FRAMES[range(j)[0]].t}`);
   }
 }
+function drawScales() {
 scale('scaleFam', 'cheap', 'rich', (t) => diverge(t * 2 - 1));
 scale('scaleGene', 'sell', 'buy', (t) => divergeInv(1 - t * 2));
 scale('scaleHold', '0%', '70%+', (t) => seq(t));
 scale('scaleRet', '−12%', '+12%', (t) => divergeInv(t * 2 - 1));
-scale('scaleSec', '−15%', '+15%', (t) => { const u = t * 2 - 1; return u >= 0 ? mix([34, 34, 38], [29, 156, 92], u) : mix([34, 34, 38], [196, 58, 58], -u); });
+scale('scaleSec', '−15%', '+15%', (t) => { const u = t * 2 - 1; return u >= 0 ? mix(NEUTRAL, [29, 156, 92], u) : mix(NEUTRAL, [196, 58, 58], -u); });
 scale('scaleBots', '¼×', '4× median', (t) => divergeInv(t * 2 - 1));
+}
+readTheme(); drawScales(); // the theme first: the scales use its neutral and deep blue
 
 /* ---------- Panels ---------- */
 // Lists update in place: each row is kept by its key and only rewritten when its content changes; a row whose number
@@ -511,8 +515,8 @@ const GROUP = { credit: ['loan', 'marginCall', 'default'], shorts: ['short', 'co
 
 /* ---------- Controls ---------- */
 $('preset').innerHTML = Object.entries(PRESETS).map(([k, v]) => `<option value="${k}">${v.label}</option>`).join('');
-const SLIDERS = { tacticMatch: [0.1, (v) => (v / 10).toFixed(1) + ' sd'], tacticWindow: [1, (v) => v + (v > 1 ? ' gens' : ' gen')], practiceWorlds: [1, (v) => (v > 1 ? v + ' worlds' : '1 (as before)')], populationFloor: [0.01, (v) => (v ? v + '% of the start' : 'off')], fitnessSharing: [0.1, (v) => (v ? 'strength ' + (v / 10).toFixed(1) : 'off')], sharingRadius: [0.01, (v) => (v / 100).toFixed(2)], guideEvery: [1, (v) => v + ' wk'], guideLag: [1, (v) => v + ' wk old'], adaptEvery: [1, (v) => v + ' wk'], adaptSize: [0.01, (v) => '±' + (v / 100).toFixed(2)], lossRate: [0.001, (v) => (v ? (v / 10).toFixed(1) + '% a season' : 'off')], entryHype: [0.1, (v) => (v ? '×' + (v / 10).toFixed(1) : 'off')], cashShockChance: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% a week' : 'off')], priceRange: [0.01, (v) => '±' + v + '%'], priceLogK: [0.01, (v) => (v / 100).toFixed(2) + ' (×' + Math.exp(v / 100).toFixed(2) + ' per unit)'], priceClamp: [1, (v) => '×' + v + ' either way'], rateLogMid: [0.001, (v) => (v / 10).toFixed(1) + '%/wk'], rateClamp: [1, (v) => (v * 100).toLocaleString() + '%/wk'], keepMax: [0.01, (v) => v + '% of worth'], rateMax: [0.001, (v) => (v / 10).toFixed(1) + '%/wk'], deployOrders: [1, (v) => String(v)], maxOrderQty: [1, (v) => String(v)], maxListings: [1, (v) => String(v)], maxShorts: [1, (v) => String(v)], maxPacks: [1, (v) => String(v)], quitDrawdown: [0.01, (v) => v + '% of peak'], quitChance: [0.01, (v) => v + '%'], extraRookies: [1, (v) => String(v)], dormantAfter: [1, (v) => (v ? 'after ' + v + ' wk' : 'never')], markDepth: [1, (v) => 'best ' + v + ' orders'], markHalfLife: [1, (v) => (v ? v + ' wk half-life' : 'off')], holdCost: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% of mark' : 'off')], estateSale: [0.01, (v) => (v ? v + '% of cards' : 'off')], cashShockChance: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% a week' : 'off')], cashShockSize: [0.01, (v) => v + '% of worth'], markWeeks: [1, (v) => v + ' wk'], collectorSaveWeeks: [1, (v) => v + ' wk of budget'], collectors: [1, (v) => String(v)], collectorError: [0.01, (v) => '±' + v + '%'], collectorStart: [0.01, (v) => v + '% of copies'], collectorPerCard: [1, (v) => v + ' copies'], collectorSpread: [0.01, (v) => v + '%'], royaltyRate: [0.01, (v) => v + '%'], nnFitnessGens: [1, (v) => v + ' gens'], practiceGens: [1, (v) => (v ? v + ' (on Restart)' : 'none')], compsWeeks: [1, (v) => v + ' wk'], formSeasons: [1, (v) => v + (v > 1 ? ' seasons' : ' season') + ` (${v * 17} games)`], hypeInjury: [0.01, (v) => (v ? '×' + (v / 100).toFixed(1) : 'off')], entryRate: [0.01, (v) => (v / 100).toFixed(2)], heirs: [1, (v) => String(v)], scarcity: [0.01, (v) => (v / 100).toFixed(2)], packsPerWeek: [1, (v) => String(v)], liqListings: [1, (v) => String(v)], outsideBudget: [1, (v) => v.toLocaleString()], outsideResale: [0.01, (v) => v + '%'], prizeShare: [0.01, (v) => v + '% of takings'], livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'], walkUp: [0.01, (v) => v + '%'], walkVolLow: [0.01, (v) => '±' + v + '%'], walkVolHigh: [0.01, (v) => '±' + v + '%'], riskPerDoubling: [1, (v) => '+' + v + ' pts'], flagWeeks: [1, (v) => (v ? v + ' wk clean' : 'forever')], cardLendFee: [0.0001, (v) => (v / 100).toFixed(2) + '%/wk'], shortMargin: [0.01, (v) => v + '%'], cardLoanWeeks: [1, (v) => v + ' wk'], nnMutation: [0.01, (v) => '±' + (v / 100).toFixed(2)], nnReset: [0.01, (v) => v.toFixed(1) + '%'], evolveShare: [0.01, (v) => v + '%'] };
-const SELECTS = ['priceMap', 'rateMap', 'entrants', 'quitRule', 'forcedOrder', 'wealthTaxTo', 'rookieRule', 'leagueFill', 'singleBidder', 'fitnessValue', 'markRule', 'royaltyFunding', 'vaultIndex', 'valueBasis', 'pastSave', 'valueModel', 'priceRule', 'outsideMode', 'liquidation', 'forcedSale', 'packSale'];
+const SLIDERS = { tacticMatch: [0.1, (v) => (v / 10).toFixed(1) + ' sd'], tacticWindow: [1, (v) => v + (v > 1 ? ' gens' : ' gen')], practiceWorlds: [1, (v) => (v > 1 ? v + ' worlds' : '1 (as before)')], populationFloor: [0.01, (v) => (v ? v + '% of the start' : 'off')], fitnessSharing: [0.1, (v) => (v ? 'strength ' + (v / 10).toFixed(1) : 'off')], sharingRadius: [0.01, (v) => (v / 100).toFixed(2)], guideEvery: [1, (v) => v + ' wk'], guideLag: [1, (v) => v + ' wk old'], adaptEvery: [1, (v) => v + ' wk'], adaptSize: [0.01, (v) => '±' + (v / 100).toFixed(2)], lossRate: [0.001, (v) => (v ? (v / 10).toFixed(1) + '% a season' : 'off')], entryHype: [0.1, (v) => (v ? '×' + (v / 10).toFixed(1) : 'off')], entryReturns: [0.1, (v) => (v ? '×' + (v / 10).toFixed(1) : 'off')], entryNews: [0.1, (v) => (v ? '×' + (v / 10).toFixed(1) : 'off')], cashShockChance: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% a week' : 'off')], priceRange: [0.01, (v) => '±' + v + '%'], priceLogK: [0.01, (v) => (v / 100).toFixed(2) + ' (×' + Math.exp(v / 100).toFixed(2) + ' per unit)'], priceClamp: [1, (v) => '×' + v + ' either way'], rateLogMid: [0.001, (v) => (v / 10).toFixed(1) + '%/wk'], rateClamp: [1, (v) => (v * 100).toLocaleString() + '%/wk'], keepMax: [0.01, (v) => v + '% of worth'], rateMax: [0.001, (v) => (v / 10).toFixed(1) + '%/wk'], deployOrders: [1, (v) => String(v)], maxOrderQty: [1, (v) => String(v)], maxListings: [1, (v) => String(v)], maxShorts: [1, (v) => String(v)], maxPacks: [1, (v) => String(v)], attention: [1, (v) => (v ? v + ' + holdings and watchlist' : 'every live card')], attentionMemory: [1, (v) => v + ' wk'], quitDrawdown: [0.01, (v) => v + '% of peak'], quitChance: [0.01, (v) => v + '%'], extraRookies: [1, (v) => String(v)], dormantAfter: [1, (v) => (v ? 'after ' + v + ' wk' : 'never')], markDepth: [1, (v) => 'best ' + v + ' orders'], markHalfLife: [1, (v) => (v ? v + ' wk half-life' : 'off')], holdCost: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% of mark' : 'off')], estateSale: [0.01, (v) => (v ? v + '% of cards' : 'off')], cashShockChance: [0.0001, (v) => (v ? (v / 100).toFixed(2) + '% a week' : 'off')], cashShockSize: [0.01, (v) => v + '% of worth'], markWeeks: [1, (v) => v + ' wk'], collectorSaveWeeks: [1, (v) => v + ' wk of budget'], collectors: [1, (v) => String(v)], collectorError: [0.01, (v) => '±' + v + '%'], collectorStart: [0.01, (v) => v + '% of copies'], collectorPerCard: [1, (v) => v + ' copies'], collectorSpread: [0.01, (v) => v + '%'], royaltyRate: [0.01, (v) => v + '%'], nnFitnessGens: [1, (v) => v + ' gens'], practiceGens: [1, (v) => (v ? v + ' (on Restart)' : 'none')], compsWeeks: [1, (v) => v + ' wk'], formSeasons: [1, (v) => v + (v > 1 ? ' seasons' : ' season') + ` (${v * 17} games)`], hypeInjury: [0.01, (v) => (v ? '×' + (v / 100).toFixed(1) : 'off')], entryRate: [0.01, (v) => (v / 100).toFixed(2)], heirs: [1, (v) => String(v)], scarcity: [0.01, (v) => (v / 100).toFixed(2)], packsPerWeek: [1, (v) => String(v)], liqListings: [1, (v) => String(v)], outsideBudget: [1, (v) => v.toLocaleString()], outsideResale: [0.01, (v) => v + '%'], prizeShare: [0.01, (v) => v + '% of takings'], livingCost: [1, (v) => String(v)], lifestyle: [0.0001, (v) => (v / 100).toFixed(2) + '%'], maxLTV: [0.01, (v) => (v ? v + '%' : 'off')], interest: [0.0001, (v) => (v / 100).toFixed(2) + '%'], fee: [0.01, (v) => v + '%'], allowance: [1, (v) => String(v)], packEdge: [0.01, (v) => v + '%'], passesPerWeek: [1, (v) => String(v)], knowledgeWeeks: [1, (v) => v + ' wk'], detectChance: [0.01, (v) => v + '%'], priceLimit: [0.01, (v) => (v ? '±' + v + '%' : 'off')], wealthTax: [0.01, (v) => (v ? v + '%' : 'off')], positionLimit: [0.01, (v) => (v ? v + '%' : 'off')], storePremium: [0.01, (v) => '+' + v + '%'], walkUp: [0.01, (v) => v + '%'], walkVolLow: [0.01, (v) => '±' + v + '%'], walkVolHigh: [0.01, (v) => '±' + v + '%'], riskPerDoubling: [1, (v) => '+' + v + ' pts'], flagWeeks: [1, (v) => (v ? v + ' wk clean' : 'forever')], cardLendFee: [0.0001, (v) => (v / 100).toFixed(2) + '%/wk'], shortMargin: [0.01, (v) => v + '%'], cardLoanWeeks: [1, (v) => v + ' wk'], nnMutation: [0.01, (v) => '±' + (v / 100).toFixed(2)], nnReset: [0.01, (v) => v.toFixed(1) + '%'], evolveShare: [0.01, (v) => v + '%'] };
+const SELECTS = ['botScale', 'attentionSample', 'priceMap', 'rateMap', 'entrants', 'quitRule', 'forcedOrder', 'wealthTaxTo', 'rookieRule', 'leagueFill', 'singleBidder', 'fitnessValue', 'markRule', 'royaltyFunding', 'vaultIndex', 'valueBasis', 'pastSave', 'valueModel', 'priceRule', 'outsideMode', 'liquidation', 'forcedSale', 'packSale'];
 const TOGGLES = ['tactics', 'guideOn', 'adaptOn', 'priceAnchor', 'wealthTaxForced', 'outsideNews', 'retirementByAge', 'injuryByAge', 'pressure', 'injuries', 'retirement', 'rookies', 'awards', 'capPoorest', 'turnover', 'twoSidedQuotes', 'shorting', 'credit', 'passesTradable', 'games', 'sharing', 'stealing', 'gossip', 'outsideCollectors', 'royalties', 'evolve', 'leagueUpdates', 'centralBank', 'store', 'closedEconomy'];
 function syncControls() {
   const c = cfgNow(); if (!c) return;
@@ -574,7 +578,11 @@ $('runFile').addEventListener('change', async (e) => {
   catch (err) { $('hyp').innerHTML = `<b>Not a sandbox run.</b> Pick a run.json from <span class="mono">sandbox/runs/</span> (${esc(err.message)}).`; }
 });
 document.querySelectorAll('[data-speed]').forEach((b) => b.addEventListener('click', () => { speed = Number(b.dataset.speed); tell({ cmd: 'speed', v: speed }); document.querySelectorAll('[data-speed]').forEach((o) => o.setAttribute('aria-pressed', String(o === b))); }));
-Object.assign(COL, { chalk: css('--chalk'), muted: css('--muted'), faint: css('--faint'), gold: css('--gold'), panel: css('--panel') });
+function readTheme() {
+  Object.assign(COL, { chalk: css('--chalk'), muted: css('--muted'), faint: css('--faint'), gold: css('--gold'), panel: css('--panel'), up: css('--up'), down: css('--down'), sky: css('--sky'), mark: css('--mark'), onAccent: css('--on-accent'), lampOff: css('--lamp-off'), lampNone: css('--lamp-none'), ink: css('--ink-rgb') });
+  NEUTRAL.splice(0, 3, ...css('--neutral-rgb').split(',').map(Number)); BLUE_HI.splice(0, 3, ...css('--deep-rgb').split(',').map(Number));
+}
+readTheme();
 
 
 /* ---------- Stock-market desk: selection, tape, watchlist, main chart, detail, account ---------- */
@@ -675,15 +683,15 @@ function drawMain() {
   const sp = hi - lo || hi || 1; lo -= sp * 0.06; hi += sp * 0.06; if (!(met && met.zero)) lo = Math.max(0, lo);
   const X = (i) => pad.l + (iw * (i + 0.5)) / bars.length + SH, Y = (v) => pad.t + ih * (1 - (v - lo) / (hi - lo)), bw = Math.max(1, (iw / bars.length) * 0.66);
   x.font = `500 10px ${css('--mono')}`; x.textBaseline = 'middle';
-  for (let i = 0; i <= 5; i++) { const v = lo + ((hi - lo) * i) / 5, y = Y(v); x.fillStyle = 'rgba(255,255,255,0.06)'; x.fillRect(pad.l, Math.round(y), iw, 1); x.fillStyle = COL.faint; x.fillText(show(v), Wd - pad.r + 6, y); }
+  for (let i = 0; i <= 5; i++) { const v = lo + ((hi - lo) * i) / 5, y = Y(v); x.fillStyle = ink(0.06); x.fillRect(pad.l, Math.round(y), iw, 1); x.fillStyle = COL.faint; x.fillText(show(v), Wd - pad.r + 6, y); }
   x.save(); x.beginPath(); x.rect(pad.l, 0, iw, Ht); x.clip();
   x.textBaseline = 'alphabetic'; x.fillStyle = COL.faint;
   const step = Math.max(1, Math.ceil(bars.length / 8)); for (let i = 0; i < bars.length; i += step) x.fillText(`W${bars[i].t}`, X(i) - 8, Ht - 3);
   // Hidden value (or median) line
   x.beginPath(); let on = false; bars.forEach((b, i) => { if (b.val == null) { on = false; return; } on ? x.lineTo(X(i), Y(b.val)) : x.moveTo(X(i), Y(b.val)); on = true; }); x.setLineDash([5, 4]); x.strokeStyle = COL.chalk; x.lineWidth = 1.5; x.stroke(); x.setLineDash([]);
-  if (bars.some((b) => b.mk != null)) { x.beginPath(); let on2 = false; bars.forEach((b, i) => { if (b.mk == null) { on2 = false; return; } on2 ? x.lineTo(X(i), Y(b.mk)) : x.moveTo(X(i), Y(b.mk)); on2 = true; }); x.strokeStyle = '#9cc7ff'; x.lineWidth = 1.4; x.stroke(); } // every card's mark (bids and asks included)
+  if (bars.some((b) => b.mk != null)) { x.beginPath(); let on2 = false; bars.forEach((b, i) => { if (b.mk == null) { on2 = false; return; } on2 ? x.lineTo(X(i), Y(b.mk)) : x.moveTo(X(i), Y(b.mk)); on2 = true; }); x.strokeStyle = COL.sky; x.lineWidth = 1.4; x.stroke(); } // every card's mark (bids and asks included)
   if (CMODE === 'candle') {
-    bars.forEach((b, i) => { const upc = b.c >= b.o, col = upc ? '#4fd18b' : '#ff8a8a'; x.fillStyle = col; x.fillRect(Math.round(X(i)) - 0.5, Y(b.h), 1, Math.max(1, Y(b.l) - Y(b.h))); const y1 = Y(Math.max(b.o, b.c)), y2 = Y(Math.min(b.o, b.c)); x.fillRect(X(i) - bw / 2, y1, bw, Math.max(1.5, y2 - y1)); });
+    bars.forEach((b, i) => { const upc = b.c >= b.o, col = upc ? COL.up : COL.down; x.fillStyle = col; x.fillRect(Math.round(X(i)) - 0.5, Y(b.h), 1, Math.max(1, Y(b.l) - Y(b.h))); const y1 = Y(Math.max(b.o, b.c)), y2 = Y(Math.min(b.o, b.c)); x.fillRect(X(i) - bw / 2, y1, bw, Math.max(1.5, y2 - y1)); });
   } else {
     x.beginPath(); bars.forEach((b, i) => (i ? x.lineTo(X(i), Y(b.c)) : x.moveTo(X(i), Y(b.c)))); x.lineTo(X(bars.length - 1), pad.t + ih); x.lineTo(X(0), pad.t + ih); x.closePath();
     const g = x.createLinearGradient(0, pad.t, 0, pad.t + ih); g.addColorStop(0, rgba(COL.gold, 0.22)); g.addColorStop(1, rgba(COL.gold, 0)); x.fillStyle = g; x.fill();
@@ -692,14 +700,14 @@ function drawMain() {
   if (sel.type !== 'bot') drawStudies(x, bars, X, Y);
   x.restore();
   // Last price tag
-  if (last) { const y = Y(last.c); x.fillStyle = COL.gold; x.fillRect(Wd - pad.r + 2, y - 8, pad.r - 4, 16); x.fillStyle = '#1a1205'; x.font = `700 10px ${css('--mono')}`; x.textBaseline = 'middle'; x.fillText(show(last.c), Wd - pad.r + 6, y); }
+  if (last) { const y = Y(last.c); x.fillStyle = COL.gold; x.fillRect(Wd - pad.r + 2, y - 8, pad.r - 4, 16); x.fillStyle = COL.onAccent; x.font = `700 10px ${css('--mono')}`; x.textBaseline = 'middle'; x.fillText(show(last.c), Wd - pad.r + 6, y); }
   // Volume
   const vmax = Math.max(1, ...bars.map((b) => b.v || 0));
-  bars.forEach((b, i) => { const h = ((b.v || 0) / vmax) * (vH - 4); vx.fillStyle = b.c >= b.o ? 'rgba(79,209,139,0.55)' : 'rgba(255,138,138,0.55)'; vx.fillRect(X(i) - bw / 2, vH - h, bw, h); });
+  bars.forEach((b, i) => { const h = ((b.v || 0) / vmax) * (vH - 4); vx.fillStyle = b.c >= b.o ? rgba(COL.up, 0.5) : rgba(COL.down, 0.5); vx.fillRect(X(i) - bw / 2, vH - h, bw, h); });
   vx.fillStyle = COL.faint; vx.font = `500 10px ${css('--mono')}`; vx.fillText(sel.type === 'bot' || met ? '' : `volume (max ${fmt(vmax)})`, pad.l, 10);
   drawRsi(bars, X, pad);
   // Crosshair
-  if (MAIN.hi != null && MAIN.hi < bars.length) { const i = MAIN.hi, b = bars[i]; x.fillStyle = 'rgba(238,241,250,0.35)'; x.fillRect(Math.round(X(i)), pad.t, 1, ih); x.fillRect(pad.l, Math.round(Y(b.c)), iw, 1); }
+  if (MAIN.hi != null && MAIN.hi < bars.length) { const i = MAIN.hi, b = bars[i]; x.fillStyle = ink(0.35); x.fillRect(Math.round(X(i)), pad.t, 1, ih); x.fillRect(pad.l, Math.round(Y(b.c)), iw, 1); }
   Object.assign(MAIN, { bars, X, pad, iw });
 }
 {
@@ -834,7 +842,7 @@ function mval(m, i) {
 const metricSeries = (m, upto = ix(), from = 0) => { const out = []; for (let i = Math.max(0, from); i <= upto; i++) out.push(mval(m, i)); return out; };
 // A market-site mini chart: the last 52 weeks, green when it ended above where it started and red when below, a dotted
 // baseline at the start, a fading fill, high and low marks, and a dot on the latest value
-const UP = '#26c281', DN = '#ff5c5c';
+let UP = COL.up, DN = COL.down; // reset by readTheme's listener
 function spark(cv, d, show, zero, selected) {
   const [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
   const idx = d.map((v, i) => (v == null ? -1 : i)).filter((i) => i >= 0); if (idx.length < 2) return null;
@@ -844,7 +852,7 @@ function spark(cv, d, show, zero, selected) {
   const sp = hi - lo || Math.abs(hi) || 1, pt = 9, pb = 9, L0 = 1, R0 = 4;
   const X = (i) => L0 + (i / Math.max(1, d.length - 1)) * (Wd - L0 - R0), Y = (v) => pt + (1 - (v - lo) / sp) * (Ht - pt - pb);
   // baseline at the start of the window
-  x.strokeStyle = 'rgba(238,241,250,0.28)'; x.lineWidth = 1; x.setLineDash([2, 3]); x.beginPath(); x.moveTo(L0, Math.round(Y(first)) + 0.5); x.lineTo(Wd - R0, Math.round(Y(first)) + 0.5); x.stroke(); x.setLineDash([]);
+  x.strokeStyle = ink(0.28); x.lineWidth = 1; x.setLineDash([2, 3]); x.beginPath(); x.moveTo(L0, Math.round(Y(first)) + 0.5); x.lineTo(Wd - R0, Math.round(Y(first)) + 0.5); x.stroke(); x.setLineDash([]);
   const path = () => { x.beginPath(); let on = false; d.forEach((v, i) => { if (v == null) { on = false; return; } on ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)); on = true; }); };
   path(); x.lineTo(X(idx[idx.length - 1]), Ht); x.lineTo(X(idx[0]), Ht); x.closePath();
   const g = x.createLinearGradient(0, pt, 0, Ht); g.addColorStop(0, rgba(col, 0.28)); g.addColorStop(1, rgba(col, 0)); x.fillStyle = g; x.fill();
@@ -906,14 +914,14 @@ const MS = (k) => metricSeries(METRICS.find((m) => m.key === k));
 function drawFeatures() {
   if (!FRAMES.length || !$('fxMkt')) return; // only on the sectioned layout
   line('fxMkt', [{ data: MS('mcap'), color: COL.gold, fill: true }, { data: MS('vcap'), color: COL.chalk, dash: true }], { fy: fmt, min: 0 });
-  line('fxPrem', [{ data: MS('prem'), color: '#9cc7ff', fill: true }], { fy: (v) => (v * 100).toFixed(0) + '%', ref: 0 });
-  line('fxAD', [{ data: MS('adline'), color: '#26c281', fill: true }], { fy: (v) => fmt(v), ref: 0 });
-  line('fxFlow', [{ data: MS('bids'), color: '#26c281' }, { data: MS('asks'), color: '#ff8a8a' }], { fy: fmt, min: 0 });
-  line('fxShort', [{ data: MS('sopen'), color: '#ff8a8a', fill: true }, { data: MS('slend'), color: '#9cc7ff' }], { fy: fmt, min: 0 });
+  line('fxPrem', [{ data: MS('prem'), color: COL.sky, fill: true }], { fy: (v) => (v * 100).toFixed(0) + '%', ref: 0 });
+  line('fxAD', [{ data: MS('adline'), color: COL.up, fill: true }], { fy: (v) => fmt(v), ref: 0 });
+  line('fxFlow', [{ data: MS('bids'), color: COL.up }, { data: MS('asks'), color: COL.down }], { fy: fmt, min: 0 });
+  line('fxShort', [{ data: MS('sopen'), color: COL.down, fill: true }, { data: MS('slend'), color: COL.sky }], { fy: fmt, min: 0 });
   line('fxCards', [{ data: MS('cards'), color: COL.gold, fill: true }], { fy: fmt });
-  line('fxMint', [{ data: MS('minted'), color: COL.gold }, { data: MS('packs'), color: '#9cc7ff' }], { fy: fmt, min: 0 });
+  line('fxMint', [{ data: MS('minted'), color: COL.gold }, { data: MS('packs'), color: COL.sky }], { fy: fmt, min: 0 });
   line('fxDebt', [{ data: MS('debt'), color: COL.gold, fill: true }], { fy: fmt, min: 0 });
-  line('fxRate', [{ data: MS('rate'), color: '#9cc7ff', fill: true }], { fy: (v) => (v * 100).toFixed(2) + '%', min: 0 });
+  line('fxRate', [{ data: MS('rate'), color: COL.sky, fill: true }], { fy: (v) => (v * 100).toFixed(2) + '%', min: 0 });
 }
 const fxTip = (keys) => (i) => `<b>${when(FRAMES[i].t)}</b><br>` + keys.map((k) => { const m = METRICS.find((x) => x.key === k), v = metricSeries(m, i)[i]; return `${m.label} <span class="mono">${v == null ? '–' : m.show(v)}</span>`; }).join('<br>');
 [['fxMkt', ['mcap', 'vcap', 'prem']], ['fxPrem', ['prem']], ['fxAD', ['adline', 'adv', 'dec']], ['fxFlow', ['bids', 'asks', 'press']], ['fxShort', ['sopen', 'slend', 'sval']], ['fxCards', ['cards']], ['fxMint', ['minted', 'packs']], ['fxDebt', ['debt', 'lev']], ['fxRate', ['rate']]].forEach(([id, ks]) => { if ($(id)) crosshair(id, fxTip(ks)); });
@@ -1004,13 +1012,13 @@ function drawSectors() {
   $('sectors').tBodies[0].html = SECTORS.map((p, k) => { const a = s1[k]; return `<tr><td><b>${p}</b></td><td class="num">${a.n}</td><td class="num">${r(a) == null ? '–' : chgSpan(r(a))}</td><td class="num">${r(s4[k]) == null ? '–' : chgSpan(r(s4[k]))}</td><td class="num">${r(s12[k]) == null ? '–' : chgSpan(r(s12[k]))}</td><td class="num">${a.val ? (a.now / a.val).toFixed(2) + '×' : '–'}</td><td class="num">${pct(a.now / tot)}</td><td class="num">${a.vol}</td><td class="num"><span class="up">${a.adv}</span> / <span class="down">${a.dec}</span></td></tr>`; }).join('');
   const n = nNow(), { cols, range } = buckets(n, hmWidth('hmSec')), rows = SECTORS.map((p) => ({ label: p }));
   const val = (i, j) => { const s = sectorAt(range(j)[1], 4); const x = s?.[i]; return x && x.then ? x.now / x.then - 1 : null; };
-  heatmap('hmSec', rows, cols, val, (v) => { const t = C(v / 0.15, -1, 1); return t >= 0 ? mix([34, 34, 38], [29, 156, 92], t) : mix([34, 34, 38], [196, 58, 58], -t); }, (i, j) => { const [a, b] = range(j), v = val(i, j); return `<b>${SECTORS[i]}</b><br>Weeks ${FRAMES[a].t}–${FRAMES[b].t}<br>4-week return <span class="mono">${v == null ? '–' : (v > 0 ? '+' : '') + (v * 100).toFixed(1) + '%'}</span><br><span class="k">every ${SECTORS[i]}'s price, weighted by the cards he has out</span>`; }, (j) => `W${FRAMES[range(j)[0]].t}`);
+  heatmap('hmSec', rows, cols, val, (v) => { const t = C(v / 0.15, -1, 1); return t >= 0 ? mix(NEUTRAL, [29, 156, 92], t) : mix(NEUTRAL, [196, 58, 58], -t); }, (i, j) => { const [a, b] = range(j), v = val(i, j); return `<b>${SECTORS[i]}</b><br>Weeks ${FRAMES[a].t}–${FRAMES[b].t}<br>4-week return <span class="mono">${v == null ? '–' : (v > 0 ? '+' : '') + (v * 100).toFixed(1) + '%'}</span><br><span class="k">every ${SECTORS[i]}'s price, weighted by the cards he has out</span>`; }, (j) => `W${FRAMES[range(j)[0]].t}`);
 }
 // The market detail under the chart: breadth and order flow as bars
 function internalsHtml(f, at) {
   const b = breadth(at) || { adv: 0, dec: 0, unch: 0, hi: [], lo: [] }, o = f.ord || {};
   const bar = (l, r, lc, rc, ll, rl) => { const t = l + r || 1; return `<div class="ibar"><div class="ibar__lab"><span>${ll} <b>${Math.round(l).toLocaleString()}</b></span><span><b>${Math.round(r).toLocaleString()}</b> ${rl}</span></div><div class="ibar__track"><i style="width:${(l / t) * 100}%;background:${lc}"></i><i style="width:${(r / t) * 100}%;background:${rc}"></i></div></div>`; };
-  return `<div style="grid-column:1/-1;display:grid;gap:10px"><h3>Market internals this week</h3>${bar(b.adv, b.dec, '#4fd18b', '#ff8a8a', 'Advancers', 'decliners')}${bar(o.bids || 0, o.asks || 0, '#4fd18b', '#ff8a8a', 'Bids', 'offers')}${bar(o.pullUp || 0, o.pullDown || 0, '#4fd18b', '#ff8a8a', 'Quotes pulled up', 'pulled down')}${bar(b.hi.length, b.lo.length, '#4fd18b', '#ff8a8a', 'New highs', 'new lows')}${bar(o.aucSold || 0, (o.aucListed || 0) - (o.aucSold || 0), '#9cc7ff', '#5d6889', 'Auctions sold', 'unsold')}<p class="note">Every indicator, with its history, is in the board below the desk. Click one to chart it here.</p></div>${(() => { const w = cur()?.why; if (!w) return ''; const top = (o) => Object.entries(o || {}).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => `${esc(k)} <b>${n}</b>`).join(' · ') || '–'; return `<div class="note" style="grid-column:1/-1">Why neural bots traded this week (the input that pushed hardest): bought on ${top(w.buy)}<br>sold on ${top(w.sell)}</div>`; })()}`;
+  return `<div style="grid-column:1/-1;display:grid;gap:10px"><h3>Market internals this week</h3>${bar(b.adv, b.dec, COL.up, COL.down, 'Advancers', 'decliners')}${bar(o.bids || 0, o.asks || 0, COL.up, COL.down, 'Bids', 'offers')}${bar(o.pullUp || 0, o.pullDown || 0, COL.up, COL.down, 'Quotes pulled up', 'pulled down')}${bar(b.hi.length, b.lo.length, COL.up, COL.down, 'New highs', 'new lows')}${bar(o.aucSold || 0, (o.aucListed || 0) - (o.aucSold || 0), COL.sky, COL.lampOff, 'Auctions sold', 'unsold')}<p class="note">Every indicator, with its history, is in the board below the desk. Click one to chart it here.</p></div>${(() => { const w = cur()?.why; if (!w) return ''; const top = (o) => Object.entries(o || {}).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, n]) => `${esc(k)} <b>${n}</b>`).join(' · ') || '–'; return `<div class="note" style="grid-column:1/-1">Why neural bots traded this week (the input that pushed hardest): bought on ${top(w.buy)}<br>sold on ${top(w.sell)}</div>`; })()}`;
 }
 
 /* ---------- Terminal: status line, market map, calendar, chart studies ---------- */
@@ -1018,9 +1026,9 @@ let MAPK = 4, STUD = { ma: true, bb: false, rsi: true }, watchAll = false, lbAll
 function drawStatus() {
   const f = cur(), at = ix(); if (!f) return;
   const p1 = FRAMES[Math.max(0, at - 1)]?.h.p ?? f.h.p, b = breadth(at) || {}, o = f.ord || {};
-  $('statusBadge').html = mode === 'replay' ? `<span class="paused">REPLAY</span>` : playing ? `<span class="live">LIVE</span>` : `<span class="paused">PAUSED</span>`;
+  $('statusBadge').html = mode === 'replay' ? `<span class="paused">Replay</span>` : playing ? `<span class="live">Live</span>` : `<span class="paused">Paused</span>`;
   const item = (k, v, w) => `<span style="width:${k.length + w + 4}ch">${k}<b>${v}</b></span>`; // w = the widest the value gets
-  marquee($('statusView'), $('statusSet'), $('statusSet2'), [item('WK', f.t, 4), item('SEASON', f.season || '–', 4), `<span style="width:20ch">VAULT<b>${f.h.p.toFixed(1)}</b> ${chgSpan(f.h.p / p1 - 1)}</span>`, item('PREMIUM', f.mkt?.vcap ? ((f.mkt.mcap / f.mkt.vcap - 1) * 100).toFixed(1) + '%' : '–', 7), `<span style="width:13ch">A/D<b><span class="up">${b.adv ?? 0}</span>/<span class="down">${b.dec ?? 0}</span></b></span>`, item('VOL', b.vix == null ? '–' : (b.vix * 100).toFixed(1) + '%', 6), item('TRADES', f.h.trades, 6), item('COINS TRADED', fmt(o.coins), 8), item('BUY PRESSURE', o.bids + o.asks ? pct(o.bids / (o.bids + o.asks)) : '–', 4), item('RATE', f.mkt?.rate == null ? '–' : (f.mkt.rate * 100).toFixed(2) + '%', 6), item('BOTS', f.bots.length, 4), ...(f.guideT != null ? [item('GUIDE', 'wk ' + f.guideT, 6)] : []), item('NEW COINS', f.money ? (f.money.net >= 0 ? '+' : '−') + fmt(Math.abs(f.money.net)) : '–', 9), `<span style="width:58ch">TOP CARD<b>${f.top?.[0] ? `${esc(f.top[0].label)} ${fmt(f.top[0].P)}` : '–'}</b></span>`].join(''));
+  marquee($('statusView'), $('statusSet'), $('statusSet2'), [item('Week', f.t, 4), item('Season', f.season || '–', 4), `<span style="width:20ch">Vault index<b>${f.h.p.toFixed(1)}</b> ${chgSpan(f.h.p / p1 - 1)}</span>`, item('Premium', f.mkt?.vcap ? ((f.mkt.mcap / f.mkt.vcap - 1) * 100).toFixed(1) + '%' : '–', 7), `<span style="width:13ch">A/D<b><span class="up">${b.adv ?? 0}</span>/<span class="down">${b.dec ?? 0}</span></b></span>`, item('Volatility', b.vix == null ? '–' : (b.vix * 100).toFixed(1) + '%', 6), item('Trades', f.h.trades, 6), item('Coins traded', fmt(o.coins), 8), item('Buy pressure', o.bids + o.asks ? pct(o.bids / (o.bids + o.asks)) : '–', 4), item('Loan rate', f.mkt?.rate == null ? '–' : (f.mkt.rate * 100).toFixed(2) + '%', 6), item('Bots', f.bots.length, 4), ...(f.guideT != null ? [item('Guide', 'wk ' + f.guideT, 6)] : []), item('New coins', f.money ? (f.money.net >= 0 ? '+' : '−') + fmt(Math.abs(f.money.net)) : '–', 9), `<span style="width:58ch">Top card<b>${f.top?.[0] ? `${esc(f.top[0].label)} ${fmt(f.top[0].P)}` : '–'}</b></span>`].join(''));
 }
 // Squarified treemap: rectangles close to square, biggest first
 function squarify(items, x, y, w, h) {
@@ -1037,7 +1045,8 @@ function squarify(items, x, y, w, h) {
   }
   return out;
 }
-const mapCol = (r) => { if (r == null) return 'rgb(34,34,38)'; const t = C(r / (MAPK === 1 ? 0.08 : MAPK === 4 ? 0.2 : 0.4), -1, 1); return t >= 0 ? mix([34, 34, 38], [29, 156, 92], t) : mix([34, 34, 38], [196, 58, 58], -t); };
+const mapCol = (r) => { if (r == null) return `rgb(${NEUTRAL})`; const t = C(r / (MAPK === 1 ? 0.08 : MAPK === 4 ? 0.2 : 0.4), -1, 1); return t >= 0 ? mix(NEUTRAL, [29, 156, 92], t) : mix(NEUTRAL, [196, 58, 58], -t); };
+const onTile = (fill, a) => { const [r, g, b] = (fill.match(/\d+/g) || [0, 0, 0]).map(Number); return 0.2126 * r + 0.7152 * g + 0.0722 * b > 150 ? `rgba(0,0,0,${a * 0.85})` : `rgba(255,255,255,${a})`; };
 let MAPR = [];
 scale('scaleMap', 'down', 'up', (t) => mapCol(((t * 2 - 1) * 0.2)));
 function drawMap() {
@@ -1056,10 +1065,10 @@ function drawMap() {
       if (SEL.type === 'card' && SEL.id === k.id) { x.strokeStyle = COL.gold; x.lineWidth = 2; x.strokeRect(k.x + 1.5, k.y + 1.5, k.w - 3, k.h - 3); }
       MAPR.push(k);
       if (k.w > 44 && k.h > 24) {
-        const p = LIBRARY.players[k.id], big = k.w > 110 && k.h > 46; x.fillStyle = 'rgba(255,255,255,0.95)'; x.textAlign = 'center'; x.textBaseline = 'middle';
-        x.font = `800 ${big ? 15 : 11}px ${css('--display')}`; const nm = big ? p.name : p.name.split(' ').slice(-1)[0];
+        const p = LIBRARY.players[k.id], big = k.w > 110 && k.h > 46; x.fillStyle = onTile(mapCol(k.r), 0.95); x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.font = `600 ${big ? 14 : 11}px ${css('--display')}`; const nm = big ? p.name : p.name.split(' ').slice(-1)[0];
         x.fillText(nm.length * (big ? 7 : 6) > k.w ? nm.slice(0, Math.max(3, Math.floor(k.w / (big ? 7.5 : 6.5)))) : nm, k.x + k.w / 2, k.y + k.h / 2 - (big ? 8 : 5));
-        x.font = `600 ${big ? 12 : 10}px ${css('--mono')}`; x.fillStyle = 'rgba(255,255,255,0.8)'; x.fillText(k.r == null ? '' : `${k.r >= 0 ? '+' : ''}${(k.r * 100).toFixed(1)}%`, k.x + k.w / 2, k.y + k.h / 2 + (big ? 9 : 6));
+        x.font = `500 ${big ? 12 : 10}px ${css('--mono')}`; x.fillStyle = onTile(mapCol(k.r), 0.75); x.fillText(k.r == null ? '' : `${k.r >= 0 ? '+' : ''}${(k.r * 100).toFixed(1)}%`, k.x + k.w / 2, k.y + k.h / 2 + (big ? 9 : 6));
       }
     }
     if (head) { x.fillStyle = COL.muted; x.textAlign = 'left'; x.textBaseline = 'middle'; x.font = `700 11px ${css('--mono')}`; x.fillText(`${g.pos} · ${fmt(g.v)}`, g.x + 5, g.y + 8); }
@@ -1096,16 +1105,16 @@ function sdev(xs, k) { const m = sma(xs, k); return xs.map((_, i) => (m[i] == nu
 function rsi(xs, k = 14) { const out = xs.map(() => null); let g = 0, l = 0; for (let i = 1; i < xs.length; i++) { const d = xs[i] - xs[i - 1]; if (i <= k) { g += Math.max(0, d); l += Math.max(0, -d); if (i === k) out[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l); continue; } g = (g * (k - 1) + Math.max(0, d)) / k; l = (l * (k - 1) + Math.max(0, -d)) / k; out[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l); } return out; }
 function drawStudies(x, bars, X, Y) {
   const cl = bars.map((b) => b.c), path = (d, col, w, dash) => { x.beginPath(); let on = false; d.forEach((v, i) => { if (v == null) { on = false; return; } on ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)); on = true; }); x.setLineDash(dash || []); x.strokeStyle = col; x.lineWidth = w; x.stroke(); x.setLineDash([]); };
-  if (STUD.bb) { const m = sma(cl, 12), s = sdev(cl, 12); path(m.map((v, i) => (v == null ? null : v + 2 * s[i])), 'rgba(156,199,255,0.55)', 1, [2, 3]); path(m.map((v, i) => (v == null ? null : v - 2 * s[i])), 'rgba(156,199,255,0.55)', 1, [2, 3]); }
-  if (STUD.ma) { path(sma(cl, 4), '#9085e9', 1.4); path(sma(cl, 12), '#4fd18b', 1.4); }
+  if (STUD.bb) { const m = sma(cl, 12), s = sdev(cl, 12); path(m.map((v, i) => (v == null ? null : v + 2 * s[i])), rgba(COL.sky, 0.6), 1, [2, 3]); path(m.map((v, i) => (v == null ? null : v - 2 * s[i])), rgba(COL.sky, 0.6), 1, [2, 3]); }
+  if (STUD.ma) { path(sma(cl, 4), '#9085e9', 1.4); path(sma(cl, 12), '#2fa565', 1.4); }
 }
 function drawRsi(bars, X, pad) {
   const cv = $('rsic'); cv.hidden = !STUD.rsi; if (!STUD.rsi) return;
   const [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht); const r = rsi(bars.map((b) => b.c)), Y = (v) => 4 + (1 - v / 100) * (Ht - 8);
-  x.fillStyle = 'rgba(255,255,255,0.04)'; x.fillRect(pad.l, Y(70), Wd - pad.l - pad.r, Y(30) - Y(70));
+  x.fillStyle = ink(0.04); x.fillRect(pad.l, Y(70), Wd - pad.l - pad.r, Y(30) - Y(70));
   x.fillStyle = COL.faint; x.font = `500 10px ${css('--mono')}`; x.textBaseline = 'middle'; x.fillText('70', Wd - pad.r + 6, Y(70)); x.fillText('30', Wd - pad.r + 6, Y(30)); x.fillText('RSI 14', pad.l + 2, 9);
   x.beginPath(); let on = false; r.forEach((v, i) => { if (v == null) { on = false; return; } on ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)); on = true; }); x.strokeStyle = '#ffc83d'; x.lineWidth = 1.4; x.stroke();
-  const last = r[r.length - 1]; if (last != null) { x.fillStyle = last > 70 ? '#ff8a8a' : last < 30 ? '#4fd18b' : COL.muted; x.fillText(last.toFixed(0), Wd - pad.r + 24, Y(last)); }
+  const last = r[r.length - 1]; if (last != null) { x.fillStyle = last > 70 ? COL.down : last < 30 ? COL.up : COL.muted; x.fillText(last.toFixed(0), Wd - pad.r + 24, Y(last)); }
 }
 
 function drawDetail() {
@@ -1225,7 +1234,7 @@ function drawAcct() {
   <h3 class="ah3">Week by week<span>click a week for every entry</span></h3>
   <div class="wks">${weekRows.join('') || ''}</div>`;
   const cv = $('acctSpark'), [x, Wd, Ht] = fit(cv), vals = ws.filter((v) => v != null);
-  if (vals.length > 1) { const lo = Math.min(...vals), hi = Math.max(...vals), sp = hi - lo || 1, up = vals[vals.length - 1] >= vals[0]; x.beginPath(); let on = false, lx = 0; ws.forEach((v, k) => { if (v == null) { on = false; return; } const px = (k / (ws.length - 1)) * (Wd - 4) + 2, py = Ht - 3 - ((v - lo) / sp) * (Ht - 6); on ? x.lineTo(px, py) : x.moveTo(px, py); on = true; lx = px; }); x.strokeStyle = up ? '#4fd18b' : '#e66767'; x.lineWidth = 1.6; x.stroke(); x.lineTo(lx, Ht); x.lineTo(2, Ht); x.closePath(); x.fillStyle = up ? 'rgba(79,209,139,0.08)' : 'rgba(230,103,103,0.08)'; x.fill(); }
+  if (vals.length > 1) { const lo = Math.min(...vals), hi = Math.max(...vals), sp = hi - lo || 1, up = vals[vals.length - 1] >= vals[0]; x.beginPath(); let on = false, lx = 0; ws.forEach((v, k) => { if (v == null) { on = false; return; } const px = (k / (ws.length - 1)) * (Wd - 4) + 2, py = Ht - 3 - ((v - lo) / sp) * (Ht - 6); on ? x.lineTo(px, py) : x.moveTo(px, py); on = true; lx = px; }); x.strokeStyle = up ? COL.up : COL.down; x.lineWidth = 1.6; x.stroke(); x.lineTo(lx, Ht); x.lineTo(2, Ht); x.closePath(); x.fillStyle = up ? rgba(COL.up, 0.1) : rgba(COL.down, 0.1); x.fill(); }
 }
 document.addEventListener('click', (e) => {
   const wk = e.target.closest('[data-wk]'); if (wk) { const t = +wk.dataset.wk; ACCT_UI.open.has(t) ? ACCT_UI.open.delete(t) : ACCT_UI.open.add(t); drawAcct(); }
@@ -1298,7 +1307,7 @@ function applyLayout() {
     r.hidden = LAY.hideRow.includes(r.dataset.row) || (ps.length > 0 && vis === 0);
     if (r.classList.contains('grid') || r.classList.contains('desk') || r.classList.contains('movers')) { r.classList.remove('n1', 'n2', 'n3', 'n4', 'n5'); const top = [...r.children].filter((c) => !c.hidden && !(c.classList.contains('stack') && panelsOf(c).every((p) => p.hidden))); for (const c of r.children) if (c.classList.contains('stack')) c.hidden = panelsOf(c).every((p) => p.hidden); if (top.length < r.children.length) r.classList.add('n' + Math.max(1, top.length)); }
   }
-  ACCT_UI.weeks = 8; wake = true; drawLayoutPanel();
+  ACCT_UI.weeks = 8; wake = true; drawLayoutPanel(); drawNav();
 }
 function moveRow(key, d) { const keys = [...WRAP.children].filter((el) => el.dataset.row).map((el) => el.dataset.row), i = keys.indexOf(key), j = i + d; if (i < 0 || j < 0 || j >= keys.length) return; [keys[i], keys[j]] = [keys[j], keys[i]]; LAY.order = keys; saveLay(); applyLayout(); }
 const toggleIn = (arr, k) => { const i = arr.indexOf(k); i >= 0 ? arr.splice(i, 1) : arr.push(k); };
@@ -1336,7 +1345,7 @@ function rulesUi() {
   for (const el of document.querySelectorAll('#rules [data-when]')) el.hidden = !el.dataset.when.split('&').every((c) => { const ne = c.includes('!='), [k, v] = c.split(ne ? '!=' : '='), x = $(k); return v == null ? x.checked : ne ? x.value !== v : x.value === v; });
   for (const k of [...Object.keys(SLIDERS), ...TOGGLES, ...SELECTS]) {
     const el = $(k), d = DEFAULTS[k]; if (!el || d === undefined) continue; const v = ctlVal(k);
-    const diff = typeof d === 'number' ? Math.abs(v - d) > ((+el.step || 1) * SLIDERS[k][0]) / 2 : v !== d;
+    const diff = typeof d === 'number' && SLIDERS[k] ? Math.abs(v - d) > ((+el.step || 1) * SLIDERS[k][0]) / 2 : String(v) !== String(d); // a select holds strings (botScale's default is the number 1)
     el.closest('.slider, .mech, .toggle')?.classList.toggle('chg', diff);
   }
 }
@@ -1428,7 +1437,7 @@ function drawHealth() {
   host.dataset.built = '1';
   // timeline strip: one row per group, each week colored by the group's worst light
   let cv = $('hbStripCv'); if (!cv) { $('hbStrip').innerHTML = '<canvas id="hbStripCv" aria-label="Each group’s worst light, week by week"></canvas>'; cv = $('hbStripCv'); cv.addEventListener('click', (e) => { if (mode !== 'replay') return; const r = cv.getBoundingClientRect(), k = Math.floor(((e.clientX - r.left - 70) / Math.max(1, r.width - 70)) * nNow()); if (k >= 0 && k < FRAMES.length) { cursor = k; drawCharts(); drawPanels(); } }); }
-  const [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht); const n = nNow(), rh = Ht / HGROUPS.length, x0 = 70, w = (Wd - x0) / Math.max(1, n), COLS = { a: '#ff5c5c', r: '#c94b4b', o: '#2a2d33', g: '#3fae73', n: '#16181c' };
+  const [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht); const n = nNow(), rh = Ht / HGROUPS.length, x0 = 70, w = (Wd - x0) / Math.max(1, n), COLS = { a: COL.down, r: rgba(COL.down, 0.55), o: COL.lampOff, g: COL.up, n: COL.lampNone };
   x.font = `600 10px ${css('--mono')}`; x.textBaseline = 'middle';
   HGROUPS.forEach((g, gi) => { x.fillStyle = COL.faint; x.fillText(g, 2, gi * rh + rh / 2); const Ls = HEALTH.lights.filter((L) => L.group === g);
     for (let k = 0; k < n; k++) { let worst = 'n'; for (const L of Ls) { const s = lightAt(L, k).s; if (HL_RANK[s] > HL_RANK[worst]) worst = s; } x.fillStyle = COLS[worst]; x.fillRect(x0 + k * w, gi * rh + 1, Math.max(1, w + 0.5), rh - 2); } });
@@ -1437,3 +1446,23 @@ function drawHealth() {
   for (let k = Math.max(1, n - 400); k < n; k++) for (const L of HEALTH.lights) { const s = lightAt(L, k), p = lightAt(L, k - 1); if ((s.s === 'a' || s.s === 'r') && (p.s === 'g' || p.s === 'o') && !(last[L.key] > k - HEALTH.alertCooldown)) { last[L.key] = k; alerts.push([FRAMES[k].t, L, s]); } }
   $('hbAlerts').html = alerts.slice(-6).reverse().map(([t, L, s]) => `<div class="ln"><time>W${t}</time><span class="tag k-credit">Health</span><div>${esc(L.label)} turned red: ${esc(L.fmt(s.x))}${s.alarm ? `, ${esc(s.alarm)}` : ''}</div></div>`).join('') || '<p class="note">No lights have turned red yet.</p>';
 }
+
+/* ---------- Sidebar: one link per row in the current layout order, the row in view marked; theme changes ---------- */
+function drawNav() {
+  const nav = $('sideNav'); if (!nav) return;
+  const NAMES = { tape: 'Overview', 'w-h': 'Market desk', healthPanel: 'Health board', 'ln-h': 'League news', 'sec-h': 'Sectors', 'floor-h': 'Floor and leaderboard', 'hg-h': 'What they learned', 'tac-h': 'Tactics', 'hf-h': 'Prices and holdings', 'gt-h': 'Games, notes and wealth', 'ind-h': 'Indicators', 'map-h': 'Market map' };
+  const SKIP = new Set(['r-kpis', 'mvc']); // the key numbers and top cards sit under Overview
+  const rows = [...document.querySelector('.wrap').children].filter((el) => el.dataset.row && !el.hidden && !SKIP.has(el.dataset.row));
+  nav.innerHTML = rows.map((r) => { const p = r.matches('section.panel') ? r : r.querySelector('section.panel'); const name = NAMES[r.dataset.row] || (p?.querySelector('h2')?.firstChild?.textContent || '').trim() || 'Section'; return `<a href="#" data-go="${esc(r.dataset.row)}">${esc(name)}</a>`; }).join('');
+  spyNav();
+}
+function spyNav() {
+  const nav = $('sideNav'); if (!nav) return; let on = null;
+  for (const a of nav.querySelectorAll('a')) { const r = document.querySelector(`[data-row="${CSS.escape(a.dataset.go)}"]`); if (r && r.getBoundingClientRect().top < 140) on = a; }
+  on = on || nav.querySelector('a');
+  for (const a of nav.querySelectorAll('a')) a.setAttribute('aria-current', String(a === on));
+}
+$('sideNav')?.addEventListener('click', (e) => { const a = e.target.closest('a[data-go]'); if (!a) return; e.preventDefault(); const r = document.querySelector(`[data-row="${CSS.escape(a.dataset.go)}"]`); if (r) { r.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); const h = r.querySelector('h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } } });
+{ let pend = false; addEventListener('scroll', () => { if (pend) return; pend = true; requestAnimationFrame(() => { pend = false; spyNav(); }); }, { passive: true }); }
+drawNav();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readTheme(); UP = COL.up; DN = COL.down; drawScales(); scale('scaleMap', 'down', 'up', (t) => mapCol(((t * 2 - 1) * 0.2))); drawCharts(); drawPanels(); });

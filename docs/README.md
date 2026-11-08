@@ -973,3 +973,152 @@ Realism keeps the defaults.
   in mind.
 - A tactic id stays the same while its centroid drifts slowly, so a long-lived tactic can end up some way from where it
   started. The `dist` field records each generation's move.
+
+## Round 5: speed, attention, scaled bots and market-driven entry
+
+Four changes. One makes the engine faster without changing any result; the other three are settings, each a world
+factor (how many cards a bot can look at, how many bots there are, how many newcomers arrive), never a rule about what
+the bots do. With default settings a run is byte-identical to Round 4. The Realism preset now grows the bots with the
+full league (`botScale: 'cards'`) and turns on all three entry factors (`entryHype`, `entryReturns`, `entryNews` at 1).
+The attention budget stays off in Realism: it is there to experiment with.
+
+### Speed (same results, less time)
+
+A Realism week with the full league used to take about 2.8 seconds on one core. Now it takes about 1.16 seconds, roughly 2.4 times faster, and every number the engine produces is unchanged. We checked this by hashing every week's full frame against the old engine: 45 weeks on the default rules and 40 weeks on Realism (no practice, seed 31761), plus 10-week runs on rule bots, the Vault store, fashion with price and position limits, band collectors with chase liquidation and discount forced sales, fixed pack prices with league updates and the OVR walk, and the guide with practice on two worlds. Every hash matched. There are no new settings and nothing changes in the page.
+
+Where the time went (CPU profile of a Realism week): about 92% was the neural bots looking at cards. Each bot runs its card network once for every live card, about 2,100 cards for each of about 250 bots, up to three times a week: when it picks what to research, when it places orders, and for every sealed auction bid. The network's arithmetic was about 33% of the week, building its 43 inputs about 23%, and the order loop around them about 11%. Working out each bot's worth again for every one of the 150 to 500 auctions a week took another 5%.
+
+What changed, and why the results are the same:
+
+- **The card network's arithmetic.** The 16 first-layer sums now run side by side in one pass over the inputs, and the second and output layers are written out term by term. Every sum still adds the same terms in the same order, starting from the same folded bias and still skipping zero inputs, so each result is bit-for-bit the same. The pass is about 2.5 times faster. About a third of what is left is the exact `exp` in the tanh, which we kept because any faster approximation would change the numbers.
+- **Scoring in batches.** For research wishes and weekly orders, a bot's cards are scored together. Their inputs go into one reused buffer and the network runs over all of them. In the order phase, a short sale is the only action that changes what a bot sees of its later cards (its cash). So after a short sale, the rest of the batch is scored again from the new state, and every card gets the score it would have got one at a time.
+- **Shared inputs computed once.** Some things are the same for every bot. A card's market numbers (returns, volume, copies, pool), its fixed facts, and the games on its position are now kept in one flat array per world, filled the first time the card is looked at that week, just as the old per-card cache was. Other things cannot change while bots are deciding: each card's price, last week's best bid and ask, last royalty and status, plus each player's league news and guide. These are read once at the start of the research and order phases instead of once per card per bot. At the end of each phase a check compares the saved values with the live ones and throws an error if any differ. So if a future rule changes a price inside one of these phases, it fails loudly instead of quietly changing results. Such a rule must clear the snapshot (`SNAP`) before making the change.
+- **Auction bids.** A bot's worth is kept from one auction to the next until an auction result touches it. That means the buyer, the seller, and, when a card sells, every bot that holds, lends, owes or has a one-of-a-kind copy of that card. Any bot it touches gets its worth computed again from scratch.
+
+Running bots in parallel across cores was looked at and not built. A week is one synchronous step, and the bots act in turn. Each bot's view depends on what the bots before it did (short sales move lendable counts and lenders' holdings, and packs move pools). The inputs read the whole world, which lives on the main thread. Only the network's arithmetic, now about 40% of a week, could move to workers. Doing that bit-identically would mean computing every input twice (once to guess, once to check) and moving about 200 MB of inputs a week through shared memory, for at most about a 25% gain. The page could not use it at all, because shared memory needs cross-origin isolation, which the artifact host doesn't provide. The simple way to use more cores is to run seeds or settings in separate processes, one per core. Results are the same, since each run is deterministic.
+
+### Attention budget (`attention`, `attentionMemory`, `attentionSample`)
+
+The page control is Rules → "Cards looked at / wk" (off by default). With the full league there are thousands of live card markets, and by default every neural bot's card network scores every one of them every week, so no trader is limited in what it can look at. Real collectors are limited. With `attention` set to K > 0, each week a neural bot's card network scores only:
+
+- the cards it holds or owes (short positions) and the market of each one-of-a-kind card it owns;
+- its watchlist: every live card of a player it has a note on (from research or a shared note), the cards it has up for auction, and the cards it bought or sold in the last `attentionMemory` weeks (8 by default);
+- K other live cards drawn at random with the world's random stream. With `attentionSample` 'uniform' (the default) every live card is equally likely. With 'volume', a card's chance is proportional to 1 + its public trade count over the last 4 weeks, so a busy market is more likely to be noticed. The draw never reads the bot's network or any hidden value. It only skips cards that are already in the bot's holdings or watchlist.
+
+A card the bot is not looking at that week gets no new orders from it: no bid or ask, no short sale, no auction listing, no sealed bid in that card's auction, and no research pick. Research picks come from the same set, so a bot can only research a player it has noticed. Book orders do not carry over between weeks. Auction listings already open run as before. A bot that arrives during the week, such as a newcomer or an heir, gets its own draw the first time it looks at the market. Rule bots and AI bots are unchanged, since rule bots already look at a limited list (their holdings, notes, the 30 busiest cards and 10 random ones). This is a world factor in the owner's sense: it sets how many cards a bot can look at, never which cards it prefers or which way it trades. Each week's frame then carries `attention` = {bots, cards (scored, summed over bots), sampled, watch, live} as a measurement. At `attention` 0 every run is byte-identical to the engine before this setting existed.
+
+First measurement. The runs used the Realism preset with the full league, seed 31761, 40 weeks, no practice generations, and about 2,180 live markets. All four ran at the same time on one machine, so the seconds are comparable with each other.
+
+| Setting | Seconds a week | Trades a week | Auction sales a week | Price ÷ value at week 40 | Prices follow the football |
+|---|---|---|---|---|---|
+| Off | 5.6 | 508 | 40 | 1.01 | 0.88 |
+| 100 cards | 0.89 | 490 | 35 | 0.96 | 0.90 |
+| 300 cards | 1.27 | 461 | 30 | 0.92 | 0.90 |
+| 300 cards, drawn by volume | 1.40 | 521 | 42 | 1.01 | 0.89 |
+
+Price ÷ value is the geometric mean of price over hidden value across the markets that have copies. "Prices follow the football" is the Spearman rank correlation, across players, between the change in a player's base-card price and the change in his value from week 10 to week 40.
+
+A bot scored about 254 cards a week at 100 and about 448 at 300, against about 2,180 with no budget. Its watchlist held about 25 cards. With a uniform draw, trading thinned a little and prices sat slightly below value. With a draw weighted by trade volume, trading matched the run with no budget. In every case prices tracked value about as well as with no budget. All of this is one seed over 40 weeks, so it is a first look, not a finding.
+
+### Bots that grow with the league (botScale)
+
+A full league (League size: Full rosters) has about twice as many cards as the save alone (W.fillK, measured at 2.006 on
+seed 31761). Money and packs already grew by that factor; the bots did not, so each bot held about twice as many cards
+and drew twice the allowance. **Bots with a full league** (`botScale`) sets how the population follows:
+
+- **The same bots** (`1`, the default): as before. 250 bots, each drawing allowance × W.fillK a week.
+- **Grow with the cards** (`'cards'`): the starting population, the newcomer rate (`entryRate`) and the population floor
+  and cap all grow by W.fillK (250 becomes 501). Each bot still starts with the usual starting cash, so the opening cash
+  grows with the cards as well. The cards are dealt over more hands, about 21 a bot where it used to be about 42. The
+  weekly allowance is split over the larger population. Its total still grows by W.fillK once, not twice, so each bot
+  draws the plain allowance, which in Realism equals the flat living cost again. Practice worlds use the same rule, so
+  every bot in the real market gets its own practice network (501 distinct networks, tested with one and two worlds).
+  It applies on Restart and only with a full league. The Realism preset turns it on.
+
+### Newcomers after league news (entryNews)
+
+How many newcomers arrive each week has three optional drivers. Each one changes only how many arrive, never what they
+do: every newcomer still brings fresh random networks and the usual cash. The arrival rate is
+`entryRate × (1 + entryHype × rally) × (1 + entryReturns × word of mouth) × (1 + entryNews × news)`.
+
+- **rally**: the Vault index's rise over 20 weeks, floored at 0 (`entryHype`, already in the engine).
+- **word of mouth**: the median bot's own return over 11 weeks, with money it didn't earn removed, floored at 0
+  (`entryReturns`, already in the engine, now with a page control: Newcomers after good returns).
+- **news** (new): the league's public news flow. The engine counts the league items it posts to the news feed each
+  week: Super Bowls, awards, Hall of Fame inductions, retirements, rookies, injuries of two games or more, returns from
+  injury and season openings. The simulated league has no record board or club trades, so neither of those is counted.
+  The news value is the weekly average over the last 4 weeks divided by the weekly average over the last 52 weeks (or
+  over the weeks so far, early in a run), minus 1, floored at 0. So news is positive only in a busier stretch than
+  usual, mostly the season's end. Its page control is Newcomers after league news.
+
+Each factor is our assumption, not a measurement. All three default to 0, so a default run is unchanged. The Realism
+preset sets all three to 1. Whenever any of them is on, the frame records `entry`, which is for measurement only: the
+multiplier `m`, the three components, the arrival rate, each component's share of log m, and the three raw signals
+(read even when their factor is 0).
+
+**Measured** (Realism, full league, bots grow with the cards, practiceGens 0, seed 31761, 120 weeks; one run each, so
+small gaps between runs are within noise). The population starts at 501. Entries count every arrival; exits count bots
+that gave up, chose to leave or retired (deaths of old age, with heirs, are not counted). The averages are over all 120
+weeks; a factor at 0 gives 1.
+
+| Run | Pop. wk 40 | wk 80 | wk 120 | Entries | Exits | Mean multiplier | Rally part | Returns part | News part |
+|---|---|---|---|---|---|---|---|---|---|
+| Fixed entry (all three 0) | 346 | 251 | 218 | 56 | 339 | 1.000 | 1 | 1 | 1 |
+| entryHype 1 alone | 336 | 244 | 222 | 50 | 329 | 1.045 | 1.045 | 1 | 1 |
+| entryReturns 1 alone | 336 | 262 | 242 | 70 | 329 | 1.059 | 1 | 1.059 | 1 |
+| entryNews 1 alone | 351 | 304 | 284 | 107 | 324 | 1.558 | 1 | 1 | 1.558 |
+| All three at 1 | 366 | 287 | 272 | 100 | 329 | 1.713 | 1.052 | 1.039 | 1.563 |
+| All three at 1, same bots (botScale 1, start 250) | 188 | 151 | 128 | 60 | 182 | 1.836 | 1.094 | 1.065 | 1.562 |
+
+The three signals behave differently. The rally term was above 1 in 68 of 120 weeks and never above ×1.29; word of
+mouth in 88 weeks, never above ×1.16. League news was above 1 in only 21 weeks, all near the season's end (Super Bowl,
+awards, retirements, rookies), and then large: up to ×5.7 alone. With all three on, the multiplier was above 1 in 101
+weeks (up to ×6.75), and the average share of log m was about 0.34 rally, 0.47 returns and 0.20 news over those weeks;
+by count of extra arrivals, news carries most of them because its weeks are few but big. In every run exits far exceed
+entries at entryRate 0.25 and the population falls through 120 weeks; the entry factors slow the fall but do not stop
+it. These are observations of one seed, not tuned values.
+
+**Checks.** With defaults, 45 weeks on seed 31761, every frame (minus gen, bookD, money, limits) is identical to the
+base engine. The earlier Realism (entryHype 1, the other two 0, botScale 1, practiceGens 0) is identical for 25 weeks
+too, ignoring the new measurement-only `entry` field. With botScale 'cards' the starting cash is 10,020,000 for 501 bots
+(5,000,000 for 250 before), the starting cards per bot fall from 42.4 to 21.2, and one or two practice worlds give 501
+distinct networks.
+
+### The four together: checks and a 120-week run
+
+The three patches were merged into one engine and checked by hashing every week's full frame (minus the measurement-only
+gen, bookD, money and limits fields):
+
+- Defaults, 45 weeks, seed 31761: identical to Round 4 (last hash 895859b8 on both).
+- The merged engine against each builder's own engine: Realism with the earlier entry settings plus `attention: 300`
+  (uniform draw, and the trade-volume draw), 12 weeks each, matched the attention engine week for week (ignoring the new
+  `entry` field, which that engine does not have); the new Realism, 12 weeks, matched the entry engine. So the faster
+  code gives the attention budget and the scaled bots exactly the results they gave on the old code.
+- Determinism: the new Realism (practiceGens 0), merged engine against itself, 40 weeks: identical (last hash 00f2faa0).
+- The snapshot guard (`endSnap`) never fired in any of these runs.
+
+One 120-week run of the new Realism (full league, bots grow with the cards, all three entry factors at 1, practiceGens
+0, seed 31761) on one core, nothing else running:
+
+| | Weeks 1–40 | 41–80 | 81–120 | All 120 |
+|---|---|---|---|---|
+| Seconds a week | 2.22 | 1.73 | 1.80 | 1.91 |
+| Trades a week (auction sales included) | 697 | 684 | 657 | 679 |
+| Auction card sales a week | 50.6 | 62.5 | 80.3 | 64.5 |
+| Mean entry multiplier m | 1.64 | 1.77 | 1.74 | 1.71 |
+
+The population was 501 at the start, 366 at week 40, 287 at week 80 and 272 at week 120. Active league players stayed
+at 320 to 324; live card markets grew from 2,411 to 2,866. The entry components averaged 1.052 (rally), 1.039 (word of
+mouth) and 1.563 (news) over the run, exactly as in the entry measurement above, which is the same run. With 501 bots a
+week costs about 1.9 seconds, against about 2.8 seconds for 250 bots before the speed work. The same Realism with
+`attention: 100` ran its first 20 weeks at 0.95 seconds a week (2.37 for the same weeks without the budget), with each
+bot scoring about 255 cards a week out of about 2,290 live markets.
+
+The tactic tracker over that run (`node sandbox/tactics_report.mjs`): two tactics in every generation, silhouettes 0.15
+to 0.25, so behaviour is still a continuum. Generation 1 (week 20) split into bots that trade with dealers and outsiders
+and sell often (53%) and bots that trade with each other and hold longer (47%), both losing money (−26% and −31%). By
+generation 3 (week 60) one broad tactic held 93% of the bots and returned +16%; a small group that borrowed heavily and
+was forced to sell (7%, −22%) branched off and was gone a generation later. From generation 4 on the bots split again,
+roughly in half, into auction traders who rarely open packs and bots that trade with dealers and outsiders and open about
+8 packs a generation; both returned +15% to +19% at week 120, and the tracker flagged the pack-openers as cannibalizing
+the auction traders in generation 5. One seed, so these are observations, not findings.

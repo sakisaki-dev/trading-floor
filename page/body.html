@@ -1,32 +1,47 @@
+<div class="app">
+<!-- Sidebar: one link per row, in the current layout order (drawNav in ui.js). A new row, such as the government
+     panel of docs/sandbox/regulator-spec.md §16, gets its link here without any change to this markup. -->
+<aside class="side" aria-label="Sections">
+  <div class="side__brand"><b>Trading Floor</b><span>Retro Vault sandbox</span></div>
+  <h2 class="side__h" id="side-h">On this page</h2>
+  <nav class="side__nav" id="sideNav" aria-labelledby="side-h"></nav>
+  <p class="side__foot">Arrange, minimize or hide panels with Layout.</p>
+</aside>
 <div class="wrap">
   <header class="top">
     <div>
-      <span class="kicker gold">Retro Vault · Sandbox</span>
-      <h1>The <em>Trading</em> Floor</h1>
+      <span class="kicker gold">Retro Vault sandbox</span>
+      <h1>Trading Floor</h1>
     </div>
     <p class="sub">250 neural bots trade real players' cards (every design, finish, kit, Prizm parallel and autograph) at the site's real prices, replaying the save's real seasons. Each bot is two small networks with random weights. Nobody copies anybody: a bot's networks pass to its heir when it dies, and newcomers arrive with fresh ones.</p>
   </header>
 
   <div class="bar" role="group" aria-label="Simulation controls">
-    <button class="primary" id="play" type="button">Pause</button>
-    <button id="step" type="button" title="Advance one week">Step</button>
-    <button id="reset" type="button">Restart</button>
-    <div class="seg" role="group" aria-label="Speed">
-      <button type="button" data-speed="1" aria-pressed="true">1×</button>
-      <button type="button" data-speed="4" aria-pressed="false">4×</button>
-      <button type="button" data-speed="16" aria-pressed="false">16×</button>
+    <div class="bar__g">
+      <button class="primary" id="play" type="button">Pause</button>
+      <button id="step" type="button" title="Advance one week">Step</button>
+      <button id="reset" type="button">Restart</button>
+      <div class="seg" role="group" aria-label="Speed">
+        <button type="button" data-speed="1" aria-pressed="true">1×</button>
+        <button type="button" data-speed="4" aria-pressed="false">4×</button>
+        <button type="button" data-speed="16" aria-pressed="false">16×</button>
+      </div>
     </div>
-    <select id="preset" aria-label="Market preset"></select>
-    <label class="mini" for="seed">Seed <input id="seed" type="number" value="88" min="1" max="99999"></label>
-    <button id="rulesBtn" type="button" aria-expanded="false" aria-controls="rules">Rules ▾</button>
-    <button id="layoutBtn" type="button" aria-expanded="false" aria-controls="layoutP">Layout ▾</button>
-    <button id="saveRun" type="button" title="Download every week so far, the rules and every change you made, to share or replay">Save run</button>
-    <label class="file" for="runFile">Load run<input id="runFile" type="file" accept=".json,application/json"></label>
-    <button id="liveBtn" type="button" hidden>Back to live</button>
+    <div class="bar__g">
+      <select id="preset" aria-label="Market preset"></select>
+      <label class="mini" for="seed">Seed <input id="seed" type="number" value="88" min="1" max="99999"></label>
+      <button id="rulesBtn" type="button" aria-expanded="false" aria-controls="rules">Rules ▾</button>
+      <button id="layoutBtn" type="button" aria-expanded="false" aria-controls="layoutP">Layout ▾</button>
+    </div>
+    <div class="bar__g bar__g--end">
+      <button id="saveRun" type="button" title="Download every week so far, the rules and every change you made, to share or replay">Save run</button>
+      <label class="file" for="runFile">Load run<input id="runFile" type="file" accept=".json,application/json"></label>
+      <button id="liveBtn" type="button" hidden>Back to live</button>
+    </div>
   </div>
 
   <div class="rules" id="rules" hidden>
-    <div class="rules__bar"><b>Rules</b><span class="note">changes apply to the running world at once · a gold dot marks a rule changed from its default</span><button type="button" id="rulesReset">Reset all to defaults</button></div>
+    <div class="rules__bar"><b>Rules</b><span class="note">changes apply to the running world at once · a blue dot marks a rule changed from its default</span><button type="button" id="rulesReset">Reset all to defaults</button></div>
     <section class="rgrp" aria-label="Money"><h3>Money<span>what comes in and what leaves every week</span></h3><div class="rgrp__c">
       <div class="slider"><label for="allowance">Allowance / wk <b id="allowanceV"></b></label><input id="allowance" type="range" min="0" max="2000" step="100" value="200"></div>
       <div class="slider"><label for="livingCost">Living cost / wk <b id="livingCostV"></b></label><input id="livingCost" type="range" min="0" max="400" step="20" value="80"></div>
@@ -38,6 +53,8 @@
       <div class="slider" title="Your setting: when a bot dies, this share of each of its holdings is sold (best bids first, the rest at auction) before the heirs inherit"><label for="estateSale">Estate sales <b id="estateSaleV"></b></label><input id="estateSale" type="range" min="0" max="100" step="5" value="0"></div>
       <div class="slider" title="Your assumption, not measured: the share of copies in bots' hands lost each season (damaged, misplaced), never picked by value"><label for="lossRate">Cards lost <b id="lossRateV"></b></label><input id="lossRate" type="range" min="0" max="50" step="1" value="0"></div>
       <div class="slider" title="Your assumption, not measured: newcomers arrive at the entry rate × (1 + this × the Vault index's rise over 20 weeks)"><label for="entryHype">Newcomers after rallies <b id="entryHypeV"></b></label><input id="entryHype" type="range" min="0" max="50" step="1" value="0"></div>
+      <div class="slider" title="Your assumption, not measured: newcomers arrive at the entry rate × (1 + this × the median bot's own return over the last 11 weeks, money it didn't earn removed): word of mouth. Only how many arrive, never what they do"><label for="entryReturns">Newcomers after good returns <b id="entryReturnsV"></b></label><input id="entryReturns" type="range" min="0" max="50" step="1" value="0"></div>
+      <div class="slider" title="Your assumption, not measured: newcomers arrive at the entry rate × (1 + this × the league's news flow): league news items in the feed over the last 4 weeks (Super Bowl, awards, Hall of Fame, retirements, rookies, injuries, returns, season openings) against their 52-week average, minus 1, never below 0. Only how many arrive, never what they do"><label for="entryNews">Newcomers after league news <b id="entryNewsV"></b></label><input id="entryNews" type="range" min="0" max="50" step="1" value="0"></div>
       <div class="slider" title="Your assumption, not measured: each bot's weekly chance of a sudden cash need (a layoff, a divorce). Every one is logged"><label for="cashShockChance">Cash shocks <b id="cashShockChanceV"></b></label><input id="cashShockChance" type="range" min="0" max="500" step="10" value="0"></div>
       <div class="slider" data-when="cashShockChance!=0" title="Your assumption, not measured: how big a cash shock is, as a share of the bot's worth"><label for="cashShockSize">Shock size <b id="cashShockSizeV"></b></label><input id="cashShockSize" type="range" min="0" max="50" step="1" value="10"></div>
       <div class="slider" title="Share of the house's weekly takings (trade fees, pack sales, living costs) paid back out as contest prizes"><label for="prizeShare">Prize pool <b id="prizeShareV"></b></label><input id="prizeShare" type="range" min="0" max="100" step="5" value="0"></div>
@@ -51,6 +68,7 @@
       <div class="rgrp__t" data-when="valueModel=league"><label class="toggle" title="Measured in the save: after a big rise the next season tends to fall off; after a fall, rebound"><input type="checkbox" id="pressure" checked> Pressure after rises</label><label class="toggle"><input type="checkbox" id="injuries" checked> Injuries</label><label class="toggle"><input type="checkbox" id="retirement" checked> Retirement</label><label class="toggle" title="Careers end at the save's overall rate, shaped by age as in real NFL careers (nobody plays past 40)"><input type="checkbox" id="retirementByAge" checked> Retirement by age</label><label class="toggle" title="Injury chance follows the real NFL's risk by age, at the save's overall rate"><input type="checkbox" id="injuryByAge" checked> Injuries by age</label><label class="toggle"><input type="checkbox" id="rookies" checked> Rookies</label><label class="toggle"><input type="checkbox" id="awards" checked> Awards</label></div>
       <label class="mech" data-when="valueModel=league" title="Measured: new players arrive at the save's measured rate (about 3 a season, whoever retires), so the active league can shrink. One per retiree: every retiree is replaced at his position and club (66 active players always)"><span>Rookies arrive</span><select id="rookieRule"><option value="replacePlus">One per retiree, plus extra</option><option value="replace">One per retiree</option><option value="measured">At the measured rate</option></select></label>
       <label class="mech" data-when="valueModel=league" title="The save's players only (66 active, a few per club), or a full league: every club carries a real Retro Bowl roster of 10 (QB, RB, 2 WR, TE, OL, DL, LB, 2 DB). Slots the save leaves empty get generated veterans built from measured data, who have played as many seasons as the save's active players have; retirees are replaced and gaps filled every season (Rookies arrive is then not used). Values are ranked against the save's own players, so real cards keep their values; allowance, outside money and packs grow with the number of cards. Applies on Restart; needs the latest season start."><span>League size</span><select id="leagueFill"><option value="save">The save's players</option><option value="full">Full rosters (10 a club)</option></select></label>
+      <label class="mech" data-when="leagueFill=full" title="With full rosters there are about twice as many cards; money and packs already grow with them. Grow with the cards: the starting bots, the newcomer rate and the population floor grow by the same factor, and the allowance is shared by the larger population (its total still grows with the cards once). The same bots: as before. Applies on Restart"><span>Bots with a full league</span><select id="botScale"><option value="1">The same bots</option><option value="cards">Grow with the cards</option></select></label>
       <div class="slider" data-when="leagueFill=full" title="A retired player nobody holds, bids on or trades for this many weeks is set aside: the weekly per-card upkeep skips him until anyone bids, lists, pulls or holds one of his cards (his value and pack odds are untouched). Saves time as the league grows; it changes no outcome"><label for="dormantAfter">Set aside idle retirees <b id="dormantAfterV"></b></label><input id="dormantAfter" type="range" min="0" max="104" step="1" value="52"></div>
       <div class="slider" data-when="rookieRule=replacePlus" title="New players each season on top of the one-per-retiree replacements, so the league grows"><label for="extraRookies">Extra rookies / season <b id="extraRookiesV"></b></label><input id="extraRookies" type="range" min="0" max="12" step="1" value="3"></div>
       <label class="mech" data-when="valueModel=factors" title="After the last real season there is no player data. Hold: the player factor stays put and only supply moves values. Draw: each season replays a random real season-to-season change from his position (it compounds about ×1.21 a season)."><span>Past the save</span><select id="pastSave"><option value="hold">Hold player values</option><option value="draw">Draw real season changes</option></select></label>
@@ -141,6 +159,9 @@
       <div class="slider" title="Cards a bot may put up for auction a week (one-of-a-kind cards get one more)"><label for="maxListings">Auction listings / wk <b id="maxListingsV"></b></label><input id="maxListings" type="range" min="0" max="30" step="1" value="1"></div>
       <div class="slider" title="Cards a bot may borrow and sell short a week"><label for="maxShorts">Short sales / wk <b id="maxShortsV"></b></label><input id="maxShorts" type="range" min="0" max="50" step="1" value="3"></div>
       <div class="slider" title="Packs a bot may bid for a week"><label for="maxPacks">Packs / wk <b id="maxPacksV"></b></label><input id="maxPacks" type="range" min="0" max="10" step="1" value="3"></div>
+      <div class="slider" title="An attention budget for the neural bots: each week a bot's network looks only at the cards it holds or owes, its watchlist (players it has notes on, its auction listings, cards it traded lately) and this many other live cards drawn at random. Cards it doesn't look at get no orders from it that week. Off: it looks at every live card"><label for="attention">Cards looked at / wk <b id="attentionV"></b></label><input id="attention" type="range" min="0" max="2000" step="10" value="0"></div>
+      <div class="slider" data-when="attention!=0" title="How long a card a bot traded stays on its watchlist"><label for="attentionMemory">Watchlist memory <b id="attentionMemoryV"></b></label><input id="attentionMemory" type="range" min="1" max="52" step="1" value="8"></div>
+      <label class="mech" data-when="attention!=0" title="How the extra cards are drawn: every live card equally likely, or in proportion to 1 + its public trade count over the last 4 weeks. Never by the bot's own network or by hidden values"><span>Extra cards drawn</span><select id="attentionSample"><option value="uniform">Uniformly</option><option value="volume">By trade volume</option></select></label>
       <div class="rgrp__t"><label class="toggle" title="Every few weeks a bot tries a slightly changed copy of its networks and keeps it only if its own return improved"><input type="checkbox" id="adaptOn"> Learn within a lifetime</label></div>
       <div class="slider" data-when="adaptOn" title="Weeks each trial runs before the bot compares it with the period before"><label for="adaptEvery">Trial length <b id="adaptEveryV"></b></label><input id="adaptEvery" type="range" min="4" max="40" step="1" value="10"></div>
       <div class="slider" data-when="adaptOn" title="How far each weight moves in a trial (standard deviation)"><label for="adaptSize">Trial change <b id="adaptSizeV"></b></label><input id="adaptSize" type="range" min="1" max="20" step="1" value="5"></div>
@@ -248,7 +269,7 @@
 
   <div class="grid main">
     <section class="panel" aria-labelledby="floor-h">
-      <div class="head"><h2 id="floor-h">Floor</h2><span class="note">x = worth · y = average OVR of the cards it holds · blue = gaining, red = losing (4 weeks) · gold ring = AI bot · dashed = thief · faint ring = flagged by 5+ · click a bot</span></div>
+      <div class="head"><h2 id="floor-h">Floor</h2><span class="note">x = worth · y = average OVR of the cards it holds · blue = gaining, red = losing (4 weeks) · orange ring = AI bot · dashed = thief · faint ring = flagged by 5+ · click a bot</span></div>
       <canvas id="floor" class="grow" aria-label="Every bot by worth and the average OVR of its cards, coloured by its 4-week return"></canvas>
       <div class="tip" id="floorTip" hidden></div>
     </section>
@@ -353,4 +374,5 @@
 
 
 
+</div>
 </div>

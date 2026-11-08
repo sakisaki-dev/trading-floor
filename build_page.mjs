@@ -12,9 +12,6 @@ const icon = 'data:image/svg+xml,' + encodeURIComponent(read('page/icon.svg').tr
 const head = `<title>Vault Trading Floor</title>
 <link rel="icon" type="image/svg+xml" href="${icon}">
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,800;1,800&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Silkscreen&display=swap">
 `;
 // The live world runs in a background worker built from the same engine source (page/worker.js), so the page stays
 // smooth while the bots think. The sources are embedded as strings ("</" escaped so they can't close the script tag).
