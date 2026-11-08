@@ -112,6 +112,32 @@ Week 60, Realism, seed 31761, practiceGens 0 (reported, not tuned):
 Generated veterans now open at comparable save players' prices: hidden value ÷ opening price has a median of 0.81
 (10th–90th percentile 0.49–3.24), so most open above their hidden value and the most valuable far below it. Both
 indexes are measured against the openings; with the old opening the indexes stay near the base run.
+### Bots decide for themselves (fix/nets, AUDIT.md 5b)
+
+Decisions that code made for neural bots now come from their own networks. Default and Realism results change; the
+bot network has six more outputs (47), and a network with the older 41 outputs is widened on load.
+
+- Notes: a neural bot steals when its 'steal notes' output is above 0 and offers a swap when 'share notes' is above 0
+  (no 0.5 and 0.4 draws); six new outputs weigh what it sees of each other bot (friend, public flags, weeks in the
+  market) to pick the partner or victim; nothing filters candidates by the notes they hold. Every swap is accepted
+  through the partner's own decision-maker, AI-offered swaps included (`willing`).
+- Contests: neural bots' answers are computed from their notes (research notes now keep the page's rates, totals,
+  Career Legacy and family through the same error as the value estimate) and public prices; the price prediction is
+  the card network's `sigmoid(buy − sell)`. No coin-flip accuracy curves. Genome bots keep `ruleAnswers`.
+- Pass and ticket prices under `priceMap: 'log'` are the last clearing price × exp(output), with no 30 / 15 / 10 /
+  5-coin wall. The call auction matches only pairs that can settle, so its price comes from one that did.
+- Packs spend the same spare cash (above the cash target) as card bids; the separate `keep × worth × 0.5` brake is
+  gone. AI pack orders may name a price.
+- Forced sales use one order, the network's (or `forcedOrder: 'price'`), for the bid and auction stages; one-of-a-kind
+  cards are ranked by the card network. Lenders are repaid only the margin-call and default share of what forced
+  sales raised that week, not all of the borrower's cash.
+- A called neural short seller bids its own network's price; `coverGraceWeeks` (3), `coverSettle` (1.1) and `coverBid`
+  (1.15, genome and AI borrowers) are settings with page controls.
+- The most-traded list is ranked by plain trade count (`hotRank: 'volume'`; `'momentum'` keeps the old tilt); its window
+  and sizes are settings (`hotWeeks`, `hotResearch`, `hotOrders`, `hotBook`, `marketRows`), and AI bots can page it
+  (`marketPage`).
+- `formulaPull` (0.25) replaces the fixed PULL of the 'formula' value model.
+- `tests/nets.test.mjs`: one targeted test per fix.
 
 ## [1.0.0] - 2026-11-07
 

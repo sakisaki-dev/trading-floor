@@ -173,7 +173,7 @@ only under `valueModel: 'ovrWalk'`, game results report won and net (no score), 
 it has dealt with.
 
 **Interaction.** Indirect, through markets: order books, auctions, the pack auction, the credit market and the
-card-lending pool. Direct: note swaps (both bots must accept), note theft (detected with chance 0.35, after which the
+card-lending pool. Direct: note swaps (offered and accepted through each bot's own outputs, see 7.7), note theft (detected with chance 0.35, after which the
 victim and its friends refuse to trade with the thief for 26 weeks), and contests (entrants' stakes are redistributed
 to the best scores).
 
@@ -349,10 +349,14 @@ network's buy output is positive and above its sell output, at the price from `n
   collateral and paying 0.5% of the price a week to the lender; a short seller also pays the lender any royalty the
   card earns. The card must be returned within 12 weeks or when the short seller's worth falls below 25% of what it
   owes, or when it can't pay a fee or royalty (it pays from its cash only; the shortfall is the lender's loss). A lender
-  is drawn in proportion to the copies it offers. A forced cover bids up to `coverBid` (1.15) × the price for
-  `coverGraceWeeks` (3) weeks, then settles in cash at `coverSettle` (1.1) × the price (all three the owner's
-  settings). A short whose sale did not fill is undone. A short seller holding a copy of a card it owes returns it at
-  settlement (plain netting): a bot can't be long and short the same card.
+  is drawn in proportion to the copies it offers. A called neural borrower bids each week at the price its own card
+  network names for the card (`nnPrice`); a genome or AI borrower bids `coverBid` (1.15) × the mark. One still short
+  `coverGraceWeeks` (3) weeks after the call, or that can't pay the mark, settles in cash at `coverSettle` (1.1) × the
+  mark, paid to the lender (all three the owner's settings). A short whose sale did not fill is undone. A short seller
+  holding a copy of a card it owes returns it at settlement (plain netting): a bot can't be long and short the same card.
+- **Forced sales and loans**: forced-sale proceeds are traced per sale (bids and auctions); bills owed are paid first,
+  then only the share forced by a margin call or a loan default goes to its lenders. Proceeds raised for living costs,
+  holding costs, taxes or a shock, and the rest of its cash, stay its own (`settleForced`).
 
 ### 7.6 Outside dealers and the liquidator
 
@@ -371,7 +375,7 @@ network's buy output is positive and above its sell output, at the price from `n
 Each neural bot has two feed-forward networks with tanh hidden layers and linear outputs (`forward`, `cardKernel`).
 Weights start at N(0, 1/√fan-in) (`randomNet`).
 
-**Bot network** (40 inputs, 12 hidden, 41 outputs; 1,025 weights), run once a week (`nnThink`).
+**Bot network** (40 inputs, 12 hidden, 47 outputs; 1,103 weights), run once a week (`nnThink`).
 
 - Inputs (`BOT_IN`): bias; cash, debt, money lent and short exposure as shares of worth; worth against the median
   bot; own 4-week return; age (seasons ÷ lifespan) and weeks of life left; the last loan rate; weeks to its own and
@@ -382,8 +386,37 @@ Weights start at N(0, 1/√fan-in) (`randomNet`).
 - Outputs (`BOT_OUT`): cash target (`keepMax × sigmoid`, up to 100% of worth in Realism); lending share and rate;
   leverage (borrow share) and maximum borrowing rate; pass and ticket bid and ask; research count (0–6); packs wanted
   per type (0, 1 or 2) and pack bid per type; share, steal and accept notes; enter each of 10 contests; share of cards
-  to lend; research aim per position; quit.
+  to lend; research aim per position; quit; then (added 2026-11-07, AUDIT 5b) three share-partner weights and three
+  steal-victim weights, one for each thing it sees of another bot (`PARTNER_IN`: whether it is a friend, its public
+  theft flags ÷ 5, log(1 + its weeks in the market) ÷ 5).
+- In full, `BOT_OUT` in index order: 0 cash target, 1 lend share, 2 lend rate, 3 borrow share, 4 max borrow rate,
+  5 pass bid, 6 pass ask, 7 ticket bid, 8 ticket ask, 9 research count, 10–13 Standard / Premium / Elite / Holo packs,
+  14 share notes, 15 steal notes, 16 accept swaps, 17–26 enter each contest (`GAMES` order), 27 lend cards share,
+  28–35 research aim per position (`TOPICS` order), 36–39 pack bid per type, 40 quit, 41–43 share partner: a friend of
+  mine / its public flags / its weeks in the market, 44–46 steal victim: the same three. A network saved with the
+  older 41 outputs is widened on load (`widenBot`): the six new rows start at N(0, 0.1²), every other weight unchanged.
 - Rates in Realism (`rateMap: 'log'`): `0.025 × exp(output)`, with only a safety bound of 1,000% a week.
+- Pass and ticket prices: under `priceMap: 'log'` (Realism) the last clearing price (before any trade, 15, 7.5, 5 and
+  2.5 coins × `coinScale` for pass bid, pass ask, ticket bid, ticket ask) × exp(output), held only by the `priceClamp`
+  safety bound, as pack bids are; under `'range'` the old sigmoid up to 30, 15, 10 and 5 coins. Whether a bot sells its
+  spare passes is its ask: a high ask keeps them. The weekly call auction matches a pair only if it can settle (the
+  buyer can pay its bid on top of what it has already been matched for and stays under the weekly cap; the seller still
+  has a token), so the price, the midpoint of the last matched pair, always comes from a pair that settles.
+- **Notes** (`socialPhase`): a bot whose steal output is above 0 tries one theft a week, and one whose share output is
+  above 0 (and holds notes) offers one swap a week. It picks the other bot with the best score under its partner (or
+  victim) weights; equal scores go to a uniform draw. Nothing filters candidates by the notes they hold, which it cannot
+  see: an empty victim or partner is a lost try. A swap happens only if the partner accepts through its own decision-
+  maker (`willing`): a neural bot its accept output, an AI bot its accept list, a genome bot its style. The label shown
+  for a neural bot (sharer, reciprocator, thief) is its dominant wish.
+- **Contest answers** (`nnAnswers`): computed from what the bot holds, with no draw deciding whether it is right. A
+  research note keeps what the library page showed (career per-game rates and totals, Career Legacy, play-style family)
+  seen through the same error as its value estimate; shared and stolen notes carry it. Valuation: its estimate, else
+  the price. Price prediction: `sigmoid(buy − sell)` of its card network for the player's base card. Blind Rank, Keep 3
+  / Cut 3, Higher or Lower and the duel: rank by its noted values; a player it has no note on gets the mean of the noted
+  ones in that question, and ties go to the dearer card. Closest guess: its noted total, else the median of its noted
+  totals at that position, else no answer. Over / Under: its noted rate against the line, else a uniform guess. Imposter:
+  a uniform pick among the players its noted families cannot rule out. League Grid: the dearest noted player with the
+  award, else the dearest teammate it has no note on. Genome bots keep their scripted answers (`ruleAnswers`).
 
 **Card network** (43 inputs, 16 and 8 hidden, 9 outputs in Realism; 921 weights), run for every card the bot looks
 at, once in the research phase and once in the order phase (`nnResearchWish`, `nnAct`), and for each auction it
@@ -402,7 +435,7 @@ could bid in (`nnAuctionBid`). Without an attention budget a bot looks at every 
 - **Actions from outputs** (`nnAct`): buy if buy > 0 and buy > sell; sell (ask) if it holds copies and sell > 0; list
   at auction if auction > 1; short if it holds none, short > 0.5 and short > buy. Size is
   `1 + min(maxOrderQty − 1, floor(maxOrderQty × sigmoid))` copies (1 to 3, every size reachable). Buy orders are placed in order of the buy output, up to 40 a week (`deployOrders`) while cash above the cash
-  target lasts. Up to 10 auction listings (`maxListings`), 30 short sales (`maxShorts`) and 8 packs (`maxPacks`) a week.
+  target lasts; pack bids then spend what is left of the same budget. Up to 10 auction listings (`maxListings`), 30 short sales (`maxShorts`) and 8 packs (`maxPacks`) a week.
 - **Price** (`nnPrice`): the base starts at the mark, moves toward the guide by `sigmoid(anchor to the guide)`, then
   toward its own fresh research estimate by `sigmoid(anchor to my estimate)`. The order price is
   `base × exp(0.6 × price offset)` (`priceMap: 'log'`), held only by a safety clamp of ×50 either way.
@@ -413,7 +446,8 @@ could bid in (`nnAuctionBid`). Without an attention budget a bot looks at every 
   bid's scale (before the first trade, `passOpen` 10 or `ticketOpen` 4 × coinScale). Packs: 0 to `maxPacks` of each
   type, `maxPacks` in all.
 - **Forced sales** (`forcedSales`, `forcedOrder: 'network'`): a forced seller sells the cards its own network most
-  wants to sell, first into standing bids, then at auction with no minimum.
+  wants to sell (sell − buy output), first into standing bids, then at auction with no minimum in the same order, then
+  its one-of-a-kind cards, also ranked by its card network.
 
 ### 7.8 Learning and evolution
 
