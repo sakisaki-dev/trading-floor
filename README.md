@@ -40,6 +40,9 @@ about 1.9 seconds with 500 bots on one core of an Apple M1 Pro.
 - **Learning and evolution.** Bots trial small changes to their networks and keep those that score better. At each
   generation end (20 weeks) the worst are replaced by mutated copies of the best. Bots also join, leave and die,
   passing their holdings to heirs.
+- **What bots can know.** No bot reads a player's hidden value directly. It reaches them only through disclosed
+  channels: the public price guide (a week old), dealers who trade around last week's value, and royalties, which
+  are paid from that value and so reveal it closely. Prices, cost bases and AI bots' views are built from public data.
 - **The Realism preset.** Royalties paid from each week's games, living and holding costs, a wealth tax, a public
   price guide, cash shocks, card loss, and fitness measured at what a bot could actually sell for. Every number not
   measured from the save is listed as an assumption.

@@ -52,7 +52,7 @@ same card, and mixing the two chains made the index rise about ×1.5 per 200 wee
 | Wealth share | `h.share` | Share of total worth held by the top 10%, next 40% and bottom 50% of bots by worth. | accounts |
 | Cash share | `mkt.cashShare`, `mkt.cashTop10` | The same three bands ranked by cash; `cashTop10` is the share of all cash held by the 10% of bots with the most cash. | accounts |
 | Coins held | `h.money`, `mkt.cash` | Total bot cash. | accounts |
-| Money ledger | `money` | Coins created and removed this week by kind (`record`): created = allowance, royalties, outside buyers, prizes, newcomers' cash, wealth tax paid back, dealers' net; removed = living costs, trade fees, packs, liquidator sales, Vault store, outside sellers, holding costs, wealth tax, cash shocks, cash of bots that left. `other` is whatever no tag covers, so `net` equals the change in coins held. | accounts |
+| Money ledger | `money` | Coins entering and leaving the bots' money (cash plus short collateral) this week, by tag (`record`). Every movement is booked once at its source (`led`, `transfer`, `feeTo`). Created: allowance, royalties, outside buyers, dealers buying, prizes, game pots paid, newcomers, wealth tax paid back. Removed: living costs, lifestyle, trade fees, packs, liquidator sales, Vault store, outside sellers, dealers selling, holding costs, wealth tax, cash shocks, game stakes, bots that left, card loans settled with leavers. `net` is the change in the bots' money; `other` = net − (created − removed) is zero up to rounding (a test checks it). `exo`: the lump sums booked to bots' `b.exo` this week (`fitnessExo`). `treasury.lines`: every change to the treasury by tag (fees, packs, store, holding, wealthTax, allowance, royalties, wiped), with `treasury.other` zero. | accounts |
 | Credit | `mkt.rate`, `mkt.debt`, `mkt.calls`, `mkt.defaults`, `credit` | Last clearing loan rate; total debt; margin calls and defaults this week; `credit` adds offered, asked, lent and repaid coins, and the distribution (mean, 10th, 50th, 90th percentile) of the cash target, lending share, lending rate, leverage and maximum rate outputs for all bots and the richest 10%. | public (rate) / accounts / internals (outputs) |
 | Broke bots | `mkt.broke` | Bots that could not pay their living costs this week. | accounts |
 | Forced sales by cause | `forced` | Count of forced sales this week by cause (living costs, margin call, loan default, holding costs, wealth tax, cash shock, estate). | accounts |
@@ -130,7 +130,18 @@ Written at each generation end (`genDiag`, `genIOClose`) and repeated on every f
 | `guideT`, `guideUse`, `guide` | Last guide publication week; mean anchor-to-guide output; the published values in publication weeks. | public / internals (`guideUse`) |
 | `league` | League week and season, last champion, active and injured players. | public |
 | `inj` | Ids of injured players. | public |
-| `prices`, `values`, `circ`, `pool`, `ovr`, `risk`, `vol`, `si` | Full frames only: per-player price, hidden value, copies, pool, OVR, risk rating, volume and short interest. | public / hidden value (`values`) |
+| `prices`, `values`, `circ`, `pool`, `ovr`, `risk`, `vol`, `si` | Full frames only: per-player price, hidden value, copies, pool, OVR, risk rating, volume and short interest. The risk rating is OVR plus 10 × log2(F ÷ F0), so it reads hidden value under every value model; bots see it only under `valueModel: 'ovrWalk'`. | public / hidden value (`values`, `risk`) |
+
+## 8a. Researcher-only fields
+
+Frames, the page and the run archive are for the researcher and may keep hidden values. No bot reads these fields, and
+the planned government must not receive them (AUDIT.md 5a; the field whitelist is part of the government build):
+
+- built from hidden value `F`: `h.f`, `h.bub`, the `F` column of `hot`, `values`, `risk`, `bands`, `mkt.vcap`,
+  `top[].F`, the `bubble` event, `practice.endPF`, and `summary().bubble` (the AI runner's summary);
+- built from bots' networks: `sens` (`nnSensitivity`), `why` and the journal's `buyerWhy` / `sellerWhy`,
+  `gen.netDist*`, `gen.respDist*`, `gen.respNear`, `gen.cluster*`, `gen.quitAll`, `gen.quitNew`, `gen.adapt*`,
+  `aiDetail` and `aiLog`.
 
 ## 9. The health board
 
