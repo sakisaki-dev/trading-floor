@@ -20,6 +20,20 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 - The page opens on a new preset, Realism · 250 bots (faster): the Realism laws with `botScale: 1`, about half the bots and about twice the speed to watch. Realism itself is unchanged and still matches `configs/realism.json`.
 
 - Page: more colour in Apple's system palette (one tint per section, tinted key numbers, vivid series), the main chart in the Vault's gold on navy, liquid-glass chrome, custom sliders and sliding segmented controls, a collapsible sidebar, and smooth motion (redraws spread over frames, numbers and charts ease to each new week). Presentation only; no engine change.
+- Speed: about 1.3 times faster with identical results. Realism, seed 31761, practiceGens 0, 40 weeks, the two engines one
+  after another on a shared machine: 2.84 s/week before (2.99 and 2.70) and 2.17 s/week after (2.20 and 2.15); setup with
+  practice on 140 s before and 112 s after. Same engine version: every week's full frame hashes the same as 2.0.0 on ten
+  worlds (`tests/same_results.mjs`: Realism 40 weeks, Realism with practice, the defaults, `rngStreams: 'single'`, the Vault
+  store, heavy shorting and credit, short lives with deaths and estates, the attention budget, offspring entrants with fitness
+  sharing, and fashion with limits, league updates, fixed pack prices and value openings). What changed: the order phase keeps
+  only the buy wishes it can place (a stable top ceil(deployOrders) + 1 instead of sorting them all) and works out a card's
+  price only for cards that get an order (the guide's pull still runs for every card, in order); after a short sale the rest of
+  the batch is scored again with only its cash and debt inputs rewritten instead of every input rebuilt; plain cards in the
+  research and order phases get their inputs from `cardInputsSnap`, which works out each bot's shared inputs once per batch
+  (`TF_CHECK_ROWS=1` checks every row against `cardInputs`); research scores only its one output and keeps a stable top
+  `want`; sealed auctions reuse each bot's first-layer fold while its fixed inputs are bit-for-bit the same; and several
+  scans over every bot or card are gone (note-partner picks, game results, the AI log in frames, dealer reference prices,
+  candidate copies, closing card loans). `tests/frame_hash.mjs` hashes one run's frames.
 - The page is dark by default (`data-theme="light"` for light). The README figures are drawn dark. No engine change.
 - Repository layout: helper scripts in `tools/`, the scripts that built `data/` in `data-build/`; `engine.mjs`, `sim.mjs`
   and `run.mjs` stay at the root. `npm test` runs the test files plus a new determinism test, and a GitHub Actions
