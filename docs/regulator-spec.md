@@ -1012,6 +1012,7 @@ Each step keeps default runs byte-identical and is checked the way the earlier r
 | Record of governments | Public to every government |
 | The board | Anything goes; visible to all bots |
 | Watching | Live on the page: commentary, notebook, board |
+| Exogenous booking for fitness (`fitnessExo`) | Decided 2026-11-07: only lump sums the bot did not choose (allowance, transfers and grants, poll tax, opening grants, rescues) are taken out of fitness; taxes and fees tied to a bot's holdings or activity count in its return, so bots can learn to avoid taxes and over-taxing can shrink the base |
 
 ### 22.2 Recommended, awaiting the owner's yes
 
@@ -1023,7 +1024,6 @@ Each step keeps default runs byte-identical and is checked the way the earlier r
 | Payments when short | Pro rata across all lines, with an optional published `payOrder` | A fixed priority |
 | Dials as bot inputs | Every dial a public stance input, one transform (9.4) | No dial inputs at all |
 | Living costs | Consumption outside the treasury; not a dial | Revenue (`livingTo: 'house'`), which changes A0's balance |
-| Exogenous booking (`fitnessExo`) | Lump-sum flows the bot did not choose (allowance, transfers, poll tax, opening grants, rescues) are taken out of fitness; flows proportional to a bot's holdings or activity (fees, sales taxes, the wealth tax, holding costs, subsidies on them) count in its return, so the bots can learn from them | All government flows out of fitness (AUDIT finding "Worth history and exogenous-money history"), which removes policy from learning but also removes tax avoidance as something the networks learn |
 | Borrowing | None in run 1 | Bonds (later run) |
 | Printing money | Off in run 1 | On in a later run |
 | Wealth tax | Into the treasury | Back to the bots equally (today's Realism) |
