@@ -17,6 +17,7 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 
 ### Changed
 
+- Page: more colour in Apple's system palette (one tint per section, tinted key numbers, vivid series), the main chart in the Vault's gold on navy, liquid-glass chrome, custom sliders and sliding segmented controls, a collapsible sidebar, and smooth motion (redraws spread over frames, numbers and charts ease to each new week). Presentation only; no engine change.
 - The page is dark by default (`data-theme="light"` for light). The README figures are drawn dark. No engine change.
 - Repository layout: helper scripts in `tools/`, the scripts that built `data/` in `data-build/`; `engine.mjs`, `sim.mjs`
   and `run.mjs` stay at the root. `npm test` runs the test files plus a new determinism test, and a GitHub Actions

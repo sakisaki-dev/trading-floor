@@ -42,6 +42,52 @@ const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${
 const cardName = (k) => { const m = /^([A-Z]+):(.+?)\|(\w+)\|(\w+)$/.exec(k || ''); return m ? `${m[1]} ${m[2]} · ${m[4]} ${m[3]}` : k; };
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const FAMS = familyList(LIBRARY);
+// Apple's dark system colours for data series. The wealth groups wear them too (the colour is display only: nothing in
+// the engine reads it), so a group is the same colour in every chart, table and legend.
+const SYS = { blue: '#0a84ff', green: '#30d158', indigo: '#5e5ce6', orange: '#ff9f0a', pink: '#ff375f', purple: '#bf5af2', red: '#ff453a', teal: '#40c8e0', yellow: '#ffd60a', mint: '#63e6e2' };
+GROUPS[0].color = SYS.pink; GROUPS[1].color = SYS.orange; GROUPS[2].color = SYS.blue;
+
+/* ---------- Motion ---------- */
+// Everything that moves is off under reduced motion. TW is how long a new week takes to ease in (numbers, chart ranges,
+// the newest segment of each line).
+const RMQ = matchMedia('(prefers-reduced-motion: reduce)'), RM = () => RMQ.matches;
+const TW = 380, easeOut = (t) => 1 - (1 - C(t, 0, 1)) ** 3;
+let DRAWGEN = 0; // bumped when everything must repaint (theme, restart): the chart caches key off it
+// Numbers count to their new value: setNum(el, '1,234') eases from what the element showed, keeping its format
+// (decimals, thousands commas, a prefix and suffix such as × or %). Anything that isn't one number just swaps.
+const NUMS = new Map(), NUMRE = /^([^\d−-]*)([−-]?[\d,]*\.?\d+)([^\d]*)$/;
+function setNum(el, s) {
+  if (!el) return; s = String(s); if (el._num === s) return;
+  const prev = el._num; el._num = s;
+  const m = NUMRE.exec(s), p = prev == null ? null : NUMRE.exec(prev);
+  const num = (x) => parseFloat(x.replace(/,/g, '').replace('−', '-'));
+  if (RM() || !m || !p || m[1] !== p[1] || m[3] !== p[3] || !seen(el.closest('.panel, .kpis, .chartp') || el)) { NUMS.delete(el); el.textContent = s; return; }
+  const a = NUMS.has(el) ? NUMS.get(el).now : num(p[2]), b = num(m[2]);
+  if (!isFinite(a) || !isFinite(b) || a === b) { NUMS.delete(el); el.textContent = s; return; }
+  NUMS.set(el, { a, b, now: a, t0: performance.now(), dec: (m[2].split('.')[1] || '').length, comma: m[2].includes(','), pre: m[1], post: m[3], s });
+}
+function stepNums(now) {
+  for (const [el, t] of NUMS) {
+    const e = easeOut((now - t.t0) / TW); if (e >= 1) { el.textContent = t.s; NUMS.delete(el); continue; }
+    const v = (t.now = L(t.a, t.b, e));
+    el.textContent = t.pre + (t.comma ? v.toLocaleString(undefined, { minimumFractionDigits: t.dec, maximumFractionDigits: t.dec }) : v.toFixed(t.dec)).replace('-', '−').replace(/^−(0(\.0+)?)$/, '$1') + t.post;
+  }
+}
+// A small task queue: a new week's redraws are spread over the next frames (about 8 ms of work a frame, at least one
+// task), so no single frame does them all. Queuing a task that is still waiting keeps its place and runs it once.
+const QUEUE = new Map();
+const queue = (k, fn) => QUEUE.set(k, fn);
+function runQueue(budget) { const t0 = performance.now(), P = window.__qprof; for (const [k, fn] of QUEUE) { QUEUE.delete(k); const t1 = P ? performance.now() : 0; fn(); if (P) { const d = performance.now() - t1; P[k] = Math.max(P[k] || 0, d); } if (performance.now() - t0 > budget) break; } } // window.__qprof = {} records each task's slowest run
+// Sheets (Rules, Layout) open and close with a height and opacity transition
+function sheet(el, open) {
+  el._open = open; el.getAnimations?.().forEach((a) => a.cancel()); el.style.overflow = '';
+  if (RM() || !el.animate) { el.hidden = !open; return; }
+  if (open) el.hidden = false;
+  const cs = getComputedStyle(el), full = { height: el.offsetHeight + 'px', opacity: 1, paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom, transform: 'none' }, shut = { height: '0px', opacity: 0, paddingTop: '0px', paddingBottom: '0px', transform: 'translateY(-4px)' };
+  el.style.overflow = 'hidden';
+  const a = el.animate(open ? [shut, full] : [full, shut], { duration: open ? 320 : 220, easing: open ? 'cubic-bezier(0.2, 0.8, 0.2, 1)' : 'cubic-bezier(0.4, 0, 1, 1)' });
+  a.onfinish = () => { el.style.overflow = ''; if (!open) el.hidden = true; };
+}
 
 /* ---------- State ---------- */
 const randSeed = () => 1 + Math.floor(Math.random() * 99999); // every new run gets a new seed (type one in Seed to replay a run)
@@ -93,7 +139,7 @@ async function saveRun() {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(run)], { type: 'application/json' })); a.download = `${run.meta.id || 'run'}.json`; document.body.appendChild(a); a.click(); a.remove();
 }
 const sendSel = () => tell({ cmd: 'sel', p: SEL.type === 'card' ? SEL.id : null, b: ACCT });
-let frameT = -1e9; const TWEEN = 0;
+let frameT = -1e9;
 let playing = !matchMedia('(prefers-reduced-motion: reduce)').matches, speed = 1, acc = 0, lastT = 0, panelT = 0, chartT = 0;
 const KEYS = ['p', 'f', 'bub', 'gini', 'share', 'trades', 'pass', 'informed', 'flags', 'shares', 'thefts', 'gamePacks'];
 function newHist() { H = Object.fromEntries(KEYS.map((k) => [k, []])); H.ticket = []; H.skill = []; H.cashShare = []; H.gwin = GROUPS.map(() => []); H.gnet = GROUPS.map(() => []); H.mcap = []; H.vcap = []; H.cashTop = []; H.bank = []; }
@@ -233,29 +279,43 @@ function axes(x, Wd, Ht, pad, lo, hi, fy, n) {
   x.fillStyle = ink(0.14); x.fillRect(pad.l, Ht - pad.b, Wd - pad.l - pad.r, 1);
   if (n > 1) { x.fillStyle = COL.faint; x.fillText('W0', pad.l, Ht - 2); x.textAlign = 'right'; x.fillText(`W${FRAMES[n - 1].t}`, Wd - pad.r, Ht - 2); x.textAlign = 'left'; }
 }
+// The line charts ease each new week in: the y-range glides to its new bounds and the newest segment grows out of the
+// week before, over TW ms. A chart whose data, size and hover are unchanged is not repainted at all.
+const CHART_ANIM = new Set();
 function line(id, series, o) {
   if (!seen(id)) return;
-  const cv = $(id), [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
-  const n = nNow(), pad = { l: 6, r: 52, t: 8, b: 16 }, data = series.map((s) => s.data.slice(0, n));
+  const cv = $(id), n = nNow(), c = (charts[id] ||= {}), now = performance.now();
+  const r = cv.getBoundingClientRect(), key = `${n}|${c.hi}|${r.width}|${r.height}|${DRAWGEN}|${FRAMES.length}`;
+  if (c.key === key && !CHART_ANIM.has(id)) return;
+  const [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
+  const pad = { l: 6, r: 52, t: 8, b: 16 }, data = series.map((s) => s.data.slice(0, n));
   let lo = Infinity, hi = -Infinity; data.forEach((d) => d.forEach((v) => { if (v == null) return; lo = Math.min(lo, v); hi = Math.max(hi, v); }));
   if (!isFinite(lo)) { lo = 0; hi = 1; }
   if (o.ref !== undefined) { lo = Math.min(lo, o.ref); hi = Math.max(hi, o.ref); }
   const sp = hi - lo || 1; lo -= sp * 0.06; hi += sp * 0.06; if (o.min !== undefined) lo = o.min; if (o.max !== undefined) hi = Math.max(o.max, hi);
-  const X = (i) => pad.l + ((Wd - pad.l - pad.r) * i) / Math.max(1, n - 1), Y = (v) => pad.t + (Ht - pad.t - pad.b) * (1 - (v - lo) / (hi - lo));
+  if (c.n0 !== n) { c.t0 = c.n0 === n - 1 && c.ylo != null && !RM() ? now : -1e9; c.from = [c.ylo, c.yhi]; c.n0 = n; }
+  const e = easeOut((now - c.t0) / TW); if (e < 1) { lo = L(c.from[0], lo, e); hi = L(c.from[1], hi, e); CHART_ANIM.add(id); } else CHART_ANIM.delete(id);
+  c.ylo = lo; c.yhi = hi; c.key = key;
+  const X0 = (i) => pad.l + ((Wd - pad.l - pad.r) * i) / Math.max(1, n - 1), Y = (v) => pad.t + (Ht - pad.t - pad.b) * (1 - (v - lo) / (hi - lo));
+  const X = e < 1 && n > 2 ? (i) => (i === n - 1 ? L(X0(n - 2), X0(n - 1), e) : X0(i)) : X0;
+  if (e < 1 && n > 2) data.forEach((d) => { const a = d[n - 2], b = d[n - 1]; if (a != null && b != null) d[n - 1] = L(a, b, e); });
   axes(x, Wd, Ht, pad, lo, hi, o.fy, n);
   if (o.ref !== undefined) { x.fillStyle = ink(0.18); x.fillRect(pad.l, Math.round(Y(o.ref)), Wd - pad.l - pad.r, 1); }
   series.forEach((s, k) => {
     const d = data[k];
     const path = () => { x.beginPath(); let on = false; d.forEach((v, i) => { if (v == null) { on = false; return; } on ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)); on = true; }); };
-    if (s.fill || series.length === 1) { const first = d.findIndex((v) => v != null); if (first >= 0) { path(); x.lineTo(X(n - 1), Ht - pad.b); x.lineTo(X(first), Ht - pad.b); x.closePath(); const g = x.createLinearGradient(0, pad.t, 0, Ht - pad.b); g.addColorStop(0, rgba(s.color, 0.24)); g.addColorStop(1, rgba(s.color, 0)); x.fillStyle = g; x.fill(); } }
-    path(); x.setLineDash(s.dash ? [5, 4] : []); x.strokeStyle = s.color; x.lineWidth = 1.6; x.lineJoin = 'round'; x.stroke(); x.setLineDash([]);
-    const lv = d[n - 1]; if (lv != null) { const ly = Y(lv); x.beginPath(); x.arc(X(n - 1), ly, 2.6, 0, Math.PI * 2); x.fillStyle = s.color; x.fill(); x.fillStyle = COL.panel; x.fillRect(Wd - pad.r + 1, ly - 10, pad.r, 20); x.fillStyle = s.color; x.fillRect(Wd - pad.r + 2, ly - 7, pad.r - 3, 14); x.fillStyle = '#000'; x.font = `700 9.5px ${css('--mono')}`; x.textBaseline = 'middle'; x.fillText(o.fy(lv), Wd - pad.r + 5, ly); x.textBaseline = 'alphabetic'; }
+    if (s.fill || series.length === 1) { const first = d.findIndex((v) => v != null); if (first >= 0) { path(); x.lineTo(X(n - 1), Ht - pad.b); x.lineTo(X(first), Ht - pad.b); x.closePath(); const g = x.createLinearGradient(0, pad.t, 0, Ht - pad.b); g.addColorStop(0, rgba(s.color, 0.34)); g.addColorStop(0.6, rgba(s.color, 0.08)); g.addColorStop(1, rgba(s.color, 0)); x.fillStyle = g; x.fill(); } }
+    path(); x.setLineDash(s.dash ? [5, 4] : []); x.strokeStyle = s.color; x.lineWidth = 1.8; x.lineJoin = 'round'; x.stroke(); x.setLineDash([]);
+    const lv = d[n - 1]; if (lv != null) { const ly = Y(lv); x.beginPath(); x.arc(X(n - 1), ly, 5, 0, Math.PI * 2); x.fillStyle = rgba(s.color, 0.22); x.fill(); x.beginPath(); x.arc(X(n - 1), ly, 2.6, 0, Math.PI * 2); x.fillStyle = s.color; x.fill(); x.fillStyle = COL.panel; x.fillRect(Wd - pad.r + 1, ly - 10, pad.r, 20); x.fillStyle = s.color; x.beginPath(); if (x.roundRect) x.roundRect(Wd - pad.r + 2, ly - 7, pad.r - 3, 14, 3); else x.rect(Wd - pad.r + 2, ly - 7, pad.r - 3, 14); x.fill(); x.fillStyle = '#000'; x.font = `700 9.5px ${css('--mono')}`; x.textBaseline = 'middle'; x.fillText(o.fy(lv), Wd - pad.r + 5, ly); x.textBaseline = 'alphabetic'; }
   });
-  const c = (charts[id] ||= {}); Object.assign(c, { X, n, pad, Wd });
-  if (c.hi !== undefined && c.hi < n) { x.fillStyle = ink(0.35); x.fillRect(Math.round(X(c.hi)), pad.t, 1, Ht - pad.t - pad.b); series.forEach((s, k) => { const v = data[k][c.hi]; if (v == null) return; x.beginPath(); x.arc(X(c.hi), Y(v), 4, 0, Math.PI * 2); x.fillStyle = s.color; x.fill(); x.strokeStyle = COL.panel; x.lineWidth = 2; x.stroke(); }); }
+  Object.assign(c, { X: X0, n, pad, Wd });
+  if (c.hi !== undefined && c.hi < n) { x.fillStyle = ink(0.35); x.fillRect(Math.round(X0(c.hi)), pad.t, 1, Ht - pad.t - pad.b); series.forEach((s, k) => { const v = data[k][c.hi]; if (v == null) return; x.beginPath(); x.arc(X0(c.hi), Y(v), 4, 0, Math.PI * 2); x.fillStyle = s.color; x.fill(); x.strokeStyle = COL.panel; x.lineWidth = 2; x.stroke(); }); }
 }
 function stack(id, layers, groups = GROUPS) {
-  const cv = $(id), [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
+  if (!seen(id)) return;
+  const cv = $(id), n0 = nNow(), c0 = (charts[id] ||= {}), r0 = cv.getBoundingClientRect(), key = `${n0}|${c0.hi}|${r0.width}|${r0.height}|${DRAWGEN}|${FRAMES.length}|${groups.length}`;
+  if (c0.key === key) return; c0.key = key;
+  const [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
   const n = nNow(), Ls = layers.slice(0, n), pad = { l: 6, r: 52, t: 8, b: 16 };
   const X = (i) => pad.l + ((Wd - pad.l - pad.r) * i) / Math.max(1, n - 1), Y = (v) => pad.t + (Ht - pad.t - pad.b) * (1 - v);
   axes(x, Wd, Ht, pad, 0, 1, (v) => pct(v), n);
@@ -284,14 +344,14 @@ function drawCharts() {
   if (!H || !FRAMES.length) return;
   line('gWinC', GROUPS.map((g, a) => ({ data: H.gwin[a], color: g.color })), { fy: (v) => pct(v), min: 0 });
   line('gNetC', GROUPS.map((g, a) => ({ data: H.gnet[a], color: g.color })), { fy: (v) => fmt(v), ref: 0 });
-  line('wins', [{ data: H.skill, color: '#3987e5', fill: true }], { fy: (v) => v.toFixed(2), ref: 0 });
-  line('notes', [{ data: H.shares, color: '#3987e5' }, { data: H.thefts, color: '#e66767' }], { fy: (v) => Math.round(v), min: 0 });
+  line('wins', [{ data: H.skill, color: SYS.green, fill: true }], { fy: (v) => v.toFixed(2), ref: 0 });
+  line('notes', [{ data: H.shares, color: SYS.teal, fill: true }, { data: H.thefts, color: SYS.pink, fill: true }], { fy: (v) => Math.round(v), min: 0 });
   stack('strat', H.share); if ($('cashStrat')) stack('cashStrat', H.cashShare);
   if ($('tacC') && seen('tacC')) { const T = tacSeries(); stack('tacC', T.layers, T.ids.map((id) => ({ color: tacColor(id) }))); }
   drawFeatures();
 }
 /* ---------- Tactics (engine tacticTrack: what bots actually did, clustered each generation and followed by id) ---------- */
-const TAC_COL = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#e66767', '#4fb3bf', '#008300', '#b0b4c0'];
+const TAC_COL = ['#0a84ff', '#ff9f0a', '#30d158', '#ffd60a', '#ff375f', '#bf5af2', '#40c8e0', '#5e5ce6', '#63e6e2', '#ff453a']; // the system colours: a tactic keeps its colour everywhere
 const tacColor = (id) => TAC_COL[(id - 1) % TAC_COL.length];
 let tacCache = null;
 function tacSeries() { // each frame's tactic shares, one layer slot per tactic id ever seen (frames between generation ends repeat the last)
@@ -314,7 +374,7 @@ crosshair('tacC', (i) => { const T = FRAMES[i]?.gen?.tactics; return `<b>${when(
 
 /* ---------- Heatmaps ---------- */
 // Diverging blue ↔ grey ↔ red (the validated pair), sequential blue for shares.
-const NEUTRAL = [34, 34, 38], BLUE = [57, 135, 229], RED = [230, 103, 103], BLUE_HI = [156, 199, 255];
+const NEUTRAL = [34, 34, 38], BLUE = [10, 132, 255], RED = [255, 69, 58], BLUE_HI = [156, 199, 255];
 const mix = (a, b, t) => `rgb(${a.map((v, i) => Math.round(L(v, b[i], t))).join(',')})`;
 const diverge = (t) => (t >= 0 ? mix(NEUTRAL, RED, Math.min(1, t)) : mix(NEUTRAL, BLUE, Math.min(1, -t)));
 const divergeInv = (t) => diverge(-t);
@@ -400,6 +460,9 @@ readTheme(); drawScales(); // the theme first: the scales use its neutral and de
 // changed is rewritten. Nothing is rebuilt, so nothing jumps.
 function patchRows(host, rows) {
   const have = new Map([...host.children].map((el) => [el.dataset.k, el]));
+  // FLIP: a row that moves rank glides from where it was; a new row fades in. Only for a list on screen.
+  let before = null;
+  if (!RM() && host.children.length && host.animate) { const r = host.getBoundingClientRect(); if (r.bottom > 0 && r.top < innerHeight && r.height) before = new Map([...host.children].map((el) => [el, el.getBoundingClientRect().top])); }
   rows.forEach(({ key, html, val }, i) => {
     let el = have.get(String(key));
     if (!el) { const t = document.createElement('template'); t.innerHTML = html.trim(); el = t.content.firstElementChild; el.dataset.k = key; el._h = html; el._v = val; }
@@ -408,6 +471,10 @@ function patchRows(host, rows) {
     if (host.children[i] !== el) host.insertBefore(el, host.children[i] || null);
   });
   for (const el of have.values()) el.remove();
+  if (before) for (const el of host.children) {
+    const t0 = before.get(el); if (t0 == null) { el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 240, easing: 'ease-out' }); continue; }
+    const d = t0 - el.getBoundingClientRect().top; if (Math.abs(d) > 1) el.animate([{ transform: `translateY(${d}px)` }, { transform: 'none' }], { duration: 320, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+  }
 }
 const pill = (r) => (r > 1.2 ? '<span class="pill pill--hot">▲ rich</span>' : r < 0.85 ? '<span class="pill pill--cool">▼ cheap</span>' : '<span class="pill pill--fair">fair</span>');
 let libId = 0;
@@ -421,20 +488,20 @@ function gameRows(tableId, rows) {
   $(tableId).tBodies[0].innerHTML = used.map(([label, [p, w, k], color]) => `<tr><td>${color ? `<span class="sw" style="background:${color}"></span>` : ''}${esc(label)}</td><td class="num">${p.toLocaleString()}</td><td class="num">${pct(w / p)}</td><td class="bar"><span style="width:${((w / p) / max) * 100}%;${color ? `background:${color}` : ''}"></span></td><td class="num">${(k / p).toFixed(3)}</td></tr>`).join('') || '<tr><td colspan="5" class="k">No games played.</td></tr>';
 }
 // Fast: what changes every week and is cheap to update in place (tiles, lists, quote tables). Slow: the rest.
-function drawFast() {
+function drawFast(split) {
   const f = cur(), n = nNow(); if (!f) return;
   const g4 = gamesOver(n - 1, 4), games = Object.values(g4.game).reduce((s, x) => s + x[0], 0), pots = Object.values(g4.game).reduce((s, x) => s + x[1], 0);
-  $('kWeek').textContent = String(f.t); $('kWeekS').textContent = `${f.season ? `season ${f.season} · ` : ''}gen ${Math.floor(Math.max(0, f.t - 1) / gpw()) + 1}${mode === 'replay' ? ` · replay ${cursor + 1}/${FRAMES.length}` : ''}`;
-  $('kBub').textContent = f.h.bub.toFixed(2) + '×'; $('kBubS').html = pill(f.h.bub);
-  $('kGini').textContent = f.h.gini.toFixed(3); $('kGiniS').textContent = `${f.h.gini >= H.gini[0] ? '▲' : '▼'} from ${H.gini[0].toFixed(3)}`;
-  $('kTrades').textContent = f.h.trades.toLocaleString(); $('kTradesS').textContent = `${f.house.packs.toLocaleString()} packs bought`;
-  { const pk = f.pk, L = { standard: 'Std', premium: 'Prem', elite: 'Elite', holo: 'Holo' }; $('kPack').textContent = pk?.standard?.[0] ? fmt(pk.standard[0]) : '–';
+  setNum($('kWeek'), String(f.t)); $('kWeekS').textContent = `${f.season ? `season ${f.season} · ` : ''}gen ${Math.floor(Math.max(0, f.t - 1) / gpw()) + 1}${mode === 'replay' ? ` · replay ${cursor + 1}/${FRAMES.length}` : ''}`;
+  setNum($('kBub'), f.h.bub.toFixed(2) + '×'); $('kBubS').html = pill(f.h.bub);
+  setNum($('kGini'), f.h.gini.toFixed(3)); $('kGiniS').textContent = `${f.h.gini >= H.gini[0] ? '▲' : '▼'} from ${H.gini[0].toFixed(3)}`;
+  setNum($('kTrades'), f.h.trades.toLocaleString()); $('kTradesS').textContent = `${f.house.packs.toLocaleString()} packs bought`;
+  { const pk = f.pk, L = { standard: 'Std', premium: 'Prem', elite: 'Elite', holo: 'Holo' }; setNum($('kPack'), pk?.standard?.[0] ? fmt(pk.standard[0]) : '–');
     $('kPackS').textContent = pk ? `${Object.entries(pk).filter(([t]) => t !== 'standard').map(([t, [p]]) => `${L[t] || t} ${fmt(p)}`).join(' · ')} · ${Object.values(pk).reduce((a, [, n]) => a + n, 0).toLocaleString()} sold` : 'not in this save'; $('kPack').parentElement.title = pk ? 'Standard pack price now; the other types after it, and packs sold this week' : ''; }
-  $('kPass').textContent = f.h.pass == null ? '–' : f.h.pass.toFixed(2); $('kPassS').textContent = `coins · ${f.h.informed.toFixed(1)} notes/bot`;
-  $('kTicket').textContent = f.tickets == null ? '–' : f.tickets.toFixed(2); $('kTicketS').textContent = f.gs ? `${Object.values(f.gs).reduce((x, g) => x + g[0], 0).toLocaleString()} game entries this wk` : 'games off';
-  $('kWin').textContent = g4.skill[1] ? (g4.skill[0] / g4.skill[1]).toFixed(2) : '–'; $('kWinS').textContent = games ? `${games.toLocaleString()} entries · ${fmt(pots)} coins in pots` : 'no games';
+  setNum($('kPass'), f.h.pass == null ? '–' : f.h.pass.toFixed(2)); $('kPassS').textContent = `coins · ${f.h.informed.toFixed(1)} notes/bot`;
+  setNum($('kTicket'), f.tickets == null ? '–' : f.tickets.toFixed(2)); $('kTicketS').textContent = f.gs ? `${Object.values(f.gs).reduce((x, g) => x + g[0], 0).toLocaleString()} game entries this wk` : 'games off';
+  setNum($('kWin'), g4.skill[1] ? (g4.skill[0] / g4.skill[1]).toFixed(2) : '–'); $('kWinS').textContent = games ? `${games.toLocaleString()} entries · ${fmt(pots)} coins in pots` : 'no games';
   const ranked = f.bots.slice().sort((a, b) => b[3] - a[3]);
-  $('kBank').textContent = f.mkt?.rate == null ? '–' : (f.mkt.rate * 100).toFixed(2) + '%'; $('kBankS').textContent = `per week · loans ${f.mkt?.mcap ? pct(f.mkt.debt / f.mkt.mcap) : '–'} of market · ${f.mkt?.defaults ?? 0} defaults`;
+  setNum($('kBank'), f.mkt?.rate == null ? '–' : (f.mkt.rate * 100).toFixed(2) + '%'); $('kBankS').textContent = `per week · loans ${f.mkt?.mcap ? pct(f.mkt.debt / f.mkt.mcap) : '–'} of market · ${f.mkt?.defaults ?? 0} defaults`;
   { // a slight tint on the tiles where higher or lower is better (not prices): green inside the health board's healthy band, red past its alarm line, amber between
     const lv = (key, v) => { const L = HEALTH.lights.find((x) => x.key === key), A = L?.alarm || {}; if (v == null || !L) return null; if ((A.above != null && v > A.above) || (A.below != null && v < A.below)) return 'bad'; return L.healthy ? (v >= L.healthy[0] && v <= L.healthy[1] ? 'good' : 'fair') : null; };
     const tone = (id, t, why) => { const el = $(id).parentElement; if (t) el.dataset.tone = t; else delete el.dataset.tone; el.title = t ? `${{ good: 'Healthy', fair: 'Watch', bad: 'Alarm' }[t]}: ${why}` : ''; };
@@ -445,11 +512,13 @@ function drawFast() {
   }
   const pctS = (v) => (v == null ? '–' : `<span class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${Math.round(v * 100)}%</span>`);
   patchRows($('lb').tBodies[0], (lbAll ? ranked : ranked.slice(0, 20)).map((b) => ({ key: b[0], val: b[3], html: `<tr data-bot="${b[0]}" title="${esc(b[2])} · ${kindOf(b)} · gen ${b[10]}${b[6] >= 5 ? ' · flagged' : ''}"><td><span class="sw" style="background:${grpColor(b)}"></span>${esc(b[2])}${b[9] ? ' <span class="pill pill--fair">AI</span>' : ''}${b[6] >= 5 ? ' <span class="pill pill--hot">flagged</span>' : ''}</td><td class="num">${fmt(b[3])}</td><td class="num">${pctS(b[16])}</td><td class="num">${pctS(b[13])}</td></tr>` })));
-  drawWatch(); drawStatus(); drawIndicators(); drawGroups(); drawMvc(f);
+  if (!split) { drawWatch(); drawStatus(); drawIndicators(); drawGroups(); drawMvc(f); }
   $('lbMore').textContent = lbAll ? 'Show top 20' : `Show all ${f.bots.length} bots`;
 }
-function drawPanels() {
-  const f = cur(), n = nNow(); if (!f) return; drawFast();
+function drawPanels() { if (!cur()) return; drawFast(); drawPanelsCore(); drawTape(); drawAcct(); drawCons(); drawDetail(); drawLeagueNews(); drawHealth(); drawTactics(); drawSectors(); drawMap(); drawCalendar(); drawHeatmaps(); }
+// The tables of the games, notes and wealth row
+function drawPanelsCore() {
+  const f = cur(), n = nNow(); if (!f) return;
   const g4 = gamesOver(n - 1, 4);
   { const rows = Object.entries(GAMES).map(([g, d]) => [g, d, g4.game[g] || [0, 0, 0, 0]]).sort((a, b) => (b[2][3] ? b[2][2] / b[2][3] : -1) - (a[2][3] ? a[2][2] / a[2][3] : -1));
     $('gTopic').tBodies[0].html = rows.map(([g, d, [e, pot, sk, kn]]) => { const r = kn ? sk / kn : null; return `<tr title="${esc(d.skill)}"><td>${esc(d.label)}</td><td class="k">${esc(f.topics?.[g] || '')}</td><td class="num">${e.toLocaleString()}</td><td class="num">${fmt(pot)}</td><td class="num">${r == null ? '–' : r.toFixed(2)}</td><td class="bar"><span class="${r != null && r < 0 ? 'neg' : ''}" style="width:${r == null ? 0 : Math.min(100, Math.abs(r) * 100)}%"></span></td></tr>`; }).join(''); }
@@ -458,8 +527,6 @@ function drawPanels() {
   const soc = [0, 1, 2].map((s) => { const xs = f.bots.filter((b) => b[5] === s); return [s, xs.length, avg(xs.map((b) => b[3])), avg(xs.map((b) => b[6]))]; });
   $('social').tBodies[0].html = soc.map(([s, k, w, fl]) => `<tr><td>${SOC[s]}</td><td class="num">${k}</td><td class="num">${fmt(w)}</td><td class="num">${fl == null ? '–' : fl.toFixed(1)}</td></tr>`).join('');
   $('researched').textContent = f.researched.length ? 'Most researched: ' + f.researched.map(([id, k]) => `${LIBRARY.players[id].name} (${k})`).join(', ') : '';
-  drawTape(); drawAcct(); drawCons(); drawDetail(); drawLeagueNews(); drawHealth(); drawTactics();
-  drawSectors(); drawMap(); drawCalendar(); drawHeatmaps();
 }
 const LEAGUE_KINDS = new Set(['injury', 'return', 'champion', 'award', 'hof', 'retire', 'rookie']);
 function drawLeagueNews() {
@@ -535,7 +602,7 @@ function assumeList(c) {
 for (const [k, [s, f]] of Object.entries(SLIDERS)) $(k).addEventListener('input', () => { const v = +$(k).value; $(k + 'V').textContent = f(v); opts[k] = v * s; if (mode === 'live') { tell({ cmd: 'cfg', k, v: v * s }); logChange(k, v * s); } });
 for (const k of SELECTS) $(k).addEventListener('change', (e) => { opts[k] = e.target.value; if (mode === 'live') { tell({ cmd: 'cfg', k, v: e.target.value }); logChange(k, e.target.value); } });
 for (const k of TOGGLES) $(k).addEventListener('change', (e) => { opts[k] = e.target.checked; if (mode === 'live') { tell({ cmd: 'cfg', k, v: e.target.checked }); logChange(k, e.target.checked); } });
-$('rulesBtn').addEventListener('click', () => { const open = $('rules').hidden; $('rules').hidden = !open; $('rulesBtn').setAttribute('aria-expanded', String(open)); $('rulesBtn').textContent = open ? 'Rules ▴' : 'Rules ▾'; });
+$('rulesBtn').addEventListener('click', () => { const open = !$('rules')._open; sheet($('rules'), open); $('rulesBtn').setAttribute('aria-expanded', String(open)); $('rulesBtn').textContent = open ? 'Rules ▴' : 'Rules ▾'; });
 function advance() {
   if (mode === 'live') { tell({ cmd: 'step' }); return false; }
   if (cursor < FRAMES.length - 1) { cursor++; for (const [s, b] of FRAMES[cursor].arcs || []) arcs.push({ s, b, age: 0 }); return true; }
@@ -556,21 +623,33 @@ function anchorFix(chain) {
   const d = hit[0].getBoundingClientRect().top - hit[1]; if (Math.abs(d) >= 0.5) window.scrollBy(0, d);
 }
 const steady = (fn) => (...a) => { const k = anchorNow(); try { return fn(...a); } finally { anchorFix(k); } };
+// A new week (or panels coming into view): the redraws go into the queue in the order they matter, the cheap
+// numbers and the chart first. The slow panels (heatmaps, map, feed, account) come at most every half second.
+function queueWeek(panels) {
+  queue('fast', () => drawFast(true)); queue('main', drawMain); queue('charts', drawCharts); queue('status', drawStatus);
+  queue('watch', drawWatch); queue('mvc', () => cur() && drawMvc(cur())); queue('ind', drawIndicators); queue('groups', drawGroups); queue('vis', watchVis);
+  if (!panels) return;
+  for (const [k, fn] of [['core', drawPanelsCore], ['tape', drawTape], ['acct', drawAcct], ['cons', drawCons], ['detail', drawDetail], ['league', drawLeagueNews], ['health', drawHealth], ['tactics', drawTactics], ['sectors', drawSectors], ['map', drawMap], ['cal', drawCalendar], ['heat', drawHeatmaps]]) queue(k, () => cur() && fn());
+}
 function loop(ts) {
   const dt = Math.min(0.1, (ts - lastT) / 1000 || 0); lastT = ts;
   let ran = false;
   if (mode === 'live') { ran = dirty; dirty = false; } // the worker sets the pace
   else if (playing) { acc += dt * 3 * speed; while (acc >= 1) { if (!advance()) { acc = 0; break; } acc -= 1; ran = true; } }
-  const busy = wake || ran, anchor = busy ? anchorNow() : null;
-  if (wake && FRAMES.length && H) { wake = false; watchVis(); floorDirty = true; drawCharts(); drawMain(); drawPanels(); panelT = ts; }
+  if (wake && FRAMES.length && H) { wake = false; watchVis(); floorDirty = true; queueWeek(true); panelT = ts; }
+  if (ran && FRAMES.length) { frameT = ts; const p = ts - panelT > 500; queueWeek(p); if (p) panelT = ts; }
   if (ran || floorDirty || floorMoving || arcs.length) drawFloor();
-  if (ran) { frameT = ts; drawFast(); drawCharts(); watchVis(); } // a new week: tiles, lists and charts update at once
-  if (ran) drawMain();
-  if (ran && ts - panelT > 500) { drawPanels(); panelT = ts; } // heatmaps, map, feed, account: every half second
+  const work = QUEUE.size > 0, anchor = work ? anchorNow() : null;
+  const mainQueued = QUEUE.has('main'), chartsQueued = QUEUE.has('charts');
+  if (work) runQueue(8);
+  // Tweens: the main chart and the line charts redraw every frame only while a new point is easing in
+  if (!mainQueued && MAIN.anim) drawMain();
+  if (!chartsQueued && CHART_ANIM.size) drawCharts();
+  if (NUMS.size) stepNums(performance.now());
   anchorFix(anchor);
   requestAnimationFrame(loop);
 }
-function redrawAll() { $('stratLegend').html = GROUPS.map((g) => `<span><i style="background:${g.color}"></i>${g.label}</span>`).join(''); drawFloor(); drawCharts(); drawPanels(); }
+function redrawAll() { DRAWGEN++; QUEUE.clear(); $('stratLegend').html = GROUPS.map((g) => `<span><i style="background:${g.color}"></i>${g.label}</span>`).join(''); drawFloor(); drawCharts(); drawPanels(); }
 $('play').addEventListener('click', () => setPlay(!playing));
 $('step').addEventListener('click', () => { setPlay(false); advance(); if (mode === 'replay') { drawCharts(); drawPanels(); } });
 $('seed').value = opts.seed;
@@ -640,7 +719,16 @@ function drawTape() {
   marquee($('tape'), $('tapeTrack'), $('tapeTrack2'), items.join(''));
 }
 function drawWatch() {
-  const rows = LIBRARY.players.map((p, id) => ({ id, p, ...cardNow(id) })).filter((r) => r.P != null && (!wq || r.p.name.toLowerCase().includes(wq) || r.p.pos.toLowerCase() === wq));
+  // cardNow for every player at once: the frames it looks back on are found once, not once per player
+  const at = ix(), fr = FRAMES[at]; if (!fr) return; const back = FRAMES[Math.max(0, at - 4)].prices, g = guideAt(at), vols = [];
+  let vals = null; for (let i = at; i >= 0; i--) if (FRAMES[i].values) { vals = FRAMES[i].values; break; }
+  for (let i = Math.max(0, at - 3); i <= at; i++) if (FRAMES[i].vol) vols.push(FRAMES[i].vol);
+  const rows = [];
+  LIBRARY.players.forEach((p, id) => {
+    const P = fr.prices?.[id] ?? null; if (P == null || (wq && !p.name.toLowerCase().includes(wq) && p.pos.toLowerCase() !== wq)) return;
+    let vol4 = 0; for (const v of vols) vol4 += v[id] || 0; const bk = back?.[id];
+    rows.push({ id, p, P, F: vals?.[id] ?? null, G: g?.v[id] ?? null, circ: fr.circ?.[id] ?? null, chg: bk ? P / bk - 1 : 0, vol4 });
+  });
   const by = { vol: (a, b) => b.vol4 - a.vol4, up: (a, b) => b.chg - a.chg, down: (a, b) => a.chg - b.chg, cap: (a, b) => b.P * (b.circ ?? 1) - a.P * (a.circ ?? 1), rich: (a, b) => b.P / b.F - a.P / a.F, cheap: (a, b) => a.P / a.F - b.P / b.F }[wsortKey];
   rows.sort(by);
   $('watchMore').textContent = watchAll ? 'Show fewer' : `Show all ${rows.length} players`;
@@ -664,58 +752,83 @@ function barsFor(sel) {
   return out;
 }
 
+// The main chart keeps the Vault's own colours: a gold price line over a gold-to-amber fill on a navy plot, the old
+// green and red for candles and volume, and one vivid colour per study.
+const VAULT = { gold: '#ffc83d', amber: '#ff8a1f', navy: '#111627', navy2: '#090d1a', grid: '#262f4a', label: '#96a2c4', up: '#4fd18b', down: '#ff8a8a', ink: '#1a1205',
+  value: '#63e6e2', marks: '#64d2ff', ma4: '#ff375f', ma12: '#bf5af2', bands: '#40c8e0', rsi: '#ff9f0a' };
 const MAIN = {};
+let mainCache = null;
+function navyPlot(x, Wd, Ht) { // the old navy plot: a soft vertical gradient in a rounded rectangle
+  const g = x.createLinearGradient(0, 0, 0, Ht); g.addColorStop(0, rgba(VAULT.navy, 0.96)); g.addColorStop(1, rgba(VAULT.navy2, 0.96));
+  x.fillStyle = g; x.beginPath(); if (x.roundRect) x.roundRect(0, 0, Wd, Ht, 10); else x.rect(0, 0, Wd, Ht); x.fill();
+}
 function drawMain() {
-  if (!seen('chart')) return;
-  const sel = SEL, all = barsFor(sel), bars = TF ? all.slice(-TF) : all;
+  if (!seen('chart')) { MAIN.anim = false; return; }
+  const sel = SEL, now = performance.now();
+  const ck = `${JSON.stringify(sel)}|${nNow()}|${FRAMES.length}|${DRAWGEN}`;
+  if (!mainCache || mainCache.k !== ck) mainCache = { k: ck, all: barsFor(sel) };
+  const all = mainCache.all, bars = TF ? all.slice(-TF) : all.slice();
   const cv = $('chart'), [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht);
   const vc = $('volc'), [vx, vW, vH] = fit(vc); vx.clearRect(0, 0, vW, vH);
   // Header
-  let name = 'Vault index', sub = 'repeat sales: from trades only · start = 100 · blue: every card\'s mark, bids and asks included', valLabel = 'Hidden value';
+  let name = 'Vault index', sub = 'repeat sales: from trades only · start = 100 · cyan: every card\'s mark, bids and asks included', valLabel = 'Hidden value';
   const met = sel.type === 'metric' ? METRICS.find((x) => x.key === sel.key) : null; if (met) { name = met.label; sub = 'market stat over time · click its tile again to go back'; valLabel = met.refLabel || ''; }
   if (sel.type === 'card') { const p = LIBRARY.players[sel.id]; name = `${p.pos} ${p.name}`; sub = `${teamShort(p.team)} · OVR ${ovrOf(sel.id)}${riskNow(sel.id) != null ? ` · ${riskText(sel.id)}` : ''} · price shown as Prizm Base${(() => { const c = cardNow(sel.id); return c.G != null ? ` · guide ${fmt(c.G)} (published wk ${c.GT})` : ''; })()}`; }
   if (sel.type === 'bot') { const b = cur().bots.find((b) => b[0] === sel.id); name = b ? b[2] : 'Bot'; sub = b ? `${kindOf(b)} · ${GROUPS[b[17] ?? 2].label} · worth` : 'not in the market now'; valLabel = 'Median bot'; }
   $('ch-name').textContent = name; $('chSub').textContent = sub;
   const last = bars[bars.length - 1], first = bars[0];
-  const show = met ? met.show : fmt;
-  $('chLast').textContent = last ? show(last.c) : '–'; $('chChg').html = !last || !first ? '' : met ? `<span class="k">from ${show(first.o)} · ${TF ? TF + 'W' : 'all'}</span>` : chgSpan(last.c / first.o - 1) + ` <span class="k">${TF ? TF + 'W' : 'all'}</span>`;
-  $('chLegend').html = `<span><i class="line" style="background:var(--gold)"></i>${sel.type === 'bot' ? 'Worth' : met ? met.label : 'Price'}</span>${valLabel ? `<span><i class="dash"></i>${valLabel}</span>` : ''}${sel.type === 'market' ? '<span><i class="line" style="background:#9cc7ff"></i>Marks index (every card\'s mark)</span>' : ''}${sel.type !== 'bot' && STUD.ma ? '<span><i class="line" style="background:#9085e9"></i>4W avg</span><span><i class="line" style="background:#4fd18b"></i>12W avg</span>' : ''}${sel.type !== 'bot' && STUD.bb ? '<span><i class="line" style="background:#9cc7ff"></i>Bands</span>' : ''}`;
-  if (!bars.length) return;
+  const show = met ? met.show : fmt, selKey = JSON.stringify(sel) + '|' + TF + '|' + CMODE;
+  // A new week eases in over TW: the newest bar grows out of the one before, the y-range glides to its new bounds.
+  // A new selection, timeframe or chart type snaps.
+  const snap = MAIN.selKey !== selKey; if (snap) { MAIN.selKey = selKey; $('chLast')._num = null; }
+  const lastT = last ? last.t : null; if (lastT !== MAIN.lastT) { MAIN.t0 = !snap && MAIN.lastT != null && !RM() ? now : -1e9; MAIN.from = MAIN.dom; MAIN.lastT = lastT; }
+  const ease = bars.length > 1 ? easeOut((now - MAIN.t0) / TW) : 1;
+  setNum($('chLast'), last ? show(last.c) : '–'); $('chChg').html = !last || !first ? '' : met ? `<span class="k">from ${show(first.o)} · ${TF ? TF + 'W' : 'all'}</span>` : chgSpan(last.c / first.o - 1) + ` <span class="k">${TF ? TF + 'W' : 'all'}</span>`;
+  const li = (c, t) => `<span><i class="line" style="background:${c}"></i>${t}</span>`;
+  $('chLegend').html = li(VAULT.gold, sel.type === 'bot' ? 'Worth' : met ? met.label : 'Price') + (valLabel ? `<span><i class="dash" style="border-top-color:${VAULT.value}"></i>${valLabel}</span>` : '') + (sel.type === 'market' ? li(VAULT.marks, 'Marks index (every card\'s mark)') : '') + (sel.type !== 'bot' && STUD.ma ? li(VAULT.ma4, '4W avg') + li(VAULT.ma12, '12W avg') : '') + (sel.type !== 'bot' && STUD.bb ? li(VAULT.bands, 'Bands') : '') + (sel.type !== 'bot' && STUD.rsi ? li(VAULT.rsi, 'RSI') : '');
+  if (!bars.length) { MAIN.anim = false; return; }
+  navyPlot(x, Wd, Ht); navyPlot(vx, vW, vH);
   const pad = { l: 8, r: 58, t: 10, b: 18 }, iw = Wd - pad.l - pad.r, ih = Ht - pad.t - pad.b;
-  // The newest week slides in from the right and its value glides from the week before
-  const tw = TWEEN && bars.length > 1 ? C((performance.now() - frameT) / TWEEN, 0, 1) : 1, ease = 1 - (1 - tw) ** 3;
-  if (ease < 1) { const k = bars.length - 1, a = bars[k - 1], z = bars[k], c = a.c + (z.c - a.c) * ease; bars[k] = { ...z, c, h: Math.max(z.o, c), l: Math.min(z.o, c), v: z.v * ease }; }
-  const SH = (1 - ease) * (iw / bars.length);
   let lo = Infinity, hi = -Infinity; for (const b of bars) { lo = Math.min(lo, b.l, b.val ?? Infinity, b.mk ?? Infinity); hi = Math.max(hi, b.h, b.val ?? -Infinity, b.mk ?? -Infinity); }
   const sp = hi - lo || hi || 1; lo -= sp * 0.06; hi += sp * 0.06; if (!(met && met.zero)) lo = Math.max(0, lo);
-  const X = (i) => pad.l + (iw * (i + 0.5)) / bars.length + SH, Y = (v) => pad.t + ih * (1 - (v - lo) / (hi - lo)), bw = Math.max(1, (iw / bars.length) * 0.66);
+  if (ease < 1 && MAIN.from) { lo = L(MAIN.from[0], lo, ease); hi = L(MAIN.from[1], hi, ease); }
+  MAIN.dom = [lo, hi]; MAIN.anim = ease < 1;
+  if (ease < 1) { const k = bars.length - 1, a = bars[k - 1], z = bars[k], c = a.c + (z.c - a.c) * ease; bars[k] = { ...z, c, h: Math.max(z.o, c), l: Math.min(z.o, c), v: z.v * ease, val: z.val != null && a.val != null ? L(a.val, z.val, ease) : z.val, mk: z.mk != null && a.mk != null ? L(a.mk, z.mk, ease) : z.mk }; }
+  const X0 = (i) => pad.l + (iw * (i + 0.5)) / bars.length, kL = bars.length - 1;
+  const X = ease < 1 && kL > 0 ? (i) => (i === kL ? L(X0(kL - 1), X0(kL), ease) : X0(i)) : X0;
+  const Y = (v) => pad.t + ih * (1 - (v - lo) / (hi - lo)), bw = Math.max(1, (iw / bars.length) * 0.66);
   x.font = `500 10px ${css('--mono')}`; x.textBaseline = 'middle';
-  for (let i = 0; i <= 5; i++) { const v = lo + ((hi - lo) * i) / 5, y = Y(v); x.fillStyle = ink(0.06); x.fillRect(pad.l, Math.round(y), iw, 1); x.fillStyle = COL.faint; x.fillText(show(v), Wd - pad.r + 6, y); }
+  x.setLineDash([2, 4]); x.lineWidth = 1; x.strokeStyle = VAULT.grid;
+  for (let i = 0; i <= 5; i++) { const v = lo + ((hi - lo) * i) / 5, y = Math.round(Y(v)) + 0.5; x.beginPath(); x.moveTo(pad.l, y); x.lineTo(pad.l + iw, y); x.stroke(); x.fillStyle = VAULT.label; x.fillText(show(v), Wd - pad.r + 6, y); }
+  x.setLineDash([]);
   x.save(); x.beginPath(); x.rect(pad.l, 0, iw, Ht); x.clip();
-  x.textBaseline = 'alphabetic'; x.fillStyle = COL.faint;
-  const step = Math.max(1, Math.ceil(bars.length / 8)); for (let i = 0; i < bars.length; i += step) x.fillText(`W${bars[i].t}`, X(i) - 8, Ht - 3);
+  x.textBaseline = 'alphabetic'; x.fillStyle = VAULT.label;
+  const step = Math.max(1, Math.ceil(bars.length / 8)); for (let i = 0; i < bars.length; i += step) x.fillText(`W${bars[i].t}`, X0(i) - 8, Ht - 3);
   // Hidden value (or median) line
-  x.beginPath(); let on = false; bars.forEach((b, i) => { if (b.val == null) { on = false; return; } on ? x.lineTo(X(i), Y(b.val)) : x.moveTo(X(i), Y(b.val)); on = true; }); x.setLineDash([5, 4]); x.strokeStyle = COL.chalk; x.lineWidth = 1.5; x.stroke(); x.setLineDash([]);
-  if (bars.some((b) => b.mk != null)) { x.beginPath(); let on2 = false; bars.forEach((b, i) => { if (b.mk == null) { on2 = false; return; } on2 ? x.lineTo(X(i), Y(b.mk)) : x.moveTo(X(i), Y(b.mk)); on2 = true; }); x.strokeStyle = COL.sky; x.lineWidth = 1.4; x.stroke(); } // every card's mark (bids and asks included)
-  if (CMODE === 'candle') {
-    bars.forEach((b, i) => { const upc = b.c >= b.o, col = upc ? COL.up : COL.down; x.fillStyle = col; x.fillRect(Math.round(X(i)) - 0.5, Y(b.h), 1, Math.max(1, Y(b.l) - Y(b.h))); const y1 = Y(Math.max(b.o, b.c)), y2 = Y(Math.min(b.o, b.c)); x.fillRect(X(i) - bw / 2, y1, bw, Math.max(1.5, y2 - y1)); });
-  } else {
-    x.beginPath(); bars.forEach((b, i) => (i ? x.lineTo(X(i), Y(b.c)) : x.moveTo(X(i), Y(b.c)))); x.lineTo(X(bars.length - 1), pad.t + ih); x.lineTo(X(0), pad.t + ih); x.closePath();
-    const g = x.createLinearGradient(0, pad.t, 0, pad.t + ih); g.addColorStop(0, rgba(COL.gold, 0.22)); g.addColorStop(1, rgba(COL.gold, 0)); x.fillStyle = g; x.fill();
-    x.beginPath(); bars.forEach((b, i) => (i ? x.lineTo(X(i), Y(b.c)) : x.moveTo(X(i), Y(b.c)))); x.strokeStyle = COL.gold; x.lineWidth = 2; x.stroke();
-  }
+  x.beginPath(); let on = false; bars.forEach((b, i) => { if (b.val == null) { on = false; return; } on ? x.lineTo(X(i), Y(b.val)) : x.moveTo(X(i), Y(b.val)); on = true; }); x.setLineDash([5, 4]); x.strokeStyle = VAULT.value; x.lineWidth = 1.5; x.stroke(); x.setLineDash([]);
+  if (bars.some((b) => b.mk != null)) { x.beginPath(); let on2 = false; bars.forEach((b, i) => { if (b.mk == null) { on2 = false; return; } on2 ? x.lineTo(X(i), Y(b.mk)) : x.moveTo(X(i), Y(b.mk)); on2 = true; }); x.strokeStyle = VAULT.marks; x.lineWidth = 1.4; x.stroke(); } // every card's mark (bids and asks included)
   if (sel.type !== 'bot') drawStudies(x, bars, X, Y);
+  if (CMODE === 'candle') {
+    bars.forEach((b, i) => { const upc = b.c >= b.o, col = upc ? VAULT.up : VAULT.down; x.fillStyle = col; x.fillRect(Math.round(X(i)) - 0.5, Y(b.h), 1, Math.max(1, Y(b.l) - Y(b.h))); const y1 = Y(Math.max(b.o, b.c)), y2 = Y(Math.min(b.o, b.c)); const g = x.createLinearGradient(0, y1, 0, y1 + Math.max(1.5, y2 - y1)); g.addColorStop(0, col); g.addColorStop(1, rgba(col, 0.7)); x.fillStyle = g; x.fillRect(X(i) - bw / 2, y1, bw, Math.max(1.5, y2 - y1)); });
+  } else {
+    x.beginPath(); bars.forEach((b, i) => (i ? x.lineTo(X(i), Y(b.c)) : x.moveTo(X(i), Y(b.c)))); x.lineTo(X(kL), pad.t + ih); x.lineTo(X(0), pad.t + ih); x.closePath();
+    const g = x.createLinearGradient(0, pad.t, 0, pad.t + ih); g.addColorStop(0, rgba(VAULT.gold, 0.42)); g.addColorStop(0.45, rgba(VAULT.amber, 0.16)); g.addColorStop(1, rgba(VAULT.amber, 0)); x.fillStyle = g; x.fill();
+    x.beginPath(); bars.forEach((b, i) => (i ? x.lineTo(X(i), Y(b.c)) : x.moveTo(X(i), Y(b.c))));
+    const lg = x.createLinearGradient(pad.l, 0, pad.l + iw, 0); lg.addColorStop(0, VAULT.amber); lg.addColorStop(0.35, VAULT.gold); lg.addColorStop(1, VAULT.gold);
+    x.strokeStyle = lg; x.lineWidth = 2.2; x.lineJoin = 'round'; x.shadowColor = rgba(VAULT.gold, 0.45); x.shadowBlur = 8; x.stroke(); x.shadowBlur = 0;
+    const lb = bars[kL]; x.beginPath(); x.arc(X(kL), Y(lb.c), 6, 0, Math.PI * 2); x.fillStyle = rgba(VAULT.gold, 0.25); x.fill(); x.beginPath(); x.arc(X(kL), Y(lb.c), 3, 0, Math.PI * 2); x.fillStyle = VAULT.gold; x.fill();
+  }
   x.restore();
   // Last price tag
-  if (last) { const y = Y(last.c); x.fillStyle = COL.gold; x.fillRect(Wd - pad.r + 2, y - 8, pad.r - 4, 16); x.fillStyle = COL.onAccent; x.font = `700 10px ${css('--mono')}`; x.textBaseline = 'middle'; x.fillText(show(last.c), Wd - pad.r + 6, y); }
-  // Volume
+  { const lb = bars[kL], y = Y(lb.c); x.fillStyle = VAULT.gold; x.beginPath(); if (x.roundRect) x.roundRect(Wd - pad.r + 2, y - 8, pad.r - 4, 16, 4); else x.rect(Wd - pad.r + 2, y - 8, pad.r - 4, 16); x.fill(); x.fillStyle = VAULT.ink; x.font = `700 10px ${css('--mono')}`; x.textBaseline = 'middle'; x.fillText(show(last.c), Wd - pad.r + 6, y); }
+  // Volume: green and red bars that fade toward the floor
   const vmax = Math.max(1, ...bars.map((b) => b.v || 0));
-  bars.forEach((b, i) => { const h = ((b.v || 0) / vmax) * (vH - 4); vx.fillStyle = b.c >= b.o ? rgba(COL.up, 0.5) : rgba(COL.down, 0.5); vx.fillRect(X(i) - bw / 2, vH - h, bw, h); });
-  vx.fillStyle = COL.faint; vx.font = `500 10px ${css('--mono')}`; vx.fillText(sel.type === 'bot' || met ? '' : `volume (max ${fmt(vmax)})`, pad.l, 10);
+  bars.forEach((b, i) => { const h = ((b.v || 0) / vmax) * (vH - 4), col = b.c >= b.o ? VAULT.up : VAULT.down; if (h <= 0) return; const g = vx.createLinearGradient(0, vH - h, 0, vH); g.addColorStop(0, rgba(col, 0.8)); g.addColorStop(1, rgba(col, 0.25)); vx.fillStyle = g; vx.fillRect(X(i) - bw / 2, vH - h, bw, h); });
+  vx.fillStyle = VAULT.label; vx.font = `500 10px ${css('--mono')}`; vx.fillText(sel.type === 'bot' || met ? '' : `volume (max ${fmt(vmax)})`, pad.l + 4, 12);
   drawRsi(bars, X, pad);
   // Crosshair
-  if (MAIN.hi != null && MAIN.hi < bars.length) { const i = MAIN.hi, b = bars[i]; x.fillStyle = ink(0.35); x.fillRect(Math.round(X(i)), pad.t, 1, ih); x.fillRect(pad.l, Math.round(Y(b.c)), iw, 1); }
-  Object.assign(MAIN, { bars, X, pad, iw });
+  if (MAIN.hi != null && MAIN.hi < bars.length) { const i = MAIN.hi, b = bars[i]; x.fillStyle = rgba(VAULT.gold, 0.4); x.fillRect(Math.round(X0(i)), pad.t, 1, ih); x.fillRect(pad.l, Math.round(Y(b.c)), iw, 1); }
+  Object.assign(MAIN, { bars, X: X0, pad, iw });
 }
 {
   const cv = $('chart'), tip = $('chartTip');
@@ -920,15 +1033,15 @@ function drawGroups() {
 const MS = (k) => metricSeries(METRICS.find((m) => m.key === k));
 function drawFeatures() {
   if (!FRAMES.length || !$('fxMkt')) return; // only on the sectioned layout
-  line('fxMkt', [{ data: MS('mcap'), color: COL.gold, fill: true }, { data: MS('vcap'), color: COL.chalk, dash: true }], { fy: fmt, min: 0 });
-  line('fxPrem', [{ data: MS('prem'), color: COL.sky, fill: true }], { fy: (v) => (v * 100).toFixed(0) + '%', ref: 0 });
+  line('fxMkt', [{ data: MS('mcap'), color: SYS.blue, fill: true }, { data: MS('vcap'), color: SYS.mint, dash: true }], { fy: fmt, min: 0 });
+  line('fxPrem', [{ data: MS('prem'), color: SYS.indigo, fill: true }], { fy: (v) => (v * 100).toFixed(0) + '%', ref: 0 });
   line('fxAD', [{ data: MS('adline'), color: COL.up, fill: true }], { fy: (v) => fmt(v), ref: 0 });
   line('fxFlow', [{ data: MS('bids'), color: COL.up }, { data: MS('asks'), color: COL.down }], { fy: fmt, min: 0 });
-  line('fxShort', [{ data: MS('sopen'), color: COL.down, fill: true }, { data: MS('slend'), color: COL.sky }], { fy: fmt, min: 0 });
-  line('fxCards', [{ data: MS('cards'), color: COL.gold, fill: true }], { fy: fmt });
-  line('fxMint', [{ data: MS('minted'), color: COL.gold }, { data: MS('packs'), color: COL.sky }], { fy: fmt, min: 0 });
-  line('fxDebt', [{ data: MS('debt'), color: COL.gold, fill: true }], { fy: fmt, min: 0 });
-  line('fxRate', [{ data: MS('rate'), color: COL.sky, fill: true }], { fy: (v) => (v * 100).toFixed(2) + '%', min: 0 });
+  line('fxShort', [{ data: MS('sopen'), color: SYS.orange, fill: true }, { data: MS('slend'), color: SYS.teal }], { fy: fmt, min: 0 });
+  line('fxCards', [{ data: MS('cards'), color: SYS.mint, fill: true }], { fy: fmt });
+  line('fxMint', [{ data: MS('minted'), color: SYS.purple, fill: true }, { data: MS('packs'), color: SYS.yellow }], { fy: fmt, min: 0 });
+  line('fxDebt', [{ data: MS('debt'), color: SYS.orange, fill: true }], { fy: fmt, min: 0 });
+  line('fxRate', [{ data: MS('rate'), color: SYS.yellow, fill: true }], { fy: (v) => (v * 100).toFixed(2) + '%', min: 0 });
 }
 const fxTip = (keys) => (i) => `<b>${when(FRAMES[i].t)}</b><br>` + keys.map((k) => { const m = METRICS.find((x) => x.key === k), v = metricSeries(m, i)[i]; return `${m.label} <span class="mono">${v == null ? '–' : m.show(v)}</span>`; }).join('<br>');
 [['fxMkt', ['mcap', 'vcap', 'prem']], ['fxPrem', ['prem']], ['fxAD', ['adline', 'adv', 'dec']], ['fxFlow', ['bids', 'asks', 'press']], ['fxShort', ['sopen', 'slend', 'sval']], ['fxCards', ['cards']], ['fxMint', ['minted', 'packs']], ['fxDebt', ['debt', 'lev']], ['fxRate', ['rate']]].forEach(([id, ks]) => { if ($(id)) crosshair(id, fxTip(ks)); });
@@ -1112,16 +1225,17 @@ function sdev(xs, k) { const m = sma(xs, k); return xs.map((_, i) => (m[i] == nu
 function rsi(xs, k = 14) { const out = xs.map(() => null); let g = 0, l = 0; for (let i = 1; i < xs.length; i++) { const d = xs[i] - xs[i - 1]; if (i <= k) { g += Math.max(0, d); l += Math.max(0, -d); if (i === k) out[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l); continue; } g = (g * (k - 1) + Math.max(0, d)) / k; l = (l * (k - 1) + Math.max(0, -d)) / k; out[i] = l === 0 ? 100 : 100 - 100 / (1 + g / l); } return out; }
 function drawStudies(x, bars, X, Y) {
   const cl = bars.map((b) => b.c), path = (d, col, w, dash) => { x.beginPath(); let on = false; d.forEach((v, i) => { if (v == null) { on = false; return; } on ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)); on = true; }); x.setLineDash(dash || []); x.strokeStyle = col; x.lineWidth = w; x.stroke(); x.setLineDash([]); };
-  if (STUD.bb) { const m = sma(cl, 12), s = sdev(cl, 12); path(m.map((v, i) => (v == null ? null : v + 2 * s[i])), rgba(COL.sky, 0.6), 1, [2, 3]); path(m.map((v, i) => (v == null ? null : v - 2 * s[i])), rgba(COL.sky, 0.6), 1, [2, 3]); }
-  if (STUD.ma) { path(sma(cl, 4), '#9085e9', 1.4); path(sma(cl, 12), '#2fa565', 1.4); }
+  if (STUD.bb) { const m = sma(cl, 12), s = sdev(cl, 12); const up = m.map((v, i) => (v == null ? null : v + 2 * s[i])), dn = m.map((v, i) => (v == null ? null : v - 2 * s[i])), ix0 = up.findIndex((v) => v != null); if (ix0 >= 0) { x.beginPath(); for (let i = ix0; i < up.length; i++) x.lineTo(X(i), Y(up[i])); for (let i = dn.length - 1; i >= ix0; i--) x.lineTo(X(i), Y(dn[i])); x.closePath(); x.fillStyle = rgba(VAULT.bands, 0.08); x.fill(); } path(up, rgba(VAULT.bands, 0.8), 1, [2, 3]); path(dn, rgba(VAULT.bands, 0.8), 1, [2, 3]); }
+  if (STUD.ma) { path(sma(cl, 4), VAULT.ma4, 1.5); path(sma(cl, 12), VAULT.ma12, 1.5); }
 }
 function drawRsi(bars, X, pad) {
   const cv = $('rsic'); cv.hidden = !STUD.rsi; if (!STUD.rsi) return;
-  const [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht); const r = rsi(bars.map((b) => b.c)), Y = (v) => 4 + (1 - v / 100) * (Ht - 8);
-  x.fillStyle = ink(0.04); x.fillRect(pad.l, Y(70), Wd - pad.l - pad.r, Y(30) - Y(70));
-  x.fillStyle = COL.faint; x.font = `500 10px ${css('--mono')}`; x.textBaseline = 'middle'; x.fillText('70', Wd - pad.r + 6, Y(70)); x.fillText('30', Wd - pad.r + 6, Y(30)); x.fillText('RSI 14', pad.l + 2, 9);
-  x.beginPath(); let on = false; r.forEach((v, i) => { if (v == null) { on = false; return; } on ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)); on = true; }); x.strokeStyle = '#ffc83d'; x.lineWidth = 1.4; x.stroke();
-  const last = r[r.length - 1]; if (last != null) { x.fillStyle = last > 70 ? COL.down : last < 30 ? COL.up : COL.muted; x.fillText(last.toFixed(0), Wd - pad.r + 24, Y(last)); }
+  const [x, Wd, Ht] = fit(cv); x.clearRect(0, 0, Wd, Ht); navyPlot(x, Wd, Ht); const r = rsi(bars.map((b) => b.c)), Y = (v) => 4 + (1 - v / 100) * (Ht - 8);
+  x.fillStyle = rgba(VAULT.rsi, 0.07); x.fillRect(pad.l, Y(70), Wd - pad.l - pad.r, Y(30) - Y(70));
+  x.fillStyle = rgba(VAULT.down, 0.12); x.fillRect(pad.l, Y(100), Wd - pad.l - pad.r, Y(70) - Y(100)); x.fillStyle = rgba(VAULT.up, 0.1); x.fillRect(pad.l, Y(30), Wd - pad.l - pad.r, Y(0) - Y(30));
+  x.fillStyle = VAULT.label; x.font = `500 10px ${css('--mono')}`; x.textBaseline = 'middle'; x.fillText('70', Wd - pad.r + 6, Y(70)); x.fillText('30', Wd - pad.r + 6, Y(30)); x.fillText('RSI 14', pad.l + 4, 10);
+  x.beginPath(); let on = false; r.forEach((v, i) => { if (v == null) { on = false; return; } on ? x.lineTo(X(i), Y(v)) : x.moveTo(X(i), Y(v)); on = true; }); x.strokeStyle = VAULT.rsi; x.lineWidth = 1.6; x.lineJoin = 'round'; x.stroke();
+  const last = r[r.length - 1]; if (last != null) { x.fillStyle = last > 70 ? VAULT.down : last < 30 ? VAULT.up : VAULT.label; x.fillText(last.toFixed(0), Wd - pad.r + 24, Y(last)); }
 }
 
 function drawDetail() {
@@ -1343,7 +1457,7 @@ function drawLayoutPanel() {
     ${ps.length > 1 || !ps.length ? `<label class="lay__row"><input type="checkbox" data-lay="row" data-k="${k}" ${off ? '' : 'checked'}> <b>${esc(ps.length ? 'Row' : rowName(r))}</b></label>` : ''}
     <span class="lay__ps">${ps.map((p) => { const pk = panelKey(p); return `<span class="lay__p${LAY.hide.includes(pk) ? ' off' : ''}"><label><input type="checkbox" data-lay="hide" data-k="${pk}" ${LAY.hide.includes(pk) ? '' : 'checked'}> ${esc(panelName(p))}</label><button type="button" data-lay="min" data-k="${pk}" aria-pressed="${LAY.min.includes(pk)}" title="Minimize to the title">${LAY.min.includes(pk) ? 'open' : 'min'}</button></span>`; }).join('')}</span></li>`; }).join('')}</ol>`;
 }
-$('layoutBtn').addEventListener('click', () => { const open = $('layoutP').hidden; $('layoutP').hidden = !open; $('layoutBtn').setAttribute('aria-expanded', String(open)); $('layoutBtn').textContent = open ? 'Layout ▴' : 'Layout ▾'; drawLayoutPanel(); });
+$('layoutBtn').addEventListener('click', () => { const open = !$('layoutP')._open; if (open) { $('layoutP').hidden = false; drawLayoutPanel(); } sheet($('layoutP'), open); $('layoutBtn').setAttribute('aria-expanded', String(open)); $('layoutBtn').textContent = open ? 'Layout ▴' : 'Layout ▾'; });
 applyLayout();
 
 /* ---------- Rules panel: show a control only when its rule is on; mark what differs from the defaults ---------- */
@@ -1460,7 +1574,7 @@ function drawNav() {
   const NAMES = { tape: 'Overview', 'w-h': 'Market desk', healthPanel: 'Health board', 'ln-h': 'League news', 'sec-h': 'Sectors', 'floor-h': 'Floor and leaderboard', 'hg-h': 'What they learned', 'tac-h': 'Tactics', 'hf-h': 'Prices and holdings', 'gt-h': 'Games, notes and wealth', 'ind-h': 'Indicators', 'map-h': 'Market map' };
   const SKIP = new Set(['r-kpis', 'mvc']); // the key numbers and top cards sit under Overview
   const rows = [...document.querySelector('.wrap').children].filter((el) => el.dataset.row && !el.hidden && !SKIP.has(el.dataset.row));
-  nav.innerHTML = rows.map((r) => { const p = r.matches('section.panel') ? r : r.querySelector('section.panel'); const name = NAMES[r.dataset.row] || (p?.querySelector('h2')?.firstChild?.textContent || '').trim() || 'Section'; return `<a href="#" data-go="${esc(r.dataset.row)}">${esc(name)}</a>`; }).join('');
+  nav.innerHTML = rows.map((r) => { const p = r.matches('section.panel') ? r : r.querySelector('section.panel'); const name = NAMES[r.dataset.row] || (p?.querySelector('h2')?.firstChild?.textContent || '').trim() || 'Section'; return `<a href="#" data-go="${esc(r.dataset.row)}" title="${esc(name)}"><span>${esc(name)}</span></a>`; }).join('');
   spyNav();
 }
 function spyNav() {
@@ -1468,8 +1582,70 @@ function spyNav() {
   for (const a of nav.querySelectorAll('a')) { const r = document.querySelector(`[data-row="${CSS.escape(a.dataset.go)}"]`); if (r && r.getBoundingClientRect().top < 140) on = a; }
   on = on || nav.querySelector('a');
   for (const a of nav.querySelectorAll('a')) a.setAttribute('aria-current', String(a === on));
+  // the status bar's glass takes a faint hue from the section in view
+  if (on && on._go !== on.dataset.go) { on._go = on.dataset.go; const r = document.querySelector(`[data-row="${CSS.escape(on.dataset.go)}"]`); const hue = r && getComputedStyle(r).getPropertyValue('--tint').trim(); if (hue) $('status').style.setProperty('--hue', hue); }
 }
-$('sideNav')?.addEventListener('click', (e) => { const a = e.target.closest('a[data-go]'); if (!a) return; e.preventDefault(); const r = document.querySelector(`[data-row="${CSS.escape(a.dataset.go)}"]`); if (r) { r.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); const h = r.querySelector('h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } } });
+$('sideNav')?.addEventListener('click', (e) => { const a = e.target.closest('a[data-go]'); if (!a) return; e.preventDefault(); if (typeof setSide === 'function' && NARROW.matches) setSide(false); const r = document.querySelector(`[data-row="${CSS.escape(a.dataset.go)}"]`); if (r) { r.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); const h = r.querySelector('h2'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); } } });
 { let pend = false; addEventListener('scroll', () => { if (pend) return; pend = true; requestAnimationFrame(() => { pend = false; spyNav(); }); }, { passive: true }); }
 drawNav();
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { readTheme(); UP = COL.up; DN = COL.down; drawScales(); scale('scaleMap', 'down', 'up', (t) => mapCol(((t * 2 - 1) * 0.2))); drawCharts(); drawPanels(); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { DRAWGEN++; readTheme(); UP = COL.up; DN = COL.down; drawScales(); scale('scaleMap', 'down', 'up', (t) => mapCol(((t * 2 - 1) * 0.2))); drawCharts(); drawPanels(); });
+
+/* ---------- Controls: sliding segmented pills, filled sliders with a value bubble ---------- */
+// Single-choice segmented controls get one pill that slides (and stretches) to the chosen option. The studies group
+// allows several at once, so its buttons light up on their own.
+function pillSeg(seg) {
+  const pill = document.createElement('span'); pill.className = 'seg__pill'; pill.setAttribute('aria-hidden', 'true'); seg.prepend(pill); seg.classList.add('seg--pill');
+  const place = () => { const b = seg.querySelector('button[aria-pressed="true"]'); if (!b || !b.offsetWidth) { pill.style.opacity = '0'; return; } pill.style.opacity = '1'; pill.style.width = b.offsetWidth + 'px'; pill.style.transform = `translateX(${b.offsetLeft}px)`; };
+  place(); requestAnimationFrame(() => { place(); pill.classList.add('on'); });
+  new MutationObserver(place).observe(seg, { subtree: true, attributes: true, attributeFilter: ['aria-pressed'] });
+  if (typeof ResizeObserver === 'function') new ResizeObserver(place).observe(seg);
+}
+for (const seg of document.querySelectorAll('.seg')) if (seg.id !== 'studies') pillSeg(seg);
+// Sliders: --p is how far the thumb is along, so the track fills up to it in the section's tint
+const paintRange = (el) => { const lo = +el.min || 0, hi = +el.max || 100; el.style.setProperty('--p', `${(((+el.value - lo) / (hi - lo || 1)) * 100).toFixed(2)}%`); };
+const paintRanges = () => document.querySelectorAll('input[type=range]').forEach(paintRange);
+paintRanges();
+{ const _sync = syncControls; syncControls = function () { _sync.apply(this, arguments); paintRanges(); }; }
+{ const _ui = rulesUi; rulesUi = function () { _ui.apply(this, arguments); paintRanges(); }; }
+{ // the value bubble over the thumb while dragging
+  const bub = document.createElement('div'); bub.className = 'rbubble'; bub.setAttribute('aria-hidden', 'true'); document.body.appendChild(bub);
+  let on = null;
+  const place = () => { if (!on) return; const r = on.getBoundingClientRect(), lo = +on.min || 0, hi = +on.max || 100, t = (+on.value - lo) / (hi - lo || 1); bub.textContent = $(on.id + 'V')?.textContent || on.value; bub.style.left = r.left + 10 + t * (r.width - 20) + 'px'; bub.style.top = r.top + 'px'; };
+  document.addEventListener('input', (e) => { if (e.target.matches?.('input[type=range]')) { paintRange(e.target); if (on === e.target) place(); } });
+  document.addEventListener('pointerdown', (e) => { const el = e.target.closest?.('input[type=range]'); if (!el) return; on = el; bub.classList.add('on'); requestAnimationFrame(place); });
+  const off = () => { on = null; bub.classList.remove('on'); };
+  document.addEventListener('pointerup', off); document.addEventListener('pointercancel', off); addEventListener('scroll', () => on && place(), { passive: true });
+}
+
+/* ---------- Sidebar: collapsible to a rail of section dots; on narrow screens a sheet over the page ---------- */
+const SIDE_KEY = 'tf-side-v1', NARROW = matchMedia('(max-width: 1099px)'), APP = document.querySelector('.app');
+let sideCollapsed = false, sideOpen = false;
+try { sideCollapsed = localStorage.getItem(SIDE_KEY) === 'collapsed'; } catch {}
+{
+  const icon = '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="1.75" y="2.75" width="14.5" height="12.5" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6.75 3v12" stroke="currentColor" stroke-width="1.5"/><path d="M3.6 6h1.4M3.6 8.5h1.4M3.6 11h1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>';
+  const side = document.querySelector('.side'); side.id ||= 'side';
+  side.insertAdjacentHTML('afterbegin', `<button type="button" class="side__toggle" id="sideToggle" aria-controls="${side.id}">${icon}</button>`);
+  APP.insertAdjacentHTML('afterbegin', `<button type="button" class="side__fab" id="sideFab" aria-controls="${side.id}" aria-label="Show sections">${icon}</button><div class="side__scrim" aria-hidden="true"></div>`);
+}
+function setSide(v) { // v: expanded (wide) or open (narrow)
+  if (NARROW.matches) sideOpen = v; else { sideCollapsed = !v; try { localStorage.setItem(SIDE_KEY, sideCollapsed ? 'collapsed' : 'open'); } catch {} }
+  applySide();
+}
+function applySide() {
+  const narrow = NARROW.matches, expanded = narrow ? sideOpen : !sideCollapsed;
+  APP.classList.toggle('side--collapsed', !narrow && sideCollapsed); APP.classList.toggle('side--open', narrow && sideOpen);
+  const label = expanded ? 'Hide sidebar' : 'Show sidebar', keys = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘\\' : 'Ctrl+\\';
+  for (const b of [$('sideToggle'), $('sideFab')]) { b.setAttribute('aria-expanded', String(expanded)); b.setAttribute('aria-label', label); b.title = `${label} (${keys})`; }
+  document.querySelector('.side').inert = narrow && !sideOpen;
+}
+$('sideToggle').addEventListener('click', () => setSide(NARROW.matches ? !sideOpen : sideCollapsed));
+$('sideFab').addEventListener('click', () => setSide(!sideOpen));
+document.querySelector('.side__scrim').addEventListener('click', () => setSide(false));
+document.addEventListener('keydown', (e) => {
+  if (e.key === '\\' && (e.metaKey || e.ctrlKey) && !e.altKey) { e.preventDefault(); setSide(NARROW.matches ? !sideOpen : sideCollapsed); }
+  else if (e.key === 'Escape' && NARROW.matches && sideOpen) setSide(false);
+});
+NARROW.addEventListener('change', () => { sideOpen = false; applySide(); });
+// The content widens with the sidebar's column; once it settles, the charts repaint at their new size
+APP.addEventListener('transitionend', (e) => { if (e.target !== APP || e.propertyName !== 'grid-template-columns') return; DRAWGEN++; evenTiles(); drawCharts(); drawMain(); drawPanels(); });
+applySide();

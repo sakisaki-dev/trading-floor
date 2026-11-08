@@ -40,7 +40,7 @@
   </div>
 
   <div class="rules" id="rules" hidden>
-    <div class="rules__bar"><b>Rules</b><span class="note">changes apply to the running world at once · a blue dot marks a rule changed from its default</span><button type="button" id="rulesReset">Reset all to defaults</button></div>
+    <div class="rules__bar"><b>Rules</b><span class="note">changes apply to the running world at once · a coloured dot marks a rule changed from its default</span><button type="button" id="rulesReset">Reset all to defaults</button></div>
     <section class="rgrp" aria-label="Money"><h3>Money<span>what comes in and what leaves every week</span></h3><div class="rgrp__c">
       <div class="slider"><label for="allowance">Allowance / wk <b id="allowanceV"></b></label><input id="allowance" type="range" min="0" max="2000" step="100" value="200"></div>
       <div class="slider"><label for="livingCost">Living cost / wk <b id="livingCostV"></b></label><input id="livingCost" type="range" min="0" max="400" step="20" value="80"></div>
@@ -360,12 +360,12 @@
   <div class="grid three">
     <section class="panel" aria-labelledby="gt-h">
       <div class="head"><h2 id="gt-h">Games · last 4 weeks</h2><span class="note">ticket + stake in, best scores take the pot</span></div>
-      <div class="legend"><span><i class="line" style="background:#3987e5"></i>Skill index: does knowing more score more? (0 = luck, 1 = pure skill)</span></div>
+      <div class="legend"><span><i class="line" style="background:#30d158"></i>Skill index: does knowing more score more? (0 = luck, 1 = pure skill)</span></div>
       <canvas id="wins" class="ch ch--short" aria-label="Average skill index across games, 4-week average"></canvas>
       <div class="tip" id="winsTip" hidden></div>
       <div class="tablewrap"><table id="gTopic"><thead><tr><th>Game</th><th>Topic</th><th class="num">Entries</th><th class="num">Pots</th><th class="num">Skill</th><th class="bar"><span class="sr-only">Skill bar</span></th></tr></thead><tbody></tbody></table></div>
       <div class="tablewrap"><table id="gArch"><thead><tr><th>Wealth group</th><th class="num">Entries</th><th class="num">Won</th><th class="bar"><span class="sr-only">Win rate bar</span></th><th class="num">Net coins</th></tr></thead><tbody></tbody></table></div>
-      <div class="head"><h2 class="h3">Win rate by wealth group</h2><span class="legend"><span><i class="line" style="background:#e66767"></i>Top 10%</span><span><i class="line" style="background:#c98500"></i>Next 40%</span><span><i class="line" style="background:#3987e5"></i>Bottom 50%</span></span></div>
+      <div class="head"><h2 class="h3">Win rate by wealth group</h2><span class="legend"><span><i class="line" style="background:#ff375f"></i>Top 10%</span><span><i class="line" style="background:#ff9f0a"></i>Next 40%</span><span><i class="line" style="background:#0a84ff"></i>Bottom 50%</span></span></div>
       <canvas id="gWinC" class="ch ch--short grow" aria-label="Share of game entries won by each wealth group, 4-week window"></canvas>
       <div class="tip" id="gWinCTip" hidden></div>
       <div class="head"><h2 class="h3">Net coins from games by wealth group</h2><span class="note">4 weeks · prizes minus tickets and stakes</span></div>
@@ -373,7 +373,7 @@
       <div class="tip" id="gNetCTip" hidden></div>
     </section>
     <section class="panel" aria-labelledby="nt-h">
-      <div class="head"><h2 id="nt-h">Notes</h2><span class="legend"><span><i class="line" style="background:#3987e5"></i>Swaps</span><span><i class="line" style="background:#e66767"></i>Thefts</span></span></div>
+      <div class="head"><h2 id="nt-h">Notes</h2><span class="legend"><span><i class="line" style="background:#40c8e0"></i>Swaps</span><span><i class="line" style="background:#ff375f"></i>Thefts</span></span></div>
       <canvas id="notes" class="grow ch" aria-label="Note swaps and thefts per week"></canvas>
       <div class="tip" id="notesTip" hidden></div>
       <div class="tablewrap"><table id="social"><thead><tr><th>Style</th><th class="num">Bots</th><th class="num">Avg worth</th><th class="num">Flags</th></tr></thead><tbody></tbody></table></div>
