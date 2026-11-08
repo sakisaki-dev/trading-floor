@@ -31,6 +31,8 @@ about 1.9 seconds with 500 bots on one core of an Apple M1 Pro.
 - **The league.** 32 clubs with 10-player rosters, about 320 active players. 203 players and their real career
   histories come from one Retro Bowl save. The rest are generated from rates measured in that save. Seasons are
   simulated week by week: form, injuries, awards, retirement, rookies. A player's card value follows his production.
+  The save has no ages, so each player's age is a random draw from real NFL rookie ages. A rookie plays a real
+  early-career season's rates and inherits that player's skill and grade (both assumptions, listed in the model).
 - **The cards.** 16 card markets per player (4 designs × 4 finishes), plus one-of-a-kind items. Cards enter through
   packs, sold in a weekly auction.
 - **The markets.** A weekly order book, sealed-bid auctions, card lending and short selling, cash loans between bots,

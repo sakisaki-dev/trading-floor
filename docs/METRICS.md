@@ -48,7 +48,7 @@ same card, and mixing the two chains made the index rise about ×1.5 per 200 wee
 
 | Indicator | Field | Definition | Reads |
 |---|---|---|---|
-| Gini | `h.gini` | Gini coefficient of worth across all bots (`gini`). Worth (`worth`) is cash − debt + money lent + copies at marks × (1 − fee) with a concentration haircut of `1 ÷ (1 + 0.06 × (q − 3))` above 3 copies of one card, items at 90% of their marks, cards lent out, minus borrowed cards at their marks, plus short collateral. | accounts |
+| Gini | `h.gini` | Gini coefficient of worth across all bots (`gini`). Worth (`worth`) is cash − debt + money lent + copies at marks × (1 − fee) with a concentration haircut of `1 ÷ (1 + 0.06 × (q − 3))` above 3 copies of one card (`concentrationSlope`, `concentrationFree`: assumptions), items at 90% of their marks (`itemHaircut`), cards lent out, minus borrowed cards at their marks, plus short collateral. | accounts |
 | Wealth share | `h.share` | Share of total worth held by the top 10%, next 40% and bottom 50% of bots by worth. | accounts |
 | Cash share | `mkt.cashShare`, `mkt.cashTop10` | The same three bands ranked by cash; `cashTop10` is the share of all cash held by the 10% of bots with the most cash. | accounts |
 | Coins held | `h.money`, `mkt.cash` | Total bot cash. | accounts |

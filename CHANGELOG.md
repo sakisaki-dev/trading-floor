@@ -13,6 +13,26 @@ changes results only where the bug occurred.
 Versions before 1.0.0 were not tagged at the time. They are assigned here to the development rounds in
 `docs/DEVLOG.md`, with the commit that closed each round.
 
+## [Unreleased]
+
+### Audit 5e: undisclosed assumptions (`fix/assume`)
+- Every constant in AUDIT.md section 5e is now a named setting in `DEFAULTS` with a doc comment saying it is an
+  assumption, at the value the code always used: the print run (`printRunK`, `printRunExp`, `printRunMin`,
+  `printRunValueFloor`, `printRunUnit`, one `printRun` helper at all three sites), the concentration and item haircuts
+  (`concentrationFree`, `concentrationSlope`, `itemHaircut`, shared by `worth`, `realValue` and `holdingsValue`),
+  notes (`notesPerSwap`, `notesPerTheft`, `guardChance`), contest payouts (`gamePaid`), the rule bots' hot list
+  (`hotVolWeeks`, `hotRetWeeks`, `hotFloor`), `moodWeeks`, the repeat-sales index (`rsMaxGap`, `rsWindow`, `rsClamp`,
+  `rsSmooth`), `outsideSaveWeeks`, `newcomerCashSd`, the league (`lastSeasonMinGames`, `entryAgeFallback`,
+  `injuryPoolMin`, `championWeight`, `awardWinner`, `rookieS0Fallback`, `rookieOvr`, `formBlendSeasons`),
+  `impliedVolumeWeight` and the network scales (`nnResetScale`, `nnWidenScale`). Existing keys that were assumptions
+  (`startCash`, `poolMultiplier`, `packsPerWeek`, `packMix`, `gameNoise`, `lifespan`, `aiLifespanWeeks`,
+  `nnResearchError` and the pass and note limits) are labelled as such. `ASSUMPTIONS` lists them all.
+- New options, off by default: `championWeight: 'equal'` and `nnResetScale: 'layer'`.
+- The pack price's silent 7.36 fallback for the autograph mean multiplier is gone: a world fails at build without it.
+- The page's Rules gain an Assumptions group (controls for the main ones and a list of every assumption with its
+  running value); the Realism preset (`configs/realism.json` and the page) states the main ones at their values.
+- `docs/MODEL.md` has an Assumptions table. Frames are byte-identical to 1.0.0 at defaults and on Realism.
+
 ## [1.0.0] - 2026-11-07
 
 Round 5 (commit `1487fd4`), moved to a stand-alone repository (`85ffd9a`). This is the state documented in

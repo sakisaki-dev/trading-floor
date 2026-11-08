@@ -186,7 +186,8 @@ tactics). [METRICS.md](METRICS.md) defines each field. Measurement code changes 
 3. **Timeline** (`startTimeline`): the market opens at the save's latest season (Y88, `startSeason: 'latest'`). Each
    player's value, OVR, skill, grade, Career Legacy and career totals come from the Y88 snapshot. Players without a
    Y88 row are inactive. Print run `S0 = max(2, round(40 / sqrt(max(0.5, value / 100))))` and pool = `S0 × 10`
-   (**assumption**: rarer cards for more valuable players).
+   (**assumption**: rarer cards for more valuable players; `printRunK`, `printRunExp`, `printRunMin`,
+   `printRunValueFloor`, `printRunUnit`, `poolMultiplier`, one helper `printRun` used at every site).
 4. **Full league** (`fillLeague`, `leagueFill: 'full'`): the league opens (`leagueStart`), and every club × position
    below the roster shape gets a generated veteran (`veteran`): a measured early-career season for his rates, a real
    NFL entry age, then a burn-in of s seasons under the league's rules, with s drawn from the seasons played by the
@@ -228,28 +229,34 @@ After the save's last real season the simulated league sets every hidden value (
 reads a price or a bot.
 
 - **Start** (`leagueStart`): each player's per-game rates come from his last real season (if he played 4 or more
-  games), else his career per game. His form window starts at his career pace. Entry age is drawn from real NFL
-  rookie ages.
+  games, `lastSeasonMinGames`), else his career per game. His form window starts at his career pace. The save has no
+  ages: each player's entry age is a random draw from real NFL rookie ages (**assumption**; it is not his real age, and
+  it drives his injury and retirement risk).
 - **Weekly game** (`leagueWeek`, `lgGame`): in weeks 1–17 every active, uninjured player plays one game. Yardage stats
   are log-normal around the per-game rate with spread 0.4 (`gameNoise`); count stats are Poisson. Both are
   **assumptions**: only season totals are known. Each game adds to his career totals, his Career Legacy (a per-position
   linear fit measured from the save, `legacyGrowth`) and his form window.
 - **Injuries** (`leagueInjuries`, each season): the chance of an injury season is the save's (16 injured seasons; too
   few to split). How the chance varies with age is the real NFL's (`relativeRiskByAge`), rescaled so the league's
-  average equals the save's. The games missed are drawn from a real injured season at his position. They come as one
-  spell starting at a random week (**assumption**).
+  average equals the save's. The games missed are drawn from a real injured season at his position (from every position when
+  his has fewer than 3, `injuryPoolMin`; `W.L.injuryFallback` lists those positions). They come as one spell starting
+  at a random week (**assumption**).
 - **Season end** (`leagueSeasonEnd`):
-  - Super Bowl: the champion club is drawn with chance proportional to the summed season production of its players
-    (**assumption**). Every active player on it gets a ring. A Super Bowl MVP is awarded with the save's measured
+  - Super Bowl: the champion club is drawn with chance proportional to the summed season production of its card players
+    (**assumption**, `championWeight: 'production'`; with `leagueFill: 'save'` it favours clubs with more card players;
+    `'equal'` draws evenly among clubs with active card players). Every active player on it gets a ring. A Super Bowl MVP is awarded with the save's measured
     frequency to the champion's top producer.
   - MVP, OPOY, DPOY: each awarded with the save's measured chance per season, at a position drawn from the save's mix,
-    to that position's top producer of the season. Picking the top producer is an **assumption**; in the save, MVP
+    to that position's top producer of the season. Picking the top producer is an **assumption** (`awardWinner: 'top'`, the only rule implemented: the save
+    keeps only quantiles of the winner's rank, not draws); in the save, MVP
     and OPOY winners ranked at a median quantile of 1.0 within their position (n = 7 each).
   - Retirement: how often careers end is the save's (about 11% of active players a season); how that varies with
     age is the real NFL's (`careerEndByAge`). Past age 40 every career ends.
   - New players: in a full league, each club × position is refilled to the roster shape (`fillRosters`), a retiree's
     slot first. Each rookie (`addRookie`, `leaguePlayer`) gets a name from `rookie_names.json`, first-season rates
-    from a real early-career season at his position, the median print run at his position and 16 new card markets.
+    from a real early-career season at his position, the median print run at his position (20 if none, `rookieS0Fallback`) and 16 new card markets. He
+    inherits the skill and grade of the real player whose early season was drawn as his template (skill moves value
+    0.8–1.2×) and holds OVR 62 (`rookieOvr`) until his first values (**assumptions**).
   - Hall of Fame at Career Legacy 7,500.
   - Form: each active player's rates are multiplied by `exp(swing)`, the swing drawn from the save's real
     season-to-season changes at his position and career stage, plus the measured pressure shift. The shift depends
@@ -259,7 +266,7 @@ reads a price or a bot.
 - **Values** (`leagueValues`, weekly): the site's own formula on the simulated record. OVR is a player's rank within
   his position on League Score per game, `62 + 37 × q^0.85` for rank quantile q. Active players are ranked on the last
   `formSeasons × 17` games (2 seasons in Realism; injured games count as zero), retired players and the game's legends
-  on career per game. For the first 2 seasons OVR blends from the site's career-total OVR to this form OVR, so the
+  on career per game. For the first 2 seasons (`formBlendSeasons`) OVR blends from the site's career-total OVR to this form OVR, so the
   market opens at the site's values. Value is
   `(25 + 2400 c³) × skill factor × ((1 + legacy/10000) / 1.5)³ × 1.25 if legacy ≥ 7,000 × tier multiplier × tier scarcity`,
   with `c = (OVR − 60)/39`. In a full league every rank is taken against a fixed reference (the save's own players and
@@ -427,6 +434,74 @@ All are settings; with each at its engine default a run matches the earlier engi
 | Freedom (`priceMap`, `rateMap`, `keepMax`, counts) | Log maps, cash target up to 100%, 40 / 10 / 30 / 8 | Widened so no limit binds often (DEVLOG round 4) |
 | Fitness at selling value (`fitnessValue: 'bid'`) | On | Design choice |
 | Contests (`games`, `prizeShare: 0`) | On; prizes only from stakes | Design choice |
+
+## Assumptions
+
+Every constant below is an assumption: not measured from the save, chosen by the owner or carried over from an earlier
+version of the model. Each is a setting in `DEFAULTS` with a doc comment, listed in `ASSUMPTIONS` (`engine.mjs`), shown
+with its running value in the page's Rules under **Assumptions** (the most consequential ones also as controls), and
+written into every run file with the rest of the configuration. The values are the ones the code always used: naming
+them changed no result.
+
+| Setting | Value | What it decides |
+|---|---|---|
+| `printRunK` | 40 | Print run: copies out at the open = max(printRunMin, round(printRunK ÷ max(printRunValueFloor, value ÷ printRunUnit)^printRunExp)): every card's scarcity |
+| `printRunExp` | 0.5 | Print run: how fast copies fall as value rises (0.5: a square-root law) |
+| `printRunMin` | 2 | Print run: the fewest copies of any card |
+| `printRunValueFloor` | 0.5 | Print run: the lowest value ÷ printRunUnit the formula uses, which caps the most copies |
+| `printRunUnit` | 100 | Print run: the value unit (coins) |
+| `poolMultiplier` | 10 | Unminted copies in the pool = copies out at the open × this: how long packs can mint |
+| `packsPerWeek` | 33 | Packs released a week (from an earlier simulation's purchases, not the save) |
+| `packMix` | standard 0.75, premium 0.21, elite 0.025, holo 0.015 | Share of the released packs of each type |
+| `startCash` | 20000 | A bot's opening cash |
+| `newcomerCashSd` | 0.5 | Spread (log sd) of a newcomer's cash around startCash: created money |
+| `concentrationFree` | 3 | Copies of one card counted at full mark in worth and fitness |
+| `concentrationSlope` | 0.06 | Haircut per copy beyond concentrationFree: 1 ÷ (1 + slope × excess) |
+| `itemHaircut` | 0.9 | Share of its mark a one-of-a-kind item counts for in worth, fitness value and collateral |
+| `passesPerWeek` | 3 | Research passes granted to every bot each week |
+| `passLife` | 1 | Weeks before an unused pass expires |
+| `maxResearchPerWeek` | 6 | Most players one bot may research in a week |
+| `knowledgeWeeks` | 12 | Weeks before a research note goes stale |
+| `memoryCap` | 25 | Most notes one bot keeps |
+| `nnResearchError` | 0.2 | Log-normal error of a neural bot's research note around hidden value: how much information is worth |
+| `notesPerSwap` | 3 | Freshest notes each side gives in a swap |
+| `notesPerTheft` | 3 | Freshest notes a theft copies |
+| `detectChance` | 0.35 | Chance a theft is noticed |
+| `guardChance` | 0.5 | Chance a theft from a bot that flagged the thief is stopped |
+| `gamePaid` | valuation 0.2, prediction 0.1, blindRank 0.25, closest 0.25, keepCut 0.25, imposter 0.25, grid 0.25, higherLower 0.25, overUnder 0.25, duel 0 | Share of entrants paid in each contest: how skewed winnings are |
+| `lifespan` | 6–14 | A bot's life in generations, drawn uniformly |
+| `aiLifespanWeeks` | 40–80 | An AI bot's life in weeks, drawn uniformly (AI bots only) |
+| `nnResetScale` | 1 | Sd of a weight redrawn in mutation ('layer': its layer's 1/√fan-in) |
+| `nnWidenScale` | 0.1 | Sd of the new weights when a network is widened for the price guide |
+| `hotVolWeeks` | 20 | Rule bots' hot list: weeks of trades counted |
+| `hotRetWeeks` | 4 | Rule bots' hot list: weeks of return counted |
+| `hotFloor` | 0.2 | Rule bots' hot list: floor on the return factor |
+| `moodWeeks` | 8 | Weeks of the Vault index the market drawdown (a bot input) is measured over |
+| `rsMaxGap` | 52 | Vault index: longest gap (weeks) between two sales of a card that are paired |
+| `rsWindow` | 104 | Vault index: weeks solved each week |
+| `rsClamp` | 2 | Vault index: clamp on a pair's log change |
+| `rsSmooth` | 0.001 | Vault index: smoothness between neighbouring weeks |
+| `impliedVolumeWeight` | 2 | A player's implied price weights each card market by copies out + this × last week's trades |
+| `outsideSaveWeeks` | 4 | outsideMode 'budget': weeks of budget unspent collector money can save |
+| `gameNoise` | 0.4 | Log-normal spread of a game's yards around the per-game rate (the save has season totals only) |
+| `lastSeasonMinGames` | 4 | Games in the last real season needed to open on its rates rather than the career's |
+| `entryAgeFallback` | 23 | Entry age if the NFL age data is missing (real players' ages are random draws from NFL rookie ages: the save has none) |
+| `injuryPoolMin` | 3 | Injured seasons a position needs to draw spell lengths from its own |
+| `championWeight` | production | How the Super Bowl champion club is drawn: by its card players' production, or evenly |
+| `awardWinner` | top | MVP, OPOY and DPOY go to the top producer at the drawn position |
+| `rookieS0Fallback` | 20 | A rookie's print run if his position has no players (else its median) |
+| `rookieOvr` | 62 | A rookie's OVR until his first values (he inherits his template player's skill and grade) |
+| `formBlendSeasons` | 2 | Seasons over which a card moves from career OVR to form OVR after the open |
+| `lossRate` | 0 | Share of copies lost a season |
+| `entryHype` | 0 | Newcomers after Vault index rallies |
+| `entryReturns` | 0 | Newcomers after good median returns |
+| `entryNews` | 0 | Newcomers after league news |
+| `hypeInjury` | 0 | Extra injury chance after a value rise |
+
+Two valuation rules are disclosed rather than made settings: a one-of-a-kind item is marked at its plain card's price ×
+(its premium ÷ the plain card's premium), not from its own sales (they are too rare), and `holdingsValue` (loan
+collateral) counts items at `itemHaircut` × mark without the fee that `worth` deducts. Card input 27 is the promised
+royalty yield (`royaltyRate` × the note's estimate ÷ price); input 32 carries what was actually paid.
 
 ## Known limits
 
