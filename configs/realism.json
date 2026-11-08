@@ -95,5 +95,28 @@
  "positionLimit": 0,
  "capPoorest": false,
  "leagueUpdates": false,
- "lenderCycle": false
+ "lenderCycle": false,
+ "printRunK": 40,
+ "printRunExp": 0.5,
+ "printRunMin": 2,
+ "printRunValueFloor": 0.5,
+ "printRunUnit": 100,
+ "poolMultiplier": 10,
+ "packsPerWeek": 33,
+ "packMix": {
+  "standard": 0.75,
+  "premium": 0.21,
+  "elite": 0.025,
+  "holo": 0.015
+ },
+ "startCash": 20000,
+ "newcomerCashSd": 0.5,
+ "concentrationFree": 3,
+ "concentrationSlope": 0.06,
+ "itemHaircut": 0.9,
+ "nnResearchError": 0.2,
+ "gameNoise": 0.4,
+ "formBlendSeasons": 2,
+ "championWeight": "production",
+ "awardWinner": "top"
 }
