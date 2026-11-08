@@ -14,9 +14,9 @@ const F = run.frames || [];
 if (!F.length) { console.error(`no frames in ${inFile}`); process.exit(1); }
 const meta = run.meta || {};
 
-// Colours: the reference categorical palette (light mode), in fixed order; text and grid in neutral inks
-const C = { surface: '#fcfcfb', ink: '#0b0b0b', ink2: '#52514e', muted: '#8a8984', grid: '#e7e6e2', axis: '#c9c8c3' };
-const SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
+// Colours: dark mode (GitHub's dark canvas), the categorical palette lifted for a dark surface, in fixed order
+const C = { surface: '#0d1117', ink: '#f0f3f6', ink2: '#9ea7b3', muted: '#6e7681', grid: '#21262d', axis: '#30363d' };
+const SERIES = ['#58a6ff', '#ff8a4c', '#3fd49a', '#f2c94c', '#ff8fbd', '#7ee787', '#a594ff', '#ff6b6b'];
 const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
 const W = 800, PADL = 56, PADR = 150, PW = W - PADL - PADR;

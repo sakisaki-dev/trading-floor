@@ -13,6 +13,13 @@ changes results only where the bug occurred.
 Versions before 1.0.0 were not tagged at the time. They are assigned here to the development rounds in
 `docs/DEVLOG.md`, with the commit that closed each round.
 
+## [Unreleased]
+
+### Changed
+
+- The page is dark by default (`data-theme="light"` for light). The README figures are drawn dark. No engine change.
+- README rewritten: shorter, findings first, figure after them.
+
 ## [2.0.0] - 2026-11-07
 
 The audit's code findings (`docs/AUDIT.md` section 5), fixed on four branches and merged, plus split random streams.
