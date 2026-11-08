@@ -748,6 +748,50 @@
     @media (max-width: 1099px) { .side { background: var(--panel); } }
   }
 
+
+  /* ---------- Control bar: a borderless toolbar, after macOS/iPadOS toolbars ----------
+     Plain capsule buttons with no rims (a quiet fill appears on hover), SF-style glyphs, one accent capsule for Play,
+     hairline dividers between groups, and chevrons that turn when a sheet opens. */
+  div.bar { border-radius: 999px; padding: 6px 8px 6px 6px; gap: 6px 10px; }
+  @media (max-width: 760px) { div.bar { border-radius: 22px; } }
+  .bar__g { gap: 2px; }
+  .bar__g + .bar__g { padding-left: 10px; border-left: 0; position: relative; }
+  .bar__g + .bar__g::before { content: ''; position: absolute; left: 0; top: 7px; bottom: 7px; width: 1px; background: var(--line-strong); border-radius: 1px; }
+  @media (max-width: 760px) { .bar__g + .bar__g { padding-left: 0; } .bar__g + .bar__g::before { display: none; } }
+  div.bar :is(button, select, .file, input[type=number]) {
+    border-radius: 999px; min-height: 32px; padding: 6px 13px; background: transparent; background-image: none; box-shadow: none;
+    font: 500 13px/20px var(--body); color: var(--chalk); }
+  div.bar :is(button, .file):hover { background: var(--fill); }
+  div.bar :is(button, .file):active { background: var(--fill-2); transform: scale(0.96); }
+  div.bar :is(#play, #step, #reset, #saveRun, .file)::before {
+    content: ''; display: inline-block; width: 14px; height: 14px; margin: -2px 6px 0 -2px; vertical-align: middle; background: currentColor;
+    -webkit-mask: var(--i) center / contain no-repeat; mask: var(--i) center / contain no-repeat; }
+  div.bar #play { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 2.8v10.4c0 .5.6.8 1 .5l8-5.2a.6.6 0 0 0 0-1l-8-5.2c-.4-.3-1 0-1 .5z'/%3E%3C/svg%3E"); min-width: 88px; padding: 6px 16px 6px 14px; color: var(--on-accent); font-weight: 600;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--accent-fill) 82%, #fff), var(--accent-fill) 60%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3), 0 2px 10px color-mix(in srgb, var(--accent-fill) 35%, transparent); margin-right: 4px; }
+  div.bar #play:hover { background: linear-gradient(180deg, color-mix(in srgb, var(--accent-fill) 72%, #fff), color-mix(in srgb, var(--accent-fill) 92%, #000) 60%); }
+  div.bar #play[data-state=playing] { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='3.5' y='2.5' width='3.2' height='11' rx='1'/%3E%3Crect x='9.3' y='2.5' width='3.2' height='11' rx='1'/%3E%3C/svg%3E"); }
+  div.bar #step { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2.5 3.3v9.4c0 .5.5.8.9.5l6.6-4.7a.6.6 0 0 0 0-1L3.4 2.8c-.4-.3-.9 0-.9.5z'/%3E%3Crect x='11' y='2.5' width='2.6' height='11' rx='1'/%3E%3C/svg%3E"); } div.bar #reset { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 2.5a5.5 5.5 0 1 1-5.2 3.7' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3Cpath d='M1.6 2.2l1.2 4.3 4.2-1.3z'/%3E%3C/svg%3E"); } div.bar #saveRun { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 2v8m0 0L4.8 6.8M8 10l3.2-3.2M3 12.5v.5c0 .6.4 1 1 1h8c.6 0 1-.4 1-1v-.5' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); } div.bar .file { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 10.5v-8m0 0L4.8 5.7M8 2.5l3.2 3.2M3 12.5v.5c0 .6.4 1 1 1h8c.6 0 1-.4 1-1v-.5' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+  /* Speed: the segmented control as a quiet capsule track */
+  div.bar .seg { border-radius: 999px; padding: 3px; margin-left: 6px; background: var(--fill); box-shadow: none; }
+  div.bar .seg button { min-height: 26px; padding: 3px 11px; font: 600 12px/20px var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+  div.bar .seg button[aria-pressed=true] { color: var(--chalk); }
+  div.bar .seg button:hover { background: transparent; color: var(--chalk); }
+  div.bar .seg__pill { border-radius: 999px; top: 3px; bottom: 3px; }
+  /* Preset and seed: soft filled capsules, no outline */
+  div.bar select#preset { background-color: var(--fill); padding-right: 30px; max-width: 240px; text-overflow: ellipsis;
+    background-image: var(--chev); background-repeat: no-repeat; background-position: right 11px center; background-size: 12px; }
+  div.bar select#preset:hover { background-color: var(--fill-2); }
+  div.bar .mini { gap: 6px; padding-left: 8px; font: 500 12px/1 var(--body); color: var(--muted); }
+  div.bar input[type=number] { width: 78px; padding: 6px 12px; background: var(--fill); font: 500 13px/20px var(--mono); cursor: text; }
+  div.bar input[type=number]:hover { background: var(--fill-2); }
+  div.bar input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  /* Rules and Layout: a chevron that turns over when the sheet is open */
+  div.bar :is(#rulesBtn, #layoutBtn)::after { content: ''; display: inline-block; width: 10px; height: 10px; margin: -1px -3px 0 6px; vertical-align: middle; background: var(--muted);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat; transition: transform 0.3s var(--ease-spring); }
+  div.bar :is(#rulesBtn, #layoutBtn)[aria-expanded=true] { background: color-mix(in srgb, var(--accent-fill) 18%, transparent); color: var(--accent); }
+  div.bar :is(#rulesBtn, #layoutBtn)[aria-expanded=true]::after { transform: rotate(180deg); background: var(--accent); }
+  div.bar #liveBtn { color: var(--accent); }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: 0.001ms !important; animation-delay: 0s !important; transition-duration: 0.001ms !important; }
     .lamp--pulse { animation: none !important; }
@@ -785,8 +829,8 @@
     <div class="bar__g">
       <select id="preset" aria-label="Market preset"></select>
       <label class="mini" for="seed">Seed <input id="seed" type="number" value="88" min="1" max="99999"></label>
-      <button id="rulesBtn" type="button" aria-expanded="false" aria-controls="rules">Rules ▾</button>
-      <button id="layoutBtn" type="button" aria-expanded="false" aria-controls="layoutP">Layout ▾</button>
+      <button id="rulesBtn" type="button" aria-expanded="false" aria-controls="rules">Rules</button>
+      <button id="layoutBtn" type="button" aria-expanded="false" aria-controls="layoutP">Layout</button>
     </div>
     <div class="bar__g bar__g--end">
       <button id="saveRun" type="button" title="Download every week so far, the rules and every change you made, to share or replay">Save run</button>
@@ -4727,7 +4771,7 @@ const gpw = () => (mode === 'replay' ? RUN.config.weeksPerGeneration : LIVECFG?.
 const when = (t) => (t ? `Week ${t}` : 'Start');
 const cur = () => FRAMES[mode === 'replay' ? cursor : FRAMES.length - 1];
 const nNow = () => (mode === 'replay' ? cursor + 1 : FRAMES.length);
-function setPlay(v) { playing = v; $('play').textContent = v ? 'Pause' : 'Play'; if (mode === 'live') tell({ cmd: 'play', v }); }
+function setPlay(v) { playing = v; $('play').textContent = v ? 'Pause' : 'Play'; $('play').dataset.state = v ? 'playing' : 'paused'; if (mode === 'live') tell({ cmd: 'play', v }); }
 
 function startLive() {
   mode = 'live'; RUN = null; $('liveBtn').hidden = true; $('runFile').value = '';
@@ -5156,7 +5200,7 @@ function assumeList(c) {
 for (const [k, [s, f]] of Object.entries(SLIDERS)) $(k).addEventListener('input', () => { const v = +$(k).value; $(k + 'V').textContent = f(v); opts[k] = v * s; if (mode === 'live') { tell({ cmd: 'cfg', k, v: v * s }); logChange(k, v * s); } });
 for (const k of SELECTS) $(k).addEventListener('change', (e) => { opts[k] = e.target.value; if (mode === 'live') { tell({ cmd: 'cfg', k, v: e.target.value }); logChange(k, e.target.value); } });
 for (const k of TOGGLES) $(k).addEventListener('change', (e) => { opts[k] = e.target.checked; if (mode === 'live') { tell({ cmd: 'cfg', k, v: e.target.checked }); logChange(k, e.target.checked); } });
-$('rulesBtn').addEventListener('click', () => { const open = !$('rules')._open; sheet($('rules'), open); $('rulesBtn').setAttribute('aria-expanded', String(open)); $('rulesBtn').textContent = open ? 'Rules ▴' : 'Rules ▾'; });
+$('rulesBtn').addEventListener('click', () => { const open = !$('rules')._open; sheet($('rules'), open); $('rulesBtn').setAttribute('aria-expanded', String(open));  });
 function advance() {
   if (mode === 'live') { tell({ cmd: 'step' }); return false; }
   if (cursor < FRAMES.length - 1) { cursor++; for (const [s, b] of FRAMES[cursor].arcs || []) arcs.push({ s, b, age: 0 }); return true; }
@@ -6011,7 +6055,7 @@ function drawLayoutPanel() {
     ${ps.length > 1 || !ps.length ? `<label class="lay__row"><input type="checkbox" data-lay="row" data-k="${k}" ${off ? '' : 'checked'}> <b>${esc(ps.length ? 'Row' : rowName(r))}</b></label>` : ''}
     <span class="lay__ps">${ps.map((p) => { const pk = panelKey(p); return `<span class="lay__p${LAY.hide.includes(pk) ? ' off' : ''}"><label><input type="checkbox" data-lay="hide" data-k="${pk}" ${LAY.hide.includes(pk) ? '' : 'checked'}> ${esc(panelName(p))}</label><button type="button" data-lay="min" data-k="${pk}" aria-pressed="${LAY.min.includes(pk)}" title="Minimize to the title">${LAY.min.includes(pk) ? 'open' : 'min'}</button></span>`; }).join('')}</span></li>`; }).join('')}</ol>`;
 }
-$('layoutBtn').addEventListener('click', () => { const open = !$('layoutP')._open; if (open) { $('layoutP').hidden = false; drawLayoutPanel(); } sheet($('layoutP'), open); $('layoutBtn').setAttribute('aria-expanded', String(open)); $('layoutBtn').textContent = open ? 'Layout ▴' : 'Layout ▾'; });
+$('layoutBtn').addEventListener('click', () => { const open = !$('layoutP')._open; if (open) { $('layoutP').hidden = false; drawLayoutPanel(); } sheet($('layoutP'), open); $('layoutBtn').setAttribute('aria-expanded', String(open));  });
 applyLayout();
 
 /* ---------- Rules panel: show a control only when its rule is on; mark what differs from the defaults ---------- */

@@ -179,7 +179,7 @@ const gpw = () => (mode === 'replay' ? RUN.config.weeksPerGeneration : LIVECFG?.
 const when = (t) => (t ? `Week ${t}` : 'Start');
 const cur = () => FRAMES[mode === 'replay' ? cursor : FRAMES.length - 1];
 const nNow = () => (mode === 'replay' ? cursor + 1 : FRAMES.length);
-function setPlay(v) { playing = v; $('play').textContent = v ? 'Pause' : 'Play'; if (mode === 'live') tell({ cmd: 'play', v }); }
+function setPlay(v) { playing = v; $('play').textContent = v ? 'Pause' : 'Play'; $('play').dataset.state = v ? 'playing' : 'paused'; if (mode === 'live') tell({ cmd: 'play', v }); }
 
 function startLive() {
   mode = 'live'; RUN = null; $('liveBtn').hidden = true; $('runFile').value = '';
@@ -608,7 +608,7 @@ function assumeList(c) {
 for (const [k, [s, f]] of Object.entries(SLIDERS)) $(k).addEventListener('input', () => { const v = +$(k).value; $(k + 'V').textContent = f(v); opts[k] = v * s; if (mode === 'live') { tell({ cmd: 'cfg', k, v: v * s }); logChange(k, v * s); } });
 for (const k of SELECTS) $(k).addEventListener('change', (e) => { opts[k] = e.target.value; if (mode === 'live') { tell({ cmd: 'cfg', k, v: e.target.value }); logChange(k, e.target.value); } });
 for (const k of TOGGLES) $(k).addEventListener('change', (e) => { opts[k] = e.target.checked; if (mode === 'live') { tell({ cmd: 'cfg', k, v: e.target.checked }); logChange(k, e.target.checked); } });
-$('rulesBtn').addEventListener('click', () => { const open = !$('rules')._open; sheet($('rules'), open); $('rulesBtn').setAttribute('aria-expanded', String(open)); $('rulesBtn').textContent = open ? 'Rules ▴' : 'Rules ▾'; });
+$('rulesBtn').addEventListener('click', () => { const open = !$('rules')._open; sheet($('rules'), open); $('rulesBtn').setAttribute('aria-expanded', String(open));  });
 function advance() {
   if (mode === 'live') { tell({ cmd: 'step' }); return false; }
   if (cursor < FRAMES.length - 1) { cursor++; for (const [s, b] of FRAMES[cursor].arcs || []) arcs.push({ s, b, age: 0 }); return true; }
@@ -1463,7 +1463,7 @@ function drawLayoutPanel() {
     ${ps.length > 1 || !ps.length ? `<label class="lay__row"><input type="checkbox" data-lay="row" data-k="${k}" ${off ? '' : 'checked'}> <b>${esc(ps.length ? 'Row' : rowName(r))}</b></label>` : ''}
     <span class="lay__ps">${ps.map((p) => { const pk = panelKey(p); return `<span class="lay__p${LAY.hide.includes(pk) ? ' off' : ''}"><label><input type="checkbox" data-lay="hide" data-k="${pk}" ${LAY.hide.includes(pk) ? '' : 'checked'}> ${esc(panelName(p))}</label><button type="button" data-lay="min" data-k="${pk}" aria-pressed="${LAY.min.includes(pk)}" title="Minimize to the title">${LAY.min.includes(pk) ? 'open' : 'min'}</button></span>`; }).join('')}</span></li>`; }).join('')}</ol>`;
 }
-$('layoutBtn').addEventListener('click', () => { const open = !$('layoutP')._open; if (open) { $('layoutP').hidden = false; drawLayoutPanel(); } sheet($('layoutP'), open); $('layoutBtn').setAttribute('aria-expanded', String(open)); $('layoutBtn').textContent = open ? 'Layout ▴' : 'Layout ▾'; });
+$('layoutBtn').addEventListener('click', () => { const open = !$('layoutP')._open; if (open) { $('layoutP').hidden = false; drawLayoutPanel(); } sheet($('layoutP'), open); $('layoutBtn').setAttribute('aria-expanded', String(open));  });
 applyLayout();
 
 /* ---------- Rules panel: show a control only when its rule is on; mark what differs from the defaults ---------- */
