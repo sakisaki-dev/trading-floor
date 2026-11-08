@@ -33,6 +33,10 @@ change, so this is a major version.
 `rngStreams: 'single'` and `openPrice: 'value'` restore two of the old behaviours for comparison, but no setting
 reproduces a 1.x run.
 
+The overview figure (`docs/figures/overview.svg`, Realism, seed 31761, 200 weeks) was re-run on 2.0.0: 501 bots fell to
+344 (189 arrivals, 346 departures), the Vault index ended at 77 and the marks index at 385 (on 1.0.0: 320 bots, 108 and
+149), and the same two tactics held all 10 generations.
+
 
 ### Split random streams (audit methods 1; code finding "Single shared random stream")
 Real fix: default results change. New setting `rngStreams`: `'split'` (default) gives the league (`W.rngLeague`: games,

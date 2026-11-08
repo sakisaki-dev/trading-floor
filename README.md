@@ -7,7 +7,8 @@ other out or die, when the world sets only the economic forces and never what a 
 
 ![Vault index, population and tactic shares over 200 weeks](docs/figures/overview.svg)
 
-*Figure 1: Realism preset, seed 31761, 200 weeks. The command and run details are in
+*Figure 1: Realism preset, seed 31761, 200 weeks, engine 2.0.0. 501 bots fell to 344; the marks index ended at 385
+and the Vault index at 77; two tactics held all 10 generations. The command and run details are in
 [docs/figures/README.md](docs/figures/README.md).*
 
 ## Quickstart
@@ -80,7 +81,7 @@ the last row came from engine 0.x or 1.0, before the audit's fixes (engine 2.0.0
 | The population drains, with about four exits for every entry. | same, engine 0.3 |
 | Bots rarely trade with each other. 68% of cards have no bot orders in a given week, and asks outnumber bids about 4 to 1. | seed 11906, 300 weeks, engine 1.0 or earlier |
 | In the full league, two tactics coexist at roughly 50/50: auction traders, and bots that trade with dealers and open packs. Generation 5 flagged the auction traders as cannibalized. The clusters are weak (silhouette 0.15–0.25). | Realism, seed 31761, 120 weeks, engine 1.0 |
-| Over 200 weeks of the full league, the population fell from 501 to 320 bots (188 arrivals, 369 departures). The marks index rose to 149 while the repeat-sales Vault index ended at 108. The same two tactics held through all 10 generations. Three short-lived heavy-borrowing tactics each lasted one generation. | Figure 1: Realism, seed 31761, 200 weeks, engine 1.0 |
+| Over 200 weeks of the full league, the population fell from 501 to 344 bots (189 arrivals, 346 departures). The marks index rose to 385 while the repeat-sales Vault index ended at 77; the marks index was more than 5% above it from week 1. The same two tactics held through all 10 generations (T1, dealer and outsider trading, at 49–64%), and no other appeared. On engine 1.0 the same run ended at 320 bots, a marks index of 149 and a Vault index of 108. | Figure 1: Realism, seed 31761, 200 weeks, engine 2.0.0 |
 
 The detailed record, including the comparisons behind each line, is in [docs/DEVLOG.md](docs/DEVLOG.md).
 
