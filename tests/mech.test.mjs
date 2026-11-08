@@ -80,7 +80,7 @@ test('a pending prediction passes to the heir; a leaver\'s is refunded', () => {
 test('the house prize pool comes out of the treasury, capped at what it holds', () => {
   const W = world({ games: true }); W.gameStats = { valuation: { entrants: 0, pot: 0, scoreSum: 0, skillSum: 0, skillN: 0 } }; W.gameArch = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]; W.contests = { valuation: { topic: 'QB' } };
   W.treasury = 30; const b = W.bots[0], c0 = b.cash; I.payout(W, 'valuation', [{ b, score: 1, know: 0 }], 100);
-  assert.equal(W.treasury, 0); assert.equal(b.cash, c0 + W.cfg.gameStake + 30); assert.equal(W.house.mint?.prizes ?? 0, 0);
+  assert.equal(W.treasury, 0); assert.equal(b.cash, c0 + W.cfg.gameStake + 30); assert.equal(W.house.tre?.prizes, -30); // booked as a treasury line (a transfer), not new coins
 });
 test('minting checks the pool first; a short pack is charged only for the copies it held', () => {
   const W = world({ packSale: 'markup' }), p = W.players.find((x) => x.on !== false); p.pool = 0; W.ord = { minted: 0 };

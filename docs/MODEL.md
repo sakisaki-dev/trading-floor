@@ -145,9 +145,15 @@ within a lifetime (`adaptStep`), selection between generations (`generationEnd`:
 and inheritance (`settleEstate`: heirs carry mutated copies). Newcomers bring new random networks.
 
 **Objectives (fitness).** Return on capital from a bot's own decisions over one generation, valued at what the bot
-could actually sell for (`realValue`, `fitnessValue: 'bid'`). Allowance and living costs are removed from the return
-because no bot chooses them. Royalties, fees, taxes, tax refunds, holding costs and cash shocks stay in it. Fitness is
-the mean of the last 6 generation returns (`nnFitnessGens`). Bots do not see their fitness as an input.
+could actually sell for (`realValue`, `fitnessValue: 'bid'`), divided by its capital at the generation start floored
+at 50 × `coinScale` (so a near-empty bot's ratio stays finite). Lump sums the bot did not choose are taken out of the
+return (`fitnessExo: 'lumpSums'`, the owner's decision of 2026-11-07): the allowance, the wealth tax paid back, the flat
+living cost and cash shocks. Taxes and costs tied to its holdings or activity stay in it (wealth tax, lifestyle,
+holding costs, fees), as do royalties and game winnings, so a bot can learn to avoid them. Every such flow passes
+through one helper (`transfer`) that moves the bot's cash, the money ledger and its exogenous money `b.exo` together;
+lifetime learning and the newcomers' word-of-mouth signal read the same `b.exo`. A newcomer's opening cash is its
+starting capital. `fitnessExo: 'legacy'` restores the old booking (allowance and all living costs). Fitness is the
+mean of the last 6 generation returns (`nnFitnessGens`). Bots do not see their fitness as an input.
 
 **Learning.** Hill climbing on the bot's own weights: every 10 weeks a bot scores the period just ended, keeps a
 trial perturbation if it scored better than the saved networks, else restores them, then starts a new trial
@@ -159,7 +165,12 @@ research notes, league news, the price guide) to actions. The price prediction c
 **Sensing.** Bots never read hidden value directly. They see public market data, public league news, the public price
 guide (a lagged copy of hidden value), and their own research notes. A research note is hidden value seen through a
 log-normal error (`research`: `F × exp(N(0, 0.2))`, the error size is an **assumption**). Section 7.7 lists every
-input.
+input. Three disclosed channels carry hidden value to every bot: the guide; the dealers, who trade around last week's
+value; and royalties, since what a card paid over the last generation (card input x32) is `F` × the royalty rate ×
+his games, so with royalties on `F` is close to public. Nothing else a bot reads is built from `F`: cards with no price
+yet open at comparable sales (below), cost bases come from prices paid or marks, research pages show a risk rating
+only under `valueModel: 'ovrWalk'`, game results report won and net (no score), and an AI bot sees only the other bots
+it has dealt with.
 
 **Interaction.** Indirect, through markets: order books, auctions, the pack auction, the credit market and the
 card-lending pool. Direct: note swaps (both bots must accept), note theft (detected with chance 0.35, after which the
@@ -194,7 +205,10 @@ tactics). [METRICS.md](METRICS.md) defines each field. Measurement code changes 
 4. **Full league** (`fillLeague`, `leagueFill: 'full'`): the league opens (`leagueStart`), and every club × position
    below the roster shape gets a generated veteran (`veteran`): a measured early-career season for his rates, a real
    NFL entry age, then a burn-in of s seasons under the league's rules, with s drawn from the seasons played by the
-   save's active players. Real players keep their site values; `W.fillK` is computed.
+   save's active players. Real players keep their site values; `W.fillK` is computed. A generated veteran's cards
+   open at comparable sales (`openPrice: 'comps'`): the median opening price of the 5 save players at his position
+   whose public OVR is nearest his. Rookies open the same way at their first valuation, against players with cards
+   out. `openPrice: 'value'` restores the old opening at hidden value.
 5. **Markets**: 16 per player (`makeMarket`). The site's price history is imported as each card's past
    (`seedHistory`).
 6. **Bots**: `250 × fillK` neural bots (`newBot`, `randomBrain`), each with 20,000 coins (**assumption**). Weights are

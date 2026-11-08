@@ -65,6 +65,53 @@ Real fixes: default results change (a major version once merged). Tests: `node t
   "liquidator to lenders and borrowers".
 - **Deferred to the government build:** per-subsystem random streams, per-world module state, `positionLimit` as a
   concentration tax.
+### Hidden information and money accounting (fix/info; AUDIT.md 5a and 5f)
+
+Real fixes: default results change. Tests: `node tests/info.test.mjs`.
+
+- **Hidden value no longer reaches bots or prices except through disclosed channels.** Cards with no price yet
+  (rookies at their first valuation, generated veterans at the open, save players entering a replayed season) open at
+  comparable sales (new setting `openPrice`: 'comps' default, 'position', or 'value' for the old opening at `F`).
+  Research pages carry the risk rating only under `valueModel: 'ovrWalk'`. Game results report won and net, no score.
+  Vault store asks come from the guide or last week's public value (`storeAsk`; new setting `storeCopies`, 3). Cost
+  bases never fall back to `F` (sellLot, settleEstate, addAiBot and the opening deal use prices). An AI bot's
+  `otherBots` lists only bots it has dealt with, by name. The royalty channel is documented as a disclosed carrier of
+  `F`. Researcher-only frame fields are listed in METRICS.md 8a.
+- **Lots follow copies.** Estate-sale leftovers, lent-out and listed copies keep their cost through a death; a
+  defaulter keeps the cost of copies it lent out; a lender paid in cash for a copy drops its lot; open auction listings
+  pass to the heir, or to the liquidator when a bot leaves or defaults (before, the proceeds went to a bot no longer in
+  the market).
+- **Fitness booking (owner decision 2026-11-07).** One helper, `transfer()`, moves cash, the ledger and `b.exo`
+  together. New setting `fitnessExo`: 'lumpSums' (default: allowance, wealth tax paid back, flat living cost, cash
+  shocks are taken out of fitness; lifestyle, holding costs, wealth tax and fees count) or 'legacy'. A newcomer's
+  opening cash is its starting capital (before, a newcomer's first-generation return ignored its trading).
+- **A complete money ledger.** Every movement of the bots' money (cash plus short collateral) is tagged once at its
+  source, so `money.other` is zero (it was about 2.6 million coins over 60 weeks on seed 31761). New tags: lifestyle,
+  dealers buying and selling, game stakes and pots, card loans settled with leavers. Fixed double or missing bookings
+  for liquidator auctions, refused transfers, order-book trades with the liquidator, store or outside buyers, royalties
+  paid from the treasury, and leavers' collateral. The treasury keeps its own line ledger (`money.treasury`), including
+  the weekly wipe outside a closed economy.
+- **No debit below zero.** A card-loan settlement, the card-lending fee and a short seller's royalty pay at most the
+  borrower's cash; the rest is the lender's loss. When the lender has left, the settlement leaves the economy (tag
+  `loanLeavers`) instead of going to the treasury. Living costs no longer reset a negative balance to zero. Bids of a
+  bot that died earlier in the same generation end no longer buy estate copies.
+- Deferred to the government build: the state writer and field whitelist, pack revenue to a publisher sink, network
+  inputs x25 and x27, living costs as a fixed sink, dealer count, the pressure channel, fillK and the entry channel.
+
+Week 60, Realism, seed 31761, practiceGens 0 (reported, not tuned):
+
+| | Base (`847bf14`) | fix/info | fix/info with `openPrice: 'value'` |
+|---|---|---|---|
+| Bots | 311 | 287 | 295 |
+| Trades a week (mean of weeks 51–60) | 653 | 623 | 505 |
+| Vault index | 85.0 | 61.2 | 87.1 |
+| Marks index | 89.4 | 197.7 | 83.8 |
+| Gini | 0.410 | 0.429 | 0.406 |
+| Ledger "other", weeks 1–60, absolute sum | 2,630,385 | 0 | 0 |
+
+Generated veterans now open at comparable save players' prices: hidden value ÷ opening price has a median of 0.81
+(10th–90th percentile 0.49–3.24), so most open above their hidden value and the most valuable far below it. Both
+indexes are measured against the openings; with the old opening the indexes stay near the base run.
 
 ## [1.0.0] - 2026-11-07
 
