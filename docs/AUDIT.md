@@ -1,12 +1,14 @@
 # Scientific audit of the Trading Floor engine and the AI-government design
 
-Date: 2026-11-07. Engine audited: `engine.mjs` at commit `e834845` (the last commit touching the file). Line numbers refer to the file as audited; later merges may shift them. Every real finding below is **Open** until the code change or spec revision that closes it is committed.
+Date: 2026-11-07. Engine audited: `engine.mjs` at commit `e834845` (the last commit touching the file). Line numbers refer to the file as audited; later merges may shift them. Each real finding carries its status: the code findings in section 5 were closed or deferred in engine 2.0.0 (see the note at the end of section 1); the methods findings in section 4 belong to the government build and stay **Open** until it implements them, except finding 1 (split random streams), fixed in 2.0.0.
 
 ## 1. What was audited and how
 
 - **Forces inventory.** Six code auditors each read one slice of `engine.mjs` and listed every force in it: anything that moves money, cards, prices, information or decisions. Each force was given a kind, a basis (where its numbers come from), the settings that control it, any route by which the planned AI government could reach it, and, where there was one, a problem and a proposed fix. Result: 271 forces.
 - **Methods audit.** A methods auditor read `docs/regulator-spec.md`, the README sections on the Realism preset and Rounds 3 and 4, `realism-factors-spec.md`, `realism-preset-spec.md` and `health-board-spec.md`, and spot-checked the engine wherever the spec makes a claim about the code. Result: 32 findings (numbered 0–31).
 - **Skeptic check.** The 202 forces the auditors flagged as possible problems went to a separate verifier, who re-read the cited code and gave a verdict: real or not, a severity, a reason and a fix. Where the verifier corrected the original finding, this report follows the verifier.
+
+**Update 2026-11-07: fixes landed in engine 2.0.0.** The code findings in section 5 were fixed on four branches (`fix/assume` 5e, `fix/mech` 5c and 5d, `fix/info` 5a and 5f, `fix/nets` 5b), merged into `main` together with the split random streams (methods finding 1, code finding "Single shared random stream"), and released as engine 2.0.0 (`CHANGELOG.md`). Of the 141 code findings, 116 are fixed and 25 are deferred to the government build; none is left open. Line numbers in section 5 refer to the file as audited, before these changes. Results from engine 1.x are not comparable with 2.0.0.
 
 Severity, as used by both auditors:
 
@@ -142,7 +144,21 @@ The methods auditor also listed what is already sound: closing the money printer
 
 ## 5. Code findings verified real
 
-141 findings. Severity is the verifier's. "Where" is the function and lines in `engine.mjs` unless another file is named. Fixes change mechanisms, accounting, disclosure or what the government can read; none scripts what a bot does.
+141 findings. Severity is the verifier's.
+
+**Status summary (engine 2.0.0, 2026-11-07).** Every finding has a status: "Fixed (branch)" with how, or "Deferred: government build" where it only matters once a government reads the state or owns the treasury (field whitelists and leak scans, the state writer, legacy rule-bot paths to lock out of regulated runs, the treasury's sinks).
+
+| Theme | Findings | Fixed | Deferred: government build | Open |
+|---|---|---|---|---|
+| 5a. Hidden information reaching bots or the government | 21 | 11 | 10 | 0 |
+| 5b. Decisions scripted by code | 19 | 12 | 7 | 0 |
+| 5c. Mechanism bugs | 34 | 33 | 1 | 0 |
+| 5d. Walls | 15 | 15 | 0 | 0 |
+| 5e. Undisclosed assumptions | 37 | 37 | 0 | 0 |
+| 5f. Government-only routes and accounting | 15 | 8 | 7 | 0 |
+| **Total** | **141** | **116** | **25** | **0** |
+
+One fixed finding has a deferred part: "Bid helper: cash check and position limit" (5d) fixed the cumulative cash check and deferred `positionLimit` as a concentration holding tax. "Where" is the function and lines in `engine.mjs` unless another file is named. Fixes change mechanisms, accounting, disclosure or what the government can read; none scripts what a bot does.
 
 ### 5a. Hidden information reaching bots or the government (21)
 

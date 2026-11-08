@@ -68,16 +68,17 @@ Definitions are in [docs/METRICS.md](docs/METRICS.md) and [docs/TACTICS.md](docs
 
 ## Results so far
 
-These are observations from specific runs. Each comes with the settings that produced it. Most were made before the
-full league was added (engine 0.x, about 28 active players), so they describe that world.
+These are observations from specific runs. Each comes with the settings and the engine version that produced it. Most
+were made before the full league was added (engine 0.x, about 28 active players), so they describe that world. All but
+the last row came from engine 0.x or 1.0, before the audit's fixes (engine 2.0.0), and have not been re-run.
 
 | Observation | Runs |
 |---|---|
 | Skill does not carry over between generations. The rank correlation of a bot's return from one generation to the next was between −0.03 and −0.08 under all 11 settings tested. About 5% of each generation descends from the previous top 10%. | 11 settings × 3 seeds × 300 weeks, engine 0.3 |
-| Changes kept by learning within a lifetime do no better afterwards (follow-up correlation about −0.02), under every trial yardstick tested. Only 30-week trials hint at a signal (+0.09, with seed spread covering zero). | same |
-| The quit rule shapes the economy more than any other setting tested. With quitting after heavy losses, prices track the football at 0.69 against 0.39, and the Gini is 0.47 against 0.56. | same |
-| The population drains, with about four exits for every entry. | same |
-| Bots rarely trade with each other. 68% of cards have no bot orders in a given week, and asks outnumber bids about 4 to 1. | seed 11906, 300 weeks |
+| Changes kept by learning within a lifetime do no better afterwards (follow-up correlation about −0.02), under every trial yardstick tested. Only 30-week trials hint at a signal (+0.09, with seed spread covering zero). | same, engine 0.3 |
+| The quit rule shapes the economy more than any other setting tested. With quitting after heavy losses, prices track the football at 0.69 against 0.39, and the Gini is 0.47 against 0.56. | same, engine 0.3 |
+| The population drains, with about four exits for every entry. | same, engine 0.3 |
+| Bots rarely trade with each other. 68% of cards have no bot orders in a given week, and asks outnumber bids about 4 to 1. | seed 11906, 300 weeks, engine 1.0 or earlier |
 | In the full league, two tactics coexist at roughly 50/50: auction traders, and bots that trade with dealers and open packs. Generation 5 flagged the auction traders as cannibalized. The clusters are weak (silhouette 0.15–0.25). | Realism, seed 31761, 120 weeks, engine 1.0 |
 | Over 200 weeks of the full league, the population fell from 501 to 320 bots (188 arrivals, 369 departures). The marks index rose to 149 while the repeat-sales Vault index ended at 108. The same two tactics held through all 10 generations. Three short-lived heavy-borrowing tactics each lasted one generation. | Figure 1: Realism, seed 31761, 200 weeks, engine 1.0 |
 
@@ -89,7 +90,11 @@ A full audit of the engine and the planned experiment design was completed on 20
 in the code and checked 202 flagged findings. 141 were confirmed (51 important, 90 minor); none blocks the current
 runs. Confirmed findings include hidden information reaching bots, some decisions scripted by code rather than the
 bots' networks, mechanism bugs, and 61 constants not yet labelled as assumptions. Every finding, its fix and its
-status is in [docs/AUDIT.md](docs/AUDIT.md). Fixes are in progress.
+status is in [docs/AUDIT.md](docs/AUDIT.md).
+
+The fixes landed in engine 2.0.0 (2026-11-07). Of the 141 confirmed findings, 116 are fixed and 25 are deferred to the
+government build, because they matter only once a government reads the state or owns the treasury. None is open. The
+fixes change results: runs on engine 1.x are not comparable with 2.0.0 ([CHANGELOG.md](CHANGELOG.md) says why).
 
 ## Planned: an AI government
 
@@ -113,8 +118,8 @@ project is not affiliated with or endorsed by either.
 - Most results so far rest on 3 seeds or fewer. Generations are noisy, and the tactic clusters are weak.
 - Some numbers in the model are assumptions, not measurements. They are listed in [docs/MODEL.md](docs/MODEL.md) and
   [docs/AUDIT.md](docs/AUDIT.md).
-- The audit's confirmed findings are being fixed. Results from before a fix are labelled with the engine version
-  that produced them.
+- Most results above came from engine 0.x and 1.0, before the audit's fixes. Each is labelled with the engine version
+  that produced them and has not been re-run on 2.0.0, except Figure 1.
 
 ## Repository layout
 

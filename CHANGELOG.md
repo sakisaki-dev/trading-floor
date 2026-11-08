@@ -13,7 +13,26 @@ changes results only where the bug occurred.
 Versions before 1.0.0 were not tagged at the time. They are assigned here to the development rounds in
 `docs/DEVLOG.md`, with the commit that closed each round.
 
-## [Unreleased]
+## [2.0.0] - 2026-11-07
+
+The audit's code findings (`docs/AUDIT.md` section 5), fixed on four branches and merged, plus split random streams.
+Of 141 findings, 116 are fixed and 25 are deferred to the government build; none is open. Default and Realism results
+change, so this is a major version.
+
+**Results from engine 1.x are not comparable with 2.0.0.** Every frame differs for the same seed and settings because:
+- **Hidden-value leaks are closed** (5a, 5f): cards with no price open at comparable sales instead of hidden value,
+  research pages and game results no longer carry it, and cost bases never fall back to it.
+- **Scripted decisions moved to the bots' networks** (5b): note sharing and theft, contest answers, forced-sale order,
+  short covers, pack and pass prices; the bot network has 47 outputs (41 before).
+- **Mechanism bugs are fixed** (5c, 5d): unpaid bills are owed, lenders are paid from seized cards, the call auction
+  matches only orders that can settle, shuffles are unbiased, packs mint from the live pool, and binding walls are
+  widened or turned into costs. Fitness books lump sums by the owner's rule (`fitnessExo: 'lumpSums'`).
+- **Random streams are split**: the league, the market and bots, and people each draw from their own seeded stream, so
+  the same seed gives a different sequence of draws than 1.x even where nothing else changed.
+
+`rngStreams: 'single'` and `openPrice: 'value'` restore two of the old behaviours for comparison, but no setting
+reproduces a 1.x run.
+
 
 ### Split random streams (audit methods 1; code finding "Single shared random stream")
 Real fix: default results change. New setting `rngStreams`: `'split'` (default) gives the league (`W.rngLeague`: games,
