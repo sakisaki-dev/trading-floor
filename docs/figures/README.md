@@ -49,3 +49,18 @@ node scripts/figure.mjs runs/fig-31761-v2/run.json docs/figures/overview.svg
 The first version of this figure (run `fig-31761`, engine 1.0.0, commit `85ffd9a`) ended with the Vault index at 108,
 the marks index at 149 and 320 bots (188 arrivals, 369 departures), with the same two tactics and three short-lived
 heavy-borrowing tactics that each lasted one generation. It is not comparable with 2.0.0 (see `CHANGELOG.md`).
+
+## long-run.svg
+
+Three panels over the 7,973 weeks of seed 11906 (Realism, engine 1.x, dealers off at week 1,102, the dashed line):
+(a) bots in the market where a save holds exact counts, and the largest family's share of all bots at each save;
+(b) order-book trades and card auction sales per week, 20-week means; (c) the rank correlation of price with hidden
+value across players, and the correlation of their 20-week changes.
+
+Drawn from the checked-in summary, so no save is needed:
+
+```bash
+node scripts/long_run_figure.mjs results/long-runs/seed11906-realism.json docs/figures/long-run.svg
+```
+
+How the summary was made: [results/long-runs](../../results/long-runs/README.md).

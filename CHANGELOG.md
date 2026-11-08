@@ -18,7 +18,13 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 ### Changed
 
 - The page is dark by default (`data-theme="light"` for light). The README figures are drawn dark. No engine change.
-- README rewritten: shorter, findings first, figure after them. Then the long-run findings (engine 1.x, seeds 12864 and 11906) and what we got wrong along the way; the banner gains a second ticker row for the long run.
+- Repository layout: helper scripts in `tools/`, the scripts that built `data/` in `data-build/`; `engine.mjs`, `sim.mjs`
+  and `run.mjs` stay at the root. `npm test` runs the test files plus a new determinism test, and a GitHub Actions
+  workflow runs it on every push and checks the committed page matches the engine.
+- `results/long-runs/`: small summaries of the two long page runs (`scripts/summarize_saves.mjs`), and
+  `docs/figures/long-run.svg` drawn from them (`scripts/long_run_figure.mjs`). CONTRIBUTING.md and issue templates.
+- README rewritten: findings first, the long-run findings (engine 1.x, seeds 12864 and 11906) with their own figure,
+  what we got wrong, badges and a live demo link. The banner gains a long-run ticker row.
 
 ## [2.0.0] - 2026-11-07
 

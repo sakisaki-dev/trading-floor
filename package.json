@@ -5,15 +5,22 @@
   "description": "Agent-based simulation of a trading-card market: neural-network bots trade, learn and evolve on a simulated football league.",
   "scripts": {
     "sim": "node sim.mjs",
-    "page": "node build_page.mjs",
-    "tactics": "node tactics_report.mjs",
+    "page": "node tools/build_page.mjs",
+    "tactics": "node tools/tactics_report.mjs",
     "ai-run": "node run.mjs --config configs/pilot.json",
-    "ai-dry": "node run.mjs --config configs/pilot.json --dry"
+    "ai-dry": "node run.mjs --config configs/pilot.json --dry",
+    "test": "node tests/mech.test.mjs && node tests/nets.test.mjs && node tests/determinism.test.mjs && node tests/info.test.mjs",
+    "test:quick": "node tests/mech.test.mjs && node tests/determinism.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.1.0"
   },
   "engines": {
     "node": ">=20"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sakisaki-dev/trading-floor.git"
+  },
+  "homepage": "https://sakisaki-dev.github.io/trading-floor/"
 }

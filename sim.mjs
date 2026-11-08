@@ -1,5 +1,5 @@
 // Headless run of the neural-bot world (no AI seats). Writes a summary per week and the full frames, so a run can be
-// replayed on the page (Load run) and analysed with tactics_report.mjs.
+// replayed on the page (Load run) and analysed with tools/tactics_report.mjs.
 //
 //   node sim.mjs --preset realism --seed 31761 --weeks 300 --out runs/realism-31761
 //   node sim.mjs --config my.json --seed 7 --weeks 100            # any engine settings as JSON

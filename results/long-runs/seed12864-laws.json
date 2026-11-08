@@ -1,0 +1,3102 @@
+{
+ "about": "Summary of one Trading Floor page run, built by scripts/summarize_saves.mjs from the saves listed. Engine 1.x (before the 2.0 audit).",
+ "seed": 12864,
+ "preset": "laws",
+ "weeks": 3009,
+ "savedAt": "2026-11-07T03:06:05.229Z",
+ "settingChanges": [
+  {
+   "week": 0,
+   "rule": "holdCost",
+   "value": 0.0005
+  },
+  {
+   "week": 0,
+   "rule": "cashShockChance",
+   "value": 0.001
+  },
+  {
+   "week": 0,
+   "rule": "cashShockChance",
+   "value": 0.002
+  },
+  {
+   "week": 0,
+   "rule": "cashShockChance",
+   "value": 0.003
+  },
+  {
+   "week": 0,
+   "rule": "cashShockChance",
+   "value": 0.004
+  },
+  {
+   "week": 0,
+   "rule": "cashShockChance",
+   "value": 0.005
+  },
+  {
+   "week": 0,
+   "rule": "cashShockChance",
+   "value": 0.004
+  },
+  {
+   "week": 0,
+   "rule": "cashShockChance",
+   "value": 0.003
+  },
+  {
+   "week": 0,
+   "rule": "cashShockChance",
+   "value": 0.002
+  },
+  {
+   "week": 0,
+   "rule": "cashShockChance",
+   "value": 0.001
+  },
+  {
+   "week": 0,
+   "rule": "prizeShare",
+   "value": 0.05
+  },
+  {
+   "week": 0,
+   "rule": "prizeShare",
+   "value": 0.1
+  },
+  {
+   "week": 0,
+   "rule": "prizeShare",
+   "value": 0.05
+  },
+  {
+   "week": 0,
+   "rule": "prizeShare",
+   "value": 0
+  },
+  {
+   "week": 0,
+   "rule": "closedEconomy",
+   "value": true
+  },
+  {
+   "week": 0,
+   "rule": "centralBank",
+   "value": true
+  },
+  {
+   "week": 0,
+   "rule": "wealthTaxForced",
+   "value": true
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.0005
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.01
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.0095
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.009000000000000001
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.0085
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.008
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.0075
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.006500000000000001
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.006
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.0055000000000000005
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.005
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.0045000000000000005
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.004
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.0034999999999999996
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.003
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.0025
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.002
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.0015
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.001
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.0015
+  },
+  {
+   "week": 0,
+   "rule": "wealthTax",
+   "value": 0.001
+  },
+  {
+   "week": 65,
+   "rule": "centralBank",
+   "value": true
+  },
+  {
+   "week": 70,
+   "rule": "allowance",
+   "value": 1700
+  },
+  {
+   "week": 70,
+   "rule": "allowance",
+   "value": 1500
+  },
+  {
+   "week": 70,
+   "rule": "allowance",
+   "value": 1400
+  },
+  {
+   "week": 70,
+   "rule": "allowance",
+   "value": 1200
+  },
+  {
+   "week": 70,
+   "rule": "allowance",
+   "value": 1100
+  },
+  {
+   "week": 70,
+   "rule": "allowance",
+   "value": 1000
+  },
+  {
+   "week": 70,
+   "rule": "allowance",
+   "value": 900
+  },
+  {
+   "week": 71,
+   "rule": "allowance",
+   "value": 800
+  },
+  {
+   "week": 71,
+   "rule": "allowance",
+   "value": 700
+  },
+  {
+   "week": 71,
+   "rule": "allowance",
+   "value": 600
+  },
+  {
+   "week": 72,
+   "rule": "allowance",
+   "value": 700
+  },
+  {
+   "week": 74,
+   "rule": "closedEconomy",
+   "value": true
+  },
+  {
+   "week": 75,
+   "rule": "wealthTaxForced",
+   "value": true
+  },
+  {
+   "week": 132,
+   "rule": "wealthTax",
+   "value": 0.0005
+  },
+  {
+   "week": 134,
+   "rule": "wealthTax",
+   "value": 0.001
+  },
+  {
+   "week": 334,
+   "rule": "closedEconomy",
+   "value": false
+  },
+  {
+   "week": 349,
+   "rule": "closedEconomy",
+   "value": true
+  },
+  {
+   "week": 350,
+   "rule": "centralBank",
+   "value": false
+  },
+  {
+   "week": 351,
+   "rule": "allowance",
+   "value": 800
+  },
+  {
+   "week": 351,
+   "rule": "allowance",
+   "value": 900
+  },
+  {
+   "week": 351,
+   "rule": "allowance",
+   "value": 1000
+  },
+  {
+   "week": 351,
+   "rule": "allowance",
+   "value": 1100
+  },
+  {
+   "week": 351,
+   "rule": "allowance",
+   "value": 1200
+  },
+  {
+   "week": 351,
+   "rule": "allowance",
+   "value": 1300
+  },
+  {
+   "week": 351,
+   "rule": "allowance",
+   "value": 1400
+  },
+  {
+   "week": 385,
+   "rule": "closedEconomy",
+   "value": false
+  }
+ ],
+ "saves": [
+  "page-seed12864-laws-w208.json",
+  "page-seed12864-laws-w231.json",
+  "page-seed12864-laws-w552.json",
+  "page-seed12864-laws-w637.json",
+  "page-seed12864-laws-w726.json",
+  "page-seed12864-laws-w782.json",
+  "page-seed12864-laws-w1716.json",
+  "page-seed12864-laws-w3009.json"
+ ],
+ "atSaves": [
+  {
+   "file": "page-seed12864-laws-w208.json",
+   "week": 208,
+   "bots": 187,
+   "families": [
+    {
+     "id": 169,
+     "bots": 13,
+     "share": 0.07
+    },
+    {
+     "id": 256,
+     "bots": 8,
+     "share": 0.043
+    },
+    {
+     "id": 150,
+     "bots": 5,
+     "share": 0.027
+    },
+    {
+     "id": 183,
+     "bots": 5,
+     "share": 0.027
+    },
+    {
+     "id": 106,
+     "bots": 5,
+     "share": 0.027
+    }
+   ],
+   "familyDepth": 4,
+   "lendShareMedian": 0,
+   "skillCarryOver": null,
+   "sameRunAsLongest": true
+  },
+  {
+   "file": "page-seed12864-laws-w231.json",
+   "week": 231,
+   "bots": 175,
+   "families": [
+    {
+     "id": 169,
+     "bots": 11,
+     "share": 0.063
+    },
+    {
+     "id": 205,
+     "bots": 8,
+     "share": 0.046
+    },
+    {
+     "id": 17,
+     "bots": 6,
+     "share": 0.034
+    },
+    {
+     "id": 183,
+     "bots": 5,
+     "share": 0.029
+    },
+    {
+     "id": 256,
+     "bots": 5,
+     "share": 0.029
+    }
+   ],
+   "familyDepth": 4,
+   "lendShareMedian": 0,
+   "skillCarryOver": null,
+   "sameRunAsLongest": true
+  },
+  {
+   "file": "page-seed12864-laws-w552.json",
+   "week": 552,
+   "bots": 138,
+   "families": [
+    {
+     "id": 169,
+     "bots": 23,
+     "share": 0.167
+    },
+    {
+     "id": 383,
+     "bots": 20,
+     "share": 0.145
+    },
+    {
+     "id": 17,
+     "bots": 6,
+     "share": 0.043
+    },
+    {
+     "id": 194,
+     "bots": 6,
+     "share": 0.043
+    },
+    {
+     "id": 205,
+     "bots": 4,
+     "share": 0.029
+    }
+   ],
+   "familyDepth": 8,
+   "lendShareMedian": 0,
+   "skillCarryOver": null,
+   "sameRunAsLongest": true
+  },
+  {
+   "file": "page-seed12864-laws-w637.json",
+   "week": 637,
+   "bots": 153,
+   "families": [
+    {
+     "id": 383,
+     "bots": 27,
+     "share": 0.176
+    },
+    {
+     "id": 169,
+     "bots": 27,
+     "share": 0.176
+    },
+    {
+     "id": 194,
+     "bots": 9,
+     "share": 0.059
+    },
+    {
+     "id": 432,
+     "bots": 9,
+     "share": 0.059
+    },
+    {
+     "id": 17,
+     "bots": 7,
+     "share": 0.046
+    }
+   ],
+   "familyDepth": 9,
+   "lendShareMedian": 0,
+   "skillCarryOver": null,
+   "sameRunAsLongest": true
+  },
+  {
+   "file": "page-seed12864-laws-w726.json",
+   "week": 726,
+   "bots": 174,
+   "families": [
+    {
+     "id": 383,
+     "bots": 65,
+     "share": 0.374
+    },
+    {
+     "id": 169,
+     "bots": 24,
+     "share": 0.138
+    },
+    {
+     "id": 432,
+     "bots": 8,
+     "share": 0.046
+    },
+    {
+     "id": 194,
+     "bots": 8,
+     "share": 0.046
+    },
+    {
+     "id": 150,
+     "bots": 6,
+     "share": 0.034
+    }
+   ],
+   "familyDepth": 11,
+   "lendShareMedian": 0.0491,
+   "skillCarryOver": null,
+   "sameRunAsLongest": true
+  },
+  {
+   "file": "page-seed12864-laws-w782.json",
+   "week": 782,
+   "bots": 168,
+   "families": [
+    {
+     "id": 383,
+     "bots": 79,
+     "share": 0.47
+    },
+    {
+     "id": 169,
+     "bots": 20,
+     "share": 0.119
+    },
+    {
+     "id": 194,
+     "bots": 7,
+     "share": 0.042
+    },
+    {
+     "id": 150,
+     "bots": 6,
+     "share": 0.036
+    },
+    {
+     "id": 17,
+     "bots": 5,
+     "share": 0.03
+    }
+   ],
+   "familyDepth": 12,
+   "lendShareMedian": 0,
+   "skillCarryOver": null,
+   "sameRunAsLongest": true
+  },
+  {
+   "file": "page-seed12864-laws-w1716.json",
+   "week": 1716,
+   "bots": 201,
+   "families": [
+    {
+     "id": 383,
+     "bots": 74,
+     "share": 0.368
+    },
+    {
+     "id": 873,
+     "bots": 46,
+     "share": 0.229
+    },
+    {
+     "id": 169,
+     "bots": 15,
+     "share": 0.075
+    },
+    {
+     "id": 1004,
+     "bots": 11,
+     "share": 0.055
+    },
+    {
+     "id": 1693,
+     "bots": 7,
+     "share": 0.035
+    }
+   ],
+   "familyDepth": 19,
+   "lendShareMedian": 0,
+   "skillCarryOver": null,
+   "sameRunAsLongest": true
+  },
+  {
+   "file": "page-seed12864-laws-w3009.json",
+   "week": 3009,
+   "bots": 332,
+   "families": [
+    {
+     "id": 169,
+     "bots": 146,
+     "share": 0.44
+    },
+    {
+     "id": 383,
+     "bots": 99,
+     "share": 0.298
+    },
+    {
+     "id": 873,
+     "bots": 30,
+     "share": 0.09
+    },
+    {
+     "id": 2120,
+     "bots": 15,
+     "share": 0.045
+    },
+    {
+     "id": 1101,
+     "bots": 13,
+     "share": 0.039
+    }
+   ],
+   "familyDepth": 32,
+   "lendShareMedian": 0,
+   "skillCarryOver": null,
+   "sameRunAsLongest": true
+  }
+ ],
+ "population": [
+  [
+   108,
+   215
+  ],
+  [
+   112,
+   215
+  ],
+  [
+   116,
+   217
+  ],
+  [
+   120,
+   217
+  ],
+  [
+   124,
+   216
+  ],
+  [
+   128,
+   216
+  ],
+  [
+   132,
+   215
+  ],
+  [
+   136,
+   213
+  ],
+  [
+   140,
+   213
+  ],
+  [
+   144,
+   210
+  ],
+  [
+   148,
+   207
+  ],
+  [
+   152,
+   208
+  ],
+  [
+   156,
+   209
+  ],
+  [
+   160,
+   208
+  ],
+  [
+   164,
+   204
+  ],
+  [
+   168,
+   204
+  ],
+  [
+   172,
+   201
+  ],
+  [
+   176,
+   201
+  ],
+  [
+   180,
+   200
+  ],
+  [
+   184,
+   201
+  ],
+  [
+   188,
+   199
+  ],
+  [
+   192,
+   195
+  ],
+  [
+   196,
+   196
+  ],
+  [
+   200,
+   195
+  ],
+  [
+   204,
+   191
+  ],
+  [
+   208,
+   187
+  ],
+  [
+   212,
+   184
+  ],
+  [
+   216,
+   179
+  ],
+  [
+   220,
+   178
+  ],
+  [
+   224,
+   179
+  ],
+  [
+   228,
+   177
+  ],
+  [
+   452,
+   140
+  ],
+  [
+   456,
+   140
+  ],
+  [
+   460,
+   141
+  ],
+  [
+   464,
+   139
+  ],
+  [
+   468,
+   136
+  ],
+  [
+   472,
+   136
+  ],
+  [
+   476,
+   135
+  ],
+  [
+   480,
+   137
+  ],
+  [
+   484,
+   136
+  ],
+  [
+   488,
+   135
+  ],
+  [
+   492,
+   134
+  ],
+  [
+   496,
+   133
+  ],
+  [
+   500,
+   135
+  ],
+  [
+   504,
+   135
+  ],
+  [
+   508,
+   133
+  ],
+  [
+   512,
+   132
+  ],
+  [
+   516,
+   133
+  ],
+  [
+   520,
+   132
+  ],
+  [
+   524,
+   134
+  ],
+  [
+   528,
+   132
+  ],
+  [
+   532,
+   133
+  ],
+  [
+   536,
+   134
+  ],
+  [
+   540,
+   134
+  ],
+  [
+   544,
+   137
+  ],
+  [
+   548,
+   138
+  ],
+  [
+   552,
+   138
+  ],
+  [
+   556,
+   138
+  ],
+  [
+   560,
+   139
+  ],
+  [
+   564,
+   141
+  ],
+  [
+   568,
+   141
+  ],
+  [
+   572,
+   144
+  ],
+  [
+   576,
+   146
+  ],
+  [
+   580,
+   147
+  ],
+  [
+   584,
+   148
+  ],
+  [
+   588,
+   149
+  ],
+  [
+   592,
+   148
+  ],
+  [
+   596,
+   150
+  ],
+  [
+   600,
+   150
+  ],
+  [
+   604,
+   149
+  ],
+  [
+   608,
+   150
+  ],
+  [
+   612,
+   149
+  ],
+  [
+   616,
+   149
+  ],
+  [
+   620,
+   150
+  ],
+  [
+   624,
+   151
+  ],
+  [
+   628,
+   152
+  ],
+  [
+   632,
+   153
+  ],
+  [
+   636,
+   153
+  ],
+  [
+   640,
+   153
+  ],
+  [
+   644,
+   154
+  ],
+  [
+   648,
+   153
+  ],
+  [
+   652,
+   155
+  ],
+  [
+   656,
+   156
+  ],
+  [
+   660,
+   157
+  ],
+  [
+   664,
+   157
+  ],
+  [
+   668,
+   157
+  ],
+  [
+   672,
+   158
+  ],
+  [
+   676,
+   161
+  ],
+  [
+   680,
+   162
+  ],
+  [
+   684,
+   162
+  ],
+  [
+   688,
+   163
+  ],
+  [
+   692,
+   168
+  ],
+  [
+   696,
+   170
+  ],
+  [
+   700,
+   170
+  ],
+  [
+   704,
+   171
+  ],
+  [
+   708,
+   172
+  ],
+  [
+   712,
+   171
+  ],
+  [
+   716,
+   173
+  ],
+  [
+   720,
+   173
+  ],
+  [
+   724,
+   174
+  ],
+  [
+   728,
+   174
+  ],
+  [
+   732,
+   172
+  ],
+  [
+   736,
+   169
+  ],
+  [
+   740,
+   167
+  ],
+  [
+   744,
+   170
+  ],
+  [
+   748,
+   169
+  ],
+  [
+   752,
+   169
+  ],
+  [
+   756,
+   168
+  ],
+  [
+   760,
+   167
+  ],
+  [
+   764,
+   169
+  ],
+  [
+   768,
+   169
+  ],
+  [
+   772,
+   169
+  ],
+  [
+   776,
+   170
+  ],
+  [
+   780,
+   169
+  ],
+  [
+   1616,
+   206
+  ],
+  [
+   1620,
+   204
+  ],
+  [
+   1624,
+   203
+  ],
+  [
+   1628,
+   202
+  ],
+  [
+   1632,
+   200
+  ],
+  [
+   1636,
+   199
+  ],
+  [
+   1640,
+   199
+  ],
+  [
+   1644,
+   197
+  ],
+  [
+   1648,
+   197
+  ],
+  [
+   1652,
+   197
+  ],
+  [
+   1656,
+   196
+  ],
+  [
+   1660,
+   196
+  ],
+  [
+   1664,
+   196
+  ],
+  [
+   1668,
+   198
+  ],
+  [
+   1672,
+   197
+  ],
+  [
+   1676,
+   198
+  ],
+  [
+   1680,
+   199
+  ],
+  [
+   1684,
+   201
+  ],
+  [
+   1688,
+   200
+  ],
+  [
+   1692,
+   201
+  ],
+  [
+   1696,
+   201
+  ],
+  [
+   1700,
+   200
+  ],
+  [
+   1704,
+   201
+  ],
+  [
+   1708,
+   201
+  ],
+  [
+   1712,
+   202
+  ],
+  [
+   1716,
+   201
+  ],
+  [
+   2908,
+   315
+  ],
+  [
+   2912,
+   316
+  ],
+  [
+   2916,
+   317
+  ],
+  [
+   2920,
+   317
+  ],
+  [
+   2924,
+   319
+  ],
+  [
+   2928,
+   322
+  ],
+  [
+   2932,
+   325
+  ],
+  [
+   2936,
+   325
+  ],
+  [
+   2940,
+   325
+  ],
+  [
+   2944,
+   327
+  ],
+  [
+   2948,
+   327
+  ],
+  [
+   2952,
+   327
+  ],
+  [
+   2956,
+   327
+  ],
+  [
+   2960,
+   330
+  ],
+  [
+   2964,
+   331
+  ],
+  [
+   2968,
+   331
+  ],
+  [
+   2972,
+   332
+  ],
+  [
+   2976,
+   331
+  ],
+  [
+   2980,
+   332
+  ],
+  [
+   2984,
+   333
+  ],
+  [
+   2988,
+   334
+  ],
+  [
+   2992,
+   335
+  ],
+  [
+   2996,
+   334
+  ],
+  [
+   3000,
+   333
+  ],
+  [
+   3004,
+   333
+  ],
+  [
+   3008,
+   333
+  ]
+ ],
+ "series": [
+  {
+   "week": 20,
+   "tradesPerWeek": 454,
+   "auctionSalesPerWeek": 81,
+   "cashTop10": 0.299,
+   "broke": 19,
+   "lendShareMedian": 0.065,
+   "medianValue": 546.5,
+   "priceOverValue": 1.515,
+   "priceValueRank": 0.909,
+   "changeCorr20": 0.311
+  },
+  {
+   "week": 40,
+   "tradesPerWeek": 214,
+   "auctionSalesPerWeek": 80,
+   "cashTop10": 0.406,
+   "broke": 31,
+   "lendShareMedian": 0.048,
+   "medianValue": 487,
+   "priceOverValue": 2.61,
+   "priceValueRank": 0.648,
+   "changeCorr20": 0.321
+  },
+  {
+   "week": 60,
+   "tradesPerWeek": 167,
+   "auctionSalesPerWeek": 86,
+   "cashTop10": 0.603,
+   "broke": 40,
+   "lendShareMedian": 0.099,
+   "medianValue": 574,
+   "priceOverValue": 2.882,
+   "priceValueRank": 0.618,
+   "changeCorr20": 0.039
+  },
+  {
+   "week": 80,
+   "tradesPerWeek": 121,
+   "auctionSalesPerWeek": 86,
+   "cashTop10": 0.829,
+   "broke": 85,
+   "lendShareMedian": 0.11,
+   "medianValue": 513.5,
+   "priceOverValue": 2.629,
+   "priceValueRank": 0.582,
+   "changeCorr20": 0.027
+  },
+  {
+   "week": 100,
+   "tradesPerWeek": 96,
+   "auctionSalesPerWeek": 66,
+   "cashTop10": 0.837,
+   "broke": 83,
+   "lendShareMedian": 0.074,
+   "medianValue": 500,
+   "priceOverValue": 2.421,
+   "priceValueRank": 0.599,
+   "changeCorr20": 0.114
+  },
+  {
+   "week": 120,
+   "tradesPerWeek": 87,
+   "auctionSalesPerWeek": 71,
+   "cashTop10": 0.919,
+   "broke": 135,
+   "lendShareMedian": 0.052,
+   "medianValue": 504,
+   "priceOverValue": 2.539,
+   "priceValueRank": 0.639,
+   "changeCorr20": 0
+  },
+  {
+   "week": 140,
+   "tradesPerWeek": 100,
+   "auctionSalesPerWeek": 80,
+   "cashTop10": 0.924,
+   "broke": 104,
+   "lendShareMedian": 0.096,
+   "medianValue": 473.5,
+   "priceOverValue": 2.474,
+   "priceValueRank": 0.678,
+   "changeCorr20": 0.024
+  },
+  {
+   "week": 160,
+   "tradesPerWeek": 105,
+   "auctionSalesPerWeek": 80,
+   "cashTop10": 0.92,
+   "broke": 122,
+   "lendShareMedian": 0.001,
+   "medianValue": 581,
+   "priceOverValue": 2.26,
+   "priceValueRank": 0.68,
+   "changeCorr20": 0.079
+  },
+  {
+   "week": 180,
+   "tradesPerWeek": 109,
+   "auctionSalesPerWeek": 82,
+   "cashTop10": 0.935,
+   "broke": 130,
+   "lendShareMedian": 0,
+   "medianValue": 582.5,
+   "priceOverValue": 1.895,
+   "priceValueRank": 0.671,
+   "changeCorr20": -0.053
+  },
+  {
+   "week": 200,
+   "tradesPerWeek": 147,
+   "auctionSalesPerWeek": 105,
+   "cashTop10": 0.897,
+   "broke": 101,
+   "lendShareMedian": 0.025,
+   "medianValue": 582,
+   "priceOverValue": 1.48,
+   "priceValueRank": 0.689,
+   "changeCorr20": 0.015
+  },
+  {
+   "week": 220,
+   "tradesPerWeek": 155,
+   "auctionSalesPerWeek": 106,
+   "cashTop10": 0.804,
+   "broke": 94,
+   "lendShareMedian": 0.086,
+   "medianValue": 634,
+   "priceOverValue": 1.247,
+   "priceValueRank": 0.709,
+   "changeCorr20": 0.461
+  },
+  {
+   "week": 240,
+   "tradesPerWeek": 172,
+   "auctionSalesPerWeek": 107,
+   "cashTop10": 0.75,
+   "broke": 64,
+   "lendShareMedian": 0.075,
+   "medianValue": 589,
+   "priceOverValue": 1.157,
+   "priceValueRank": 0.737,
+   "changeCorr20": 0.045
+  },
+  {
+   "week": 260,
+   "tradesPerWeek": 256,
+   "auctionSalesPerWeek": 114,
+   "cashTop10": 0.709,
+   "broke": 55,
+   "lendShareMedian": 0.041,
+   "medianValue": 564,
+   "priceOverValue": 1.036,
+   "priceValueRank": 0.762,
+   "changeCorr20": -0.145
+  },
+  {
+   "week": 280,
+   "tradesPerWeek": 264,
+   "auctionSalesPerWeek": 115,
+   "cashTop10": 0.677,
+   "broke": 59,
+   "lendShareMedian": 0,
+   "medianValue": 583,
+   "priceOverValue": 1,
+   "priceValueRank": 0.774,
+   "changeCorr20": 0.192
+  },
+  {
+   "week": 300,
+   "tradesPerWeek": 304,
+   "auctionSalesPerWeek": 152,
+   "cashTop10": 0.675,
+   "broke": 44,
+   "lendShareMedian": 0.054,
+   "medianValue": 486,
+   "priceOverValue": 0.92,
+   "priceValueRank": 0.781,
+   "changeCorr20": 0.011
+  },
+  {
+   "week": 320,
+   "tradesPerWeek": 269,
+   "auctionSalesPerWeek": 130,
+   "cashTop10": 0.694,
+   "broke": 47,
+   "lendShareMedian": 0.034,
+   "medianValue": 584,
+   "priceOverValue": 0.933,
+   "priceValueRank": 0.768,
+   "changeCorr20": 0.051
+  },
+  {
+   "week": 340,
+   "tradesPerWeek": 265,
+   "auctionSalesPerWeek": 129,
+   "cashTop10": 0.678,
+   "broke": 43,
+   "lendShareMedian": 0,
+   "medianValue": 576,
+   "priceOverValue": 0.862,
+   "priceValueRank": 0.776,
+   "changeCorr20": -0.025
+  },
+  {
+   "week": 360,
+   "tradesPerWeek": 225,
+   "auctionSalesPerWeek": 86,
+   "cashTop10": 0.722,
+   "broke": 42,
+   "lendShareMedian": 0,
+   "medianValue": 588,
+   "priceOverValue": 0.863,
+   "priceValueRank": 0.766,
+   "changeCorr20": 0.056
+  },
+  {
+   "week": 380,
+   "tradesPerWeek": 195,
+   "auctionSalesPerWeek": 87,
+   "cashTop10": 0.697,
+   "broke": 16,
+   "lendShareMedian": 0,
+   "medianValue": 572,
+   "priceOverValue": 0.825,
+   "priceValueRank": 0.765,
+   "changeCorr20": 0.074
+  },
+  {
+   "week": 400,
+   "tradesPerWeek": 161,
+   "auctionSalesPerWeek": 92,
+   "cashTop10": 0.444,
+   "broke": 0,
+   "lendShareMedian": 0.058,
+   "medianValue": 586.5,
+   "priceOverValue": 0.916,
+   "priceValueRank": 0.735,
+   "changeCorr20": -0.061
+  },
+  {
+   "week": 420,
+   "tradesPerWeek": 209,
+   "auctionSalesPerWeek": 98,
+   "cashTop10": 0.415,
+   "broke": 0,
+   "lendShareMedian": 0,
+   "medianValue": 559,
+   "priceOverValue": 0.984,
+   "priceValueRank": 0.702,
+   "changeCorr20": 0.104
+  },
+  {
+   "week": 440,
+   "tradesPerWeek": 230,
+   "auctionSalesPerWeek": 111,
+   "cashTop10": 0.391,
+   "broke": 0,
+   "lendShareMedian": 0,
+   "medianValue": 556.5,
+   "priceOverValue": 1.025,
+   "priceValueRank": 0.661,
+   "changeCorr20": 0.095
+  },
+  {
+   "week": 460,
+   "tradesPerWeek": 284,
+   "auctionSalesPerWeek": 153,
+   "cashTop10": 0.32,
+   "broke": 0,
+   "lendShareMedian": 0,
+   "medianValue": 566,
+   "priceOverValue": 1.1,
+   "priceValueRank": 0.62,
+   "changeCorr20": 0.114
+  },
+  {
+   "week": 480,
+   "tradesPerWeek": 286,
+   "auctionSalesPerWeek": 190,
+   "cashTop10": 0.341,
+   "broke": 0,
+   "lendShareMedian": 0,
+   "medianValue": 562,
+   "priceOverValue": 1.078,
+   "priceValueRank": 0.591,
+   "changeCorr20": -0.023
+  },
+  {
+   "week": 500,
+   "tradesPerWeek": 226,
+   "auctionSalesPerWeek": 153,
+   "cashTop10": 0.305,
+   "broke": 0,
+   "lendShareMedian": 0,
+   "medianValue": 570,
+   "priceOverValue": 1.127,
+   "priceValueRank": 0.604,
+   "changeCorr20": 0.03
+  },
+  {
+   "week": 520,
+   "tradesPerWeek": 225,
+   "auctionSalesPerWeek": 150,
+   "cashTop10": 0.355,
+   "broke": 0,
+   "lendShareMedian": 0,
+   "medianValue": 583,
+   "priceOverValue": 1.161,
+   "priceValueRank": 0.543,
+   "changeCorr20": 0.06
+  },
+  {
+   "week": 540,
+   "tradesPerWeek": 254,
+   "auctionSalesPerWeek": 177,
+   "cashTop10": 0.361,
+   "broke": 1,
+   "lendShareMedian": 0,
+   "medianValue": 590.5,
+   "priceOverValue": 1.151,
+   "priceValueRank": 0.514,
+   "changeCorr20": 0.158
+  },
+  {
+   "week": 560,
+   "tradesPerWeek": 206,
+   "auctionSalesPerWeek": 129,
+   "cashTop10": 0.393,
+   "broke": 5,
+   "lendShareMedian": 0,
+   "medianValue": 585,
+   "priceOverValue": 1.236,
+   "priceValueRank": 0.429,
+   "changeCorr20": 0.127
+  },
+  {
+   "week": 580,
+   "tradesPerWeek": 180,
+   "auctionSalesPerWeek": 111,
+   "cashTop10": 0.409,
+   "broke": 6,
+   "lendShareMedian": 0,
+   "medianValue": 581,
+   "priceOverValue": 1.444,
+   "priceValueRank": 0.336,
+   "changeCorr20": 0.114
+  },
+  {
+   "week": 600,
+   "tradesPerWeek": 175,
+   "auctionSalesPerWeek": 101,
+   "cashTop10": 0.439,
+   "broke": 8,
+   "lendShareMedian": 0,
+   "medianValue": 594,
+   "priceOverValue": 1.505,
+   "priceValueRank": 0.271,
+   "changeCorr20": -0.031
+  },
+  {
+   "week": 620,
+   "tradesPerWeek": 156,
+   "auctionSalesPerWeek": 91,
+   "cashTop10": 0.51,
+   "broke": 10,
+   "lendShareMedian": 0,
+   "medianValue": 565,
+   "priceOverValue": 1.6,
+   "priceValueRank": 0.249,
+   "changeCorr20": 0.071
+  },
+  {
+   "week": 640,
+   "tradesPerWeek": 176,
+   "auctionSalesPerWeek": 75,
+   "cashTop10": 0.493,
+   "broke": 8,
+   "lendShareMedian": 0,
+   "medianValue": 599,
+   "priceOverValue": 1.677,
+   "priceValueRank": 0.264,
+   "changeCorr20": 0.154
+  },
+  {
+   "week": 660,
+   "tradesPerWeek": 190,
+   "auctionSalesPerWeek": 74,
+   "cashTop10": 0.506,
+   "broke": 11,
+   "lendShareMedian": 0.042,
+   "medianValue": 585,
+   "priceOverValue": 1.74,
+   "priceValueRank": 0.265,
+   "changeCorr20": -0.041
+  },
+  {
+   "week": 680,
+   "tradesPerWeek": 204,
+   "auctionSalesPerWeek": 75,
+   "cashTop10": 0.507,
+   "broke": 9,
+   "lendShareMedian": 0,
+   "medianValue": 560,
+   "priceOverValue": 1.809,
+   "priceValueRank": 0.25,
+   "changeCorr20": 0.067
+  },
+  {
+   "week": 700,
+   "tradesPerWeek": 254,
+   "auctionSalesPerWeek": 91,
+   "cashTop10": 0.538,
+   "broke": 12,
+   "lendShareMedian": 0,
+   "medianValue": 496,
+   "priceOverValue": 1.846,
+   "priceValueRank": 0.267,
+   "changeCorr20": 0.075
+  },
+  {
+   "week": 720,
+   "tradesPerWeek": 294,
+   "auctionSalesPerWeek": 151,
+   "cashTop10": 0.558,
+   "broke": 8,
+   "lendShareMedian": 0.085,
+   "medianValue": 504,
+   "priceOverValue": 1.805,
+   "priceValueRank": 0.328,
+   "changeCorr20": 0.142
+  },
+  {
+   "week": 740,
+   "tradesPerWeek": 358,
+   "auctionSalesPerWeek": 225,
+   "cashTop10": 0.522,
+   "broke": 4,
+   "lendShareMedian": 0,
+   "medianValue": 554,
+   "priceOverValue": 1.782,
+   "priceValueRank": 0.432,
+   "changeCorr20": 0.056
+  },
+  {
+   "week": 760,
+   "tradesPerWeek": 270,
+   "auctionSalesPerWeek": 179,
+   "cashTop10": 0.492,
+   "broke": 4,
+   "lendShareMedian": 0,
+   "medianValue": 548,
+   "priceOverValue": 1.97,
+   "priceValueRank": 0.449,
+   "changeCorr20": 0.171
+  },
+  {
+   "week": 780,
+   "tradesPerWeek": 217,
+   "auctionSalesPerWeek": 165,
+   "cashTop10": 0.572,
+   "broke": 6,
+   "lendShareMedian": 0,
+   "medianValue": 558,
+   "priceOverValue": 2.095,
+   "priceValueRank": 0.464,
+   "changeCorr20": 0.065
+  },
+  {
+   "week": 800,
+   "tradesPerWeek": 157,
+   "auctionSalesPerWeek": 136,
+   "cashTop10": 0.551,
+   "broke": 7,
+   "lendShareMedian": 0,
+   "medianValue": 599,
+   "priceOverValue": 1.996,
+   "priceValueRank": 0.498,
+   "changeCorr20": 0.074
+  },
+  {
+   "week": 820,
+   "tradesPerWeek": 116,
+   "auctionSalesPerWeek": 115,
+   "cashTop10": 0.583,
+   "broke": 12,
+   "lendShareMedian": 0,
+   "medianValue": 573.5,
+   "priceOverValue": 2.111,
+   "priceValueRank": 0.451,
+   "changeCorr20": 0.01
+  },
+  {
+   "week": 840,
+   "tradesPerWeek": 178,
+   "auctionSalesPerWeek": 124,
+   "cashTop10": 0.618,
+   "broke": 9,
+   "lendShareMedian": 0,
+   "medianValue": 580,
+   "priceOverValue": 2.087,
+   "priceValueRank": 0.439,
+   "changeCorr20": 0.036
+  },
+  {
+   "week": 860,
+   "tradesPerWeek": 141,
+   "auctionSalesPerWeek": 129,
+   "cashTop10": 0.63,
+   "broke": 16,
+   "lendShareMedian": 0,
+   "medianValue": 584,
+   "priceOverValue": 2.042,
+   "priceValueRank": 0.441,
+   "changeCorr20": 0.072
+  },
+  {
+   "week": 880,
+   "tradesPerWeek": 156,
+   "auctionSalesPerWeek": 122,
+   "cashTop10": 0.633,
+   "broke": 9,
+   "lendShareMedian": 0,
+   "medianValue": 578,
+   "priceOverValue": 2.13,
+   "priceValueRank": 0.476,
+   "changeCorr20": -0.119
+  },
+  {
+   "week": 900,
+   "tradesPerWeek": 145,
+   "auctionSalesPerWeek": 117,
+   "cashTop10": 0.622,
+   "broke": 18,
+   "lendShareMedian": 0,
+   "medianValue": 520.5,
+   "priceOverValue": 2.261,
+   "priceValueRank": 0.402,
+   "changeCorr20": 0.107
+  },
+  {
+   "week": 920,
+   "tradesPerWeek": 137,
+   "auctionSalesPerWeek": 114,
+   "cashTop10": 0.677,
+   "broke": 16,
+   "lendShareMedian": 0.131,
+   "medianValue": 537,
+   "priceOverValue": 2.309,
+   "priceValueRank": 0.393,
+   "changeCorr20": 0.053
+  },
+  {
+   "week": 940,
+   "tradesPerWeek": 154,
+   "auctionSalesPerWeek": 120,
+   "cashTop10": 0.667,
+   "broke": 20,
+   "lendShareMedian": 0,
+   "medianValue": 523,
+   "priceOverValue": 2.059,
+   "priceValueRank": 0.377,
+   "changeCorr20": 0.094
+  },
+  {
+   "week": 960,
+   "tradesPerWeek": 147,
+   "auctionSalesPerWeek": 121,
+   "cashTop10": 0.691,
+   "broke": 18,
+   "lendShareMedian": 0.169,
+   "medianValue": 550.5,
+   "priceOverValue": 2.263,
+   "priceValueRank": 0.428,
+   "changeCorr20": -0.016
+  },
+  {
+   "week": 980,
+   "tradesPerWeek": 122,
+   "auctionSalesPerWeek": 112,
+   "cashTop10": 0.67,
+   "broke": 20,
+   "lendShareMedian": 0,
+   "medianValue": 596,
+   "priceOverValue": 2.259,
+   "priceValueRank": 0.438,
+   "changeCorr20": -0.032
+  },
+  {
+   "week": 1000,
+   "tradesPerWeek": 142,
+   "auctionSalesPerWeek": 119,
+   "cashTop10": 0.668,
+   "broke": 16,
+   "lendShareMedian": 0.067,
+   "medianValue": 562.5,
+   "priceOverValue": 2.244,
+   "priceValueRank": 0.421,
+   "changeCorr20": 0.084
+  },
+  {
+   "week": 1020,
+   "tradesPerWeek": 88,
+   "auctionSalesPerWeek": 107,
+   "cashTop10": 0.684,
+   "broke": 19,
+   "lendShareMedian": 0.05,
+   "medianValue": 499,
+   "priceOverValue": 2.252,
+   "priceValueRank": 0.398,
+   "changeCorr20": 0.132
+  },
+  {
+   "week": 1040,
+   "tradesPerWeek": 118,
+   "auctionSalesPerWeek": 102,
+   "cashTop10": 0.733,
+   "broke": 15,
+   "lendShareMedian": 0.044,
+   "medianValue": 533,
+   "priceOverValue": 2.466,
+   "priceValueRank": 0.378,
+   "changeCorr20": 0.038
+  },
+  {
+   "week": 1060,
+   "tradesPerWeek": 74,
+   "auctionSalesPerWeek": 98,
+   "cashTop10": 0.718,
+   "broke": 15,
+   "lendShareMedian": 0.001,
+   "medianValue": 523,
+   "priceOverValue": 2.342,
+   "priceValueRank": 0.4,
+   "changeCorr20": -0.05
+  },
+  {
+   "week": 1080,
+   "tradesPerWeek": 135,
+   "auctionSalesPerWeek": 102,
+   "cashTop10": 0.73,
+   "broke": 17,
+   "lendShareMedian": 0,
+   "medianValue": 483,
+   "priceOverValue": 2.415,
+   "priceValueRank": 0.395,
+   "changeCorr20": 0.153
+  },
+  {
+   "week": 1100,
+   "tradesPerWeek": 154,
+   "auctionSalesPerWeek": 85,
+   "cashTop10": 0.701,
+   "broke": 17,
+   "lendShareMedian": 0.031,
+   "medianValue": 485,
+   "priceOverValue": 2.449,
+   "priceValueRank": 0.383,
+   "changeCorr20": 0.071
+  },
+  {
+   "week": 1120,
+   "tradesPerWeek": 154,
+   "auctionSalesPerWeek": 101,
+   "cashTop10": 0.715,
+   "broke": 14,
+   "lendShareMedian": 0.012,
+   "medianValue": 499.5,
+   "priceOverValue": 2.537,
+   "priceValueRank": 0.366,
+   "changeCorr20": 0.152
+  },
+  {
+   "week": 1140,
+   "tradesPerWeek": 94,
+   "auctionSalesPerWeek": 88,
+   "cashTop10": 0.746,
+   "broke": 13,
+   "lendShareMedian": 0.177,
+   "medianValue": 515,
+   "priceOverValue": 2.477,
+   "priceValueRank": 0.332,
+   "changeCorr20": -0.015
+  },
+  {
+   "week": 1160,
+   "tradesPerWeek": 130,
+   "auctionSalesPerWeek": 109,
+   "cashTop10": 0.704,
+   "broke": 14,
+   "lendShareMedian": 0.023,
+   "medianValue": 491,
+   "priceOverValue": 2.407,
+   "priceValueRank": 0.317,
+   "changeCorr20": -0.027
+  },
+  {
+   "week": 1180,
+   "tradesPerWeek": 113,
+   "auctionSalesPerWeek": 94,
+   "cashTop10": 0.696,
+   "broke": 9,
+   "lendShareMedian": 0,
+   "medianValue": 495,
+   "priceOverValue": 2.589,
+   "priceValueRank": 0.322,
+   "changeCorr20": -0.114
+  },
+  {
+   "week": 1200,
+   "tradesPerWeek": 103,
+   "auctionSalesPerWeek": 79,
+   "cashTop10": 0.7,
+   "broke": 15,
+   "lendShareMedian": 0,
+   "medianValue": 485,
+   "priceOverValue": 2.509,
+   "priceValueRank": 0.316,
+   "changeCorr20": 0.119
+  },
+  {
+   "week": 1220,
+   "tradesPerWeek": 142,
+   "auctionSalesPerWeek": 95,
+   "cashTop10": 0.724,
+   "broke": 13,
+   "lendShareMedian": 0.055,
+   "medianValue": 475,
+   "priceOverValue": 2.619,
+   "priceValueRank": 0.305,
+   "changeCorr20": 0.118
+  },
+  {
+   "week": 1240,
+   "tradesPerWeek": 110,
+   "auctionSalesPerWeek": 89,
+   "cashTop10": 0.699,
+   "broke": 14,
+   "lendShareMedian": 0.159,
+   "medianValue": 483,
+   "priceOverValue": 2.743,
+   "priceValueRank": 0.248,
+   "changeCorr20": 0.017
+  },
+  {
+   "week": 1260,
+   "tradesPerWeek": 92,
+   "auctionSalesPerWeek": 94,
+   "cashTop10": 0.791,
+   "broke": 11,
+   "lendShareMedian": 0,
+   "medianValue": 482,
+   "priceOverValue": 2.606,
+   "priceValueRank": 0.243,
+   "changeCorr20": 0.087
+  },
+  {
+   "week": 1280,
+   "tradesPerWeek": 104,
+   "auctionSalesPerWeek": 79,
+   "cashTop10": 0.727,
+   "broke": 15,
+   "lendShareMedian": 0.073,
+   "medianValue": 479,
+   "priceOverValue": 2.766,
+   "priceValueRank": 0.241,
+   "changeCorr20": -0.01
+  },
+  {
+   "week": 1300,
+   "tradesPerWeek": 99,
+   "auctionSalesPerWeek": 91,
+   "cashTop10": 0.696,
+   "broke": 14,
+   "lendShareMedian": 0.194,
+   "medianValue": 515.5,
+   "priceOverValue": 2.756,
+   "priceValueRank": 0.219,
+   "changeCorr20": 0.127
+  },
+  {
+   "week": 1320,
+   "tradesPerWeek": 133,
+   "auctionSalesPerWeek": 91,
+   "cashTop10": 0.759,
+   "broke": 14,
+   "lendShareMedian": 0.095,
+   "medianValue": 514,
+   "priceOverValue": 2.819,
+   "priceValueRank": 0.26,
+   "changeCorr20": 0.058
+  },
+  {
+   "week": 1340,
+   "tradesPerWeek": 97,
+   "auctionSalesPerWeek": 89,
+   "cashTop10": 0.725,
+   "broke": 17,
+   "lendShareMedian": 0,
+   "medianValue": 499,
+   "priceOverValue": 2.788,
+   "priceValueRank": 0.266,
+   "changeCorr20": -0.018
+  },
+  {
+   "week": 1360,
+   "tradesPerWeek": 82,
+   "auctionSalesPerWeek": 88,
+   "cashTop10": 0.724,
+   "broke": 16,
+   "lendShareMedian": 0.113,
+   "medianValue": 515,
+   "priceOverValue": 2.672,
+   "priceValueRank": 0.249,
+   "changeCorr20": -0.209
+  },
+  {
+   "week": 1380,
+   "tradesPerWeek": 106,
+   "auctionSalesPerWeek": 94,
+   "cashTop10": 0.755,
+   "broke": 19,
+   "lendShareMedian": 0.108,
+   "medianValue": 478,
+   "priceOverValue": 2.819,
+   "priceValueRank": 0.224,
+   "changeCorr20": 0.121
+  },
+  {
+   "week": 1400,
+   "tradesPerWeek": 105,
+   "auctionSalesPerWeek": 95,
+   "cashTop10": 0.72,
+   "broke": 13,
+   "lendShareMedian": 0,
+   "medianValue": 504.5,
+   "priceOverValue": 2.714,
+   "priceValueRank": 0.258,
+   "changeCorr20": 0.012
+  },
+  {
+   "week": 1420,
+   "tradesPerWeek": 136,
+   "auctionSalesPerWeek": 102,
+   "cashTop10": 0.739,
+   "broke": 13,
+   "lendShareMedian": 0,
+   "medianValue": 505,
+   "priceOverValue": 2.785,
+   "priceValueRank": 0.281,
+   "changeCorr20": 0.064
+  },
+  {
+   "week": 1440,
+   "tradesPerWeek": 127,
+   "auctionSalesPerWeek": 95,
+   "cashTop10": 0.72,
+   "broke": 11,
+   "lendShareMedian": 0,
+   "medianValue": 516,
+   "priceOverValue": 2.61,
+   "priceValueRank": 0.257,
+   "changeCorr20": -0.004
+  },
+  {
+   "week": 1460,
+   "tradesPerWeek": 123,
+   "auctionSalesPerWeek": 104,
+   "cashTop10": 0.711,
+   "broke": 10,
+   "lendShareMedian": 0,
+   "medianValue": 506,
+   "priceOverValue": 2.784,
+   "priceValueRank": 0.262,
+   "changeCorr20": 0.107
+  },
+  {
+   "week": 1480,
+   "tradesPerWeek": 144,
+   "auctionSalesPerWeek": 99,
+   "cashTop10": 0.741,
+   "broke": 15,
+   "lendShareMedian": 0,
+   "medianValue": 498,
+   "priceOverValue": 2.952,
+   "priceValueRank": 0.233,
+   "changeCorr20": 0.157
+  },
+  {
+   "week": 1500,
+   "tradesPerWeek": 152,
+   "auctionSalesPerWeek": 124,
+   "cashTop10": 0.739,
+   "broke": 9,
+   "lendShareMedian": 0.02,
+   "medianValue": 531,
+   "priceOverValue": 2.892,
+   "priceValueRank": 0.273,
+   "changeCorr20": 0.21
+  },
+  {
+   "week": 1520,
+   "tradesPerWeek": 118,
+   "auctionSalesPerWeek": 125,
+   "cashTop10": 0.72,
+   "broke": 11,
+   "lendShareMedian": 0.056,
+   "medianValue": 509,
+   "priceOverValue": 2.97,
+   "priceValueRank": 0.207,
+   "changeCorr20": 0.067
+  },
+  {
+   "week": 1540,
+   "tradesPerWeek": 116,
+   "auctionSalesPerWeek": 113,
+   "cashTop10": 0.772,
+   "broke": 14,
+   "lendShareMedian": 0,
+   "medianValue": 510,
+   "priceOverValue": 2.977,
+   "priceValueRank": 0.159,
+   "changeCorr20": 0.128
+  },
+  {
+   "week": 1560,
+   "tradesPerWeek": 129,
+   "auctionSalesPerWeek": 120,
+   "cashTop10": 0.818,
+   "broke": 14,
+   "lendShareMedian": 0.038,
+   "medianValue": 507.5,
+   "priceOverValue": 2.763,
+   "priceValueRank": 0.236,
+   "changeCorr20": 0.065
+  },
+  {
+   "week": 1580,
+   "tradesPerWeek": 139,
+   "auctionSalesPerWeek": 93,
+   "cashTop10": 0.785,
+   "broke": 14,
+   "lendShareMedian": 0,
+   "medianValue": 506,
+   "priceOverValue": 2.884,
+   "priceValueRank": 0.191,
+   "changeCorr20": 0.13
+  },
+  {
+   "week": 1600,
+   "tradesPerWeek": 97,
+   "auctionSalesPerWeek": 83,
+   "cashTop10": 0.795,
+   "broke": 16,
+   "lendShareMedian": 0,
+   "medianValue": 498.5,
+   "priceOverValue": 2.794,
+   "priceValueRank": 0.192,
+   "changeCorr20": 0.118
+  },
+  {
+   "week": 1620,
+   "tradesPerWeek": 84,
+   "auctionSalesPerWeek": 74,
+   "cashTop10": 0.813,
+   "broke": 14,
+   "lendShareMedian": 0.003,
+   "medianValue": 500.5,
+   "priceOverValue": 2.66,
+   "priceValueRank": 0.196,
+   "changeCorr20": 0.06
+  },
+  {
+   "week": 1640,
+   "tradesPerWeek": 126,
+   "auctionSalesPerWeek": 78,
+   "cashTop10": 0.832,
+   "broke": 18,
+   "lendShareMedian": 0,
+   "medianValue": 506,
+   "priceOverValue": 2.672,
+   "priceValueRank": 0.221,
+   "changeCorr20": 0.073
+  },
+  {
+   "week": 1660,
+   "tradesPerWeek": 92,
+   "auctionSalesPerWeek": 83,
+   "cashTop10": 0.785,
+   "broke": 15,
+   "lendShareMedian": 0,
+   "medianValue": 513,
+   "priceOverValue": 2.872,
+   "priceValueRank": 0.252,
+   "changeCorr20": 0.029
+  },
+  {
+   "week": 1680,
+   "tradesPerWeek": 83,
+   "auctionSalesPerWeek": 86,
+   "cashTop10": 0.755,
+   "broke": 10,
+   "lendShareMedian": 0,
+   "medianValue": 522.5,
+   "priceOverValue": 2.724,
+   "priceValueRank": 0.265,
+   "changeCorr20": 0.074
+  },
+  {
+   "week": 1700,
+   "tradesPerWeek": 77,
+   "auctionSalesPerWeek": 76,
+   "cashTop10": 0.748,
+   "broke": 10,
+   "lendShareMedian": 0,
+   "medianValue": 522,
+   "priceOverValue": 2.686,
+   "priceValueRank": 0.308,
+   "changeCorr20": 0.114
+  },
+  {
+   "week": 1720,
+   "tradesPerWeek": 80,
+   "auctionSalesPerWeek": 74,
+   "cashTop10": 0.71,
+   "broke": 12,
+   "lendShareMedian": 0,
+   "medianValue": 512,
+   "priceOverValue": 2.598,
+   "priceValueRank": 0.295,
+   "changeCorr20": 0.068
+  },
+  {
+   "week": 1740,
+   "tradesPerWeek": 117,
+   "auctionSalesPerWeek": 86,
+   "cashTop10": 0.727,
+   "broke": 12,
+   "lendShareMedian": 0,
+   "medianValue": 525,
+   "priceOverValue": 2.59,
+   "priceValueRank": 0.291,
+   "changeCorr20": 0.165
+  },
+  {
+   "week": 1760,
+   "tradesPerWeek": 123,
+   "auctionSalesPerWeek": 95,
+   "cashTop10": 0.743,
+   "broke": 12,
+   "lendShareMedian": 0,
+   "medianValue": 506,
+   "priceOverValue": 2.593,
+   "priceValueRank": 0.299,
+   "changeCorr20": -0.027
+  },
+  {
+   "week": 1780,
+   "tradesPerWeek": 89,
+   "auctionSalesPerWeek": 86,
+   "cashTop10": 0.717,
+   "broke": 9,
+   "lendShareMedian": 0,
+   "medianValue": 517.5,
+   "priceOverValue": 2.486,
+   "priceValueRank": 0.315,
+   "changeCorr20": -0.37
+  },
+  {
+   "week": 1800,
+   "tradesPerWeek": 109,
+   "auctionSalesPerWeek": 90,
+   "cashTop10": 0.716,
+   "broke": 10,
+   "lendShareMedian": 0,
+   "medianValue": 492,
+   "priceOverValue": 2.473,
+   "priceValueRank": 0.362,
+   "changeCorr20": 0.186
+  },
+  {
+   "week": 1820,
+   "tradesPerWeek": 131,
+   "auctionSalesPerWeek": 105,
+   "cashTop10": 0.724,
+   "broke": 10,
+   "lendShareMedian": 0,
+   "medianValue": 497.5,
+   "priceOverValue": 2.39,
+   "priceValueRank": 0.346,
+   "changeCorr20": 0.069
+  },
+  {
+   "week": 1840,
+   "tradesPerWeek": 113,
+   "auctionSalesPerWeek": 84,
+   "cashTop10": 0.702,
+   "broke": 8,
+   "lendShareMedian": 0,
+   "medianValue": 486,
+   "priceOverValue": 2.587,
+   "priceValueRank": 0.347,
+   "changeCorr20": -0.071
+  },
+  {
+   "week": 1860,
+   "tradesPerWeek": 104,
+   "auctionSalesPerWeek": 94,
+   "cashTop10": 0.721,
+   "broke": 7,
+   "lendShareMedian": 0,
+   "medianValue": 484,
+   "priceOverValue": 2.613,
+   "priceValueRank": 0.333,
+   "changeCorr20": 0.036
+  },
+  {
+   "week": 1880,
+   "tradesPerWeek": 114,
+   "auctionSalesPerWeek": 104,
+   "cashTop10": 0.729,
+   "broke": 6,
+   "lendShareMedian": 0,
+   "medianValue": 483.5,
+   "priceOverValue": 2.523,
+   "priceValueRank": 0.346,
+   "changeCorr20": 0.317
+  },
+  {
+   "week": 1900,
+   "tradesPerWeek": 101,
+   "auctionSalesPerWeek": 89,
+   "cashTop10": 0.704,
+   "broke": 8,
+   "lendShareMedian": 0,
+   "medianValue": 509,
+   "priceOverValue": 2.466,
+   "priceValueRank": 0.372,
+   "changeCorr20": -0.029
+  },
+  {
+   "week": 1920,
+   "tradesPerWeek": 91,
+   "auctionSalesPerWeek": 80,
+   "cashTop10": 0.712,
+   "broke": 9,
+   "lendShareMedian": 0,
+   "medianValue": 510,
+   "priceOverValue": 2.463,
+   "priceValueRank": 0.373,
+   "changeCorr20": -0.043
+  },
+  {
+   "week": 1940,
+   "tradesPerWeek": 118,
+   "auctionSalesPerWeek": 82,
+   "cashTop10": 0.731,
+   "broke": 8,
+   "lendShareMedian": 0,
+   "medianValue": 496,
+   "priceOverValue": 2.549,
+   "priceValueRank": 0.359,
+   "changeCorr20": 0.212
+  },
+  {
+   "week": 1960,
+   "tradesPerWeek": 104,
+   "auctionSalesPerWeek": 84,
+   "cashTop10": 0.723,
+   "broke": 14,
+   "lendShareMedian": 0,
+   "medianValue": 455,
+   "priceOverValue": 2.597,
+   "priceValueRank": 0.327,
+   "changeCorr20": 0.233
+  },
+  {
+   "week": 1980,
+   "tradesPerWeek": 90,
+   "auctionSalesPerWeek": 76,
+   "cashTop10": 0.726,
+   "broke": 14,
+   "lendShareMedian": 0,
+   "medianValue": 469.5,
+   "priceOverValue": 2.646,
+   "priceValueRank": 0.319,
+   "changeCorr20": -0.202
+  },
+  {
+   "week": 2000,
+   "tradesPerWeek": 104,
+   "auctionSalesPerWeek": 83,
+   "cashTop10": 0.723,
+   "broke": 13,
+   "lendShareMedian": 0,
+   "medianValue": 491,
+   "priceOverValue": 2.72,
+   "priceValueRank": 0.318,
+   "changeCorr20": 0.001
+  },
+  {
+   "week": 2020,
+   "tradesPerWeek": 77,
+   "auctionSalesPerWeek": 84,
+   "cashTop10": 0.743,
+   "broke": 17,
+   "lendShareMedian": 0,
+   "medianValue": 473.5,
+   "priceOverValue": 2.849,
+   "priceValueRank": 0.325,
+   "changeCorr20": 0.123
+  },
+  {
+   "week": 2040,
+   "tradesPerWeek": 71,
+   "auctionSalesPerWeek": 62,
+   "cashTop10": 0.765,
+   "broke": 20,
+   "lendShareMedian": 0,
+   "medianValue": 465,
+   "priceOverValue": 2.91,
+   "priceValueRank": 0.305,
+   "changeCorr20": 0.235
+  },
+  {
+   "week": 2060,
+   "tradesPerWeek": 76,
+   "auctionSalesPerWeek": 64,
+   "cashTop10": 0.772,
+   "broke": 18,
+   "lendShareMedian": 0,
+   "medianValue": 449,
+   "priceOverValue": 2.907,
+   "priceValueRank": 0.288,
+   "changeCorr20": 0.073
+  },
+  {
+   "week": 2080,
+   "tradesPerWeek": 94,
+   "auctionSalesPerWeek": 73,
+   "cashTop10": 0.76,
+   "broke": 20,
+   "lendShareMedian": 0,
+   "medianValue": 456.5,
+   "priceOverValue": 2.841,
+   "priceValueRank": 0.277,
+   "changeCorr20": -0.1
+  },
+  {
+   "week": 2100,
+   "tradesPerWeek": 92,
+   "auctionSalesPerWeek": 68,
+   "cashTop10": 0.732,
+   "broke": 23,
+   "lendShareMedian": 0,
+   "medianValue": 452,
+   "priceOverValue": 2.855,
+   "priceValueRank": 0.256,
+   "changeCorr20": 0.104
+  },
+  {
+   "week": 2120,
+   "tradesPerWeek": 85,
+   "auctionSalesPerWeek": 80,
+   "cashTop10": 0.736,
+   "broke": 16,
+   "lendShareMedian": 0,
+   "medianValue": 472,
+   "priceOverValue": 2.936,
+   "priceValueRank": 0.241,
+   "changeCorr20": 0.09
+  },
+  {
+   "week": 2140,
+   "tradesPerWeek": 95,
+   "auctionSalesPerWeek": 87,
+   "cashTop10": 0.778,
+   "broke": 26,
+   "lendShareMedian": 0,
+   "medianValue": 469.5,
+   "priceOverValue": 3.097,
+   "priceValueRank": 0.274,
+   "changeCorr20": -0.066
+  },
+  {
+   "week": 2160,
+   "tradesPerWeek": 78,
+   "auctionSalesPerWeek": 82,
+   "cashTop10": 0.735,
+   "broke": 15,
+   "lendShareMedian": 0,
+   "medianValue": 447,
+   "priceOverValue": 2.995,
+   "priceValueRank": 0.268,
+   "changeCorr20": 0.089
+  },
+  {
+   "week": 2180,
+   "tradesPerWeek": 103,
+   "auctionSalesPerWeek": 97,
+   "cashTop10": 0.751,
+   "broke": 13,
+   "lendShareMedian": 0,
+   "medianValue": 459,
+   "priceOverValue": 2.971,
+   "priceValueRank": 0.299,
+   "changeCorr20": 0.009
+  },
+  {
+   "week": 2200,
+   "tradesPerWeek": 75,
+   "auctionSalesPerWeek": 95,
+   "cashTop10": 0.733,
+   "broke": 13,
+   "lendShareMedian": 0,
+   "medianValue": 467.5,
+   "priceOverValue": 2.953,
+   "priceValueRank": 0.307,
+   "changeCorr20": -0.004
+  },
+  {
+   "week": 2220,
+   "tradesPerWeek": 84,
+   "auctionSalesPerWeek": 100,
+   "cashTop10": 0.703,
+   "broke": 10,
+   "lendShareMedian": 0,
+   "medianValue": 457,
+   "priceOverValue": 2.675,
+   "priceValueRank": 0.317,
+   "changeCorr20": 0.127
+  },
+  {
+   "week": 2240,
+   "tradesPerWeek": 133,
+   "auctionSalesPerWeek": 110,
+   "cashTop10": 0.723,
+   "broke": 14,
+   "lendShareMedian": 0,
+   "medianValue": 453,
+   "priceOverValue": 2.74,
+   "priceValueRank": 0.308,
+   "changeCorr20": -0.136
+  },
+  {
+   "week": 2260,
+   "tradesPerWeek": 123,
+   "auctionSalesPerWeek": 113,
+   "cashTop10": 0.707,
+   "broke": 10,
+   "lendShareMedian": 0,
+   "medianValue": 464,
+   "priceOverValue": 2.72,
+   "priceValueRank": 0.295,
+   "changeCorr20": 0.172
+  },
+  {
+   "week": 2280,
+   "tradesPerWeek": 161,
+   "auctionSalesPerWeek": 113,
+   "cashTop10": 0.718,
+   "broke": 10,
+   "lendShareMedian": 0,
+   "medianValue": 464.5,
+   "priceOverValue": 2.816,
+   "priceValueRank": 0.27,
+   "changeCorr20": 0.187
+  },
+  {
+   "week": 2300,
+   "tradesPerWeek": 162,
+   "auctionSalesPerWeek": 109,
+   "cashTop10": 0.766,
+   "broke": 16,
+   "lendShareMedian": 0,
+   "medianValue": 481,
+   "priceOverValue": 3.049,
+   "priceValueRank": 0.232,
+   "changeCorr20": 0.132
+  },
+  {
+   "week": 2320,
+   "tradesPerWeek": 159,
+   "auctionSalesPerWeek": 109,
+   "cashTop10": 0.769,
+   "broke": 10,
+   "lendShareMedian": 0,
+   "medianValue": 461,
+   "priceOverValue": 3.22,
+   "priceValueRank": 0.21,
+   "changeCorr20": 0.184
+  },
+  {
+   "week": 2340,
+   "tradesPerWeek": 169,
+   "auctionSalesPerWeek": 100,
+   "cashTop10": 0.788,
+   "broke": 14,
+   "lendShareMedian": 0,
+   "medianValue": 472.5,
+   "priceOverValue": 3.385,
+   "priceValueRank": 0.214,
+   "changeCorr20": 0.065
+  },
+  {
+   "week": 2360,
+   "tradesPerWeek": 166,
+   "auctionSalesPerWeek": 99,
+   "cashTop10": 0.757,
+   "broke": 14,
+   "lendShareMedian": 0,
+   "medianValue": 441,
+   "priceOverValue": 3.317,
+   "priceValueRank": 0.164,
+   "changeCorr20": 0.036
+  },
+  {
+   "week": 2380,
+   "tradesPerWeek": 186,
+   "auctionSalesPerWeek": 107,
+   "cashTop10": 0.814,
+   "broke": 16,
+   "lendShareMedian": 0,
+   "medianValue": 473,
+   "priceOverValue": 3.071,
+   "priceValueRank": 0.172,
+   "changeCorr20": 0.118
+  },
+  {
+   "week": 2400,
+   "tradesPerWeek": 225,
+   "auctionSalesPerWeek": 102,
+   "cashTop10": 0.801,
+   "broke": 13,
+   "lendShareMedian": 0,
+   "medianValue": 456,
+   "priceOverValue": 3.12,
+   "priceValueRank": 0.144,
+   "changeCorr20": 0.419
+  },
+  {
+   "week": 2420,
+   "tradesPerWeek": 231,
+   "auctionSalesPerWeek": 117,
+   "cashTop10": 0.82,
+   "broke": 16,
+   "lendShareMedian": 0,
+   "medianValue": 457,
+   "priceOverValue": 3.309,
+   "priceValueRank": 0.151,
+   "changeCorr20": 0.083
+  },
+  {
+   "week": 2440,
+   "tradesPerWeek": 205,
+   "auctionSalesPerWeek": 111,
+   "cashTop10": 0.804,
+   "broke": 17,
+   "lendShareMedian": 0,
+   "medianValue": 452,
+   "priceOverValue": 3.405,
+   "priceValueRank": 0.135,
+   "changeCorr20": 0.211
+  },
+  {
+   "week": 2460,
+   "tradesPerWeek": 229,
+   "auctionSalesPerWeek": 111,
+   "cashTop10": 0.828,
+   "broke": 14,
+   "lendShareMedian": 0,
+   "medianValue": 453,
+   "priceOverValue": 3.294,
+   "priceValueRank": 0.163,
+   "changeCorr20": 0.043
+  },
+  {
+   "week": 2480,
+   "tradesPerWeek": 196,
+   "auctionSalesPerWeek": 107,
+   "cashTop10": 0.817,
+   "broke": 9,
+   "lendShareMedian": 0,
+   "medianValue": 451.5,
+   "priceOverValue": 3.118,
+   "priceValueRank": 0.221,
+   "changeCorr20": 0.173
+  },
+  {
+   "week": 2500,
+   "tradesPerWeek": 241,
+   "auctionSalesPerWeek": 123,
+   "cashTop10": 0.768,
+   "broke": 12,
+   "lendShareMedian": 0,
+   "medianValue": 466,
+   "priceOverValue": 2.934,
+   "priceValueRank": 0.249,
+   "changeCorr20": -0.042
+  },
+  {
+   "week": 2520,
+   "tradesPerWeek": 239,
+   "auctionSalesPerWeek": 135,
+   "cashTop10": 0.739,
+   "broke": 8,
+   "lendShareMedian": 0,
+   "medianValue": 470,
+   "priceOverValue": 2.968,
+   "priceValueRank": 0.278,
+   "changeCorr20": -0.024
+  },
+  {
+   "week": 2540,
+   "tradesPerWeek": 245,
+   "auctionSalesPerWeek": 136,
+   "cashTop10": 0.746,
+   "broke": 6,
+   "lendShareMedian": 0,
+   "medianValue": 477,
+   "priceOverValue": 3.055,
+   "priceValueRank": 0.283,
+   "changeCorr20": 0.198
+  },
+  {
+   "week": 2560,
+   "tradesPerWeek": 252,
+   "auctionSalesPerWeek": 152,
+   "cashTop10": 0.747,
+   "broke": 8,
+   "lendShareMedian": 0,
+   "medianValue": 461,
+   "priceOverValue": 2.795,
+   "priceValueRank": 0.335,
+   "changeCorr20": 0.161
+  },
+  {
+   "week": 2580,
+   "tradesPerWeek": 240,
+   "auctionSalesPerWeek": 144,
+   "cashTop10": 0.71,
+   "broke": 7,
+   "lendShareMedian": 0,
+   "medianValue": 458.5,
+   "priceOverValue": 2.846,
+   "priceValueRank": 0.349,
+   "changeCorr20": 0.295
+  },
+  {
+   "week": 2600,
+   "tradesPerWeek": 265,
+   "auctionSalesPerWeek": 175,
+   "cashTop10": 0.728,
+   "broke": 7,
+   "lendShareMedian": 0,
+   "medianValue": 476.5,
+   "priceOverValue": 2.868,
+   "priceValueRank": 0.35,
+   "changeCorr20": 0.225
+  },
+  {
+   "week": 2620,
+   "tradesPerWeek": 295,
+   "auctionSalesPerWeek": 174,
+   "cashTop10": 0.758,
+   "broke": 6,
+   "lendShareMedian": 0,
+   "medianValue": 459,
+   "priceOverValue": 2.801,
+   "priceValueRank": 0.32,
+   "changeCorr20": 0.166
+  },
+  {
+   "week": 2640,
+   "tradesPerWeek": 285,
+   "auctionSalesPerWeek": 169,
+   "cashTop10": 0.711,
+   "broke": 6,
+   "lendShareMedian": 0,
+   "medianValue": 469,
+   "priceOverValue": 2.871,
+   "priceValueRank": 0.315,
+   "changeCorr20": 0.024
+  },
+  {
+   "week": 2660,
+   "tradesPerWeek": 291,
+   "auctionSalesPerWeek": 155,
+   "cashTop10": 0.668,
+   "broke": 6,
+   "lendShareMedian": 0,
+   "medianValue": 470.5,
+   "priceOverValue": 2.782,
+   "priceValueRank": 0.337,
+   "changeCorr20": -0.09
+  },
+  {
+   "week": 2680,
+   "tradesPerWeek": 294,
+   "auctionSalesPerWeek": 166,
+   "cashTop10": 0.727,
+   "broke": 8,
+   "lendShareMedian": 0,
+   "medianValue": 478,
+   "priceOverValue": 2.705,
+   "priceValueRank": 0.378,
+   "changeCorr20": 0.236
+  },
+  {
+   "week": 2700,
+   "tradesPerWeek": 267,
+   "auctionSalesPerWeek": 167,
+   "cashTop10": 0.683,
+   "broke": 7,
+   "lendShareMedian": 0,
+   "medianValue": 473.5,
+   "priceOverValue": 2.675,
+   "priceValueRank": 0.376,
+   "changeCorr20": 0.114
+  },
+  {
+   "week": 2720,
+   "tradesPerWeek": 308,
+   "auctionSalesPerWeek": 179,
+   "cashTop10": 0.734,
+   "broke": 8,
+   "lendShareMedian": 0,
+   "medianValue": 476,
+   "priceOverValue": 2.454,
+   "priceValueRank": 0.434,
+   "changeCorr20": 0.144
+  },
+  {
+   "week": 2740,
+   "tradesPerWeek": 331,
+   "auctionSalesPerWeek": 172,
+   "cashTop10": 0.72,
+   "broke": 5,
+   "lendShareMedian": 0,
+   "medianValue": 468,
+   "priceOverValue": 2.358,
+   "priceValueRank": 0.424,
+   "changeCorr20": 0.145
+  },
+  {
+   "week": 2760,
+   "tradesPerWeek": 312,
+   "auctionSalesPerWeek": 197,
+   "cashTop10": 0.695,
+   "broke": 7,
+   "lendShareMedian": 0,
+   "medianValue": 466.5,
+   "priceOverValue": 2.451,
+   "priceValueRank": 0.444,
+   "changeCorr20": 0.168
+  },
+  {
+   "week": 2780,
+   "tradesPerWeek": 286,
+   "auctionSalesPerWeek": 178,
+   "cashTop10": 0.631,
+   "broke": 5,
+   "lendShareMedian": 0,
+   "medianValue": 464,
+   "priceOverValue": 2.588,
+   "priceValueRank": 0.439,
+   "changeCorr20": 0.147
+  },
+  {
+   "week": 2800,
+   "tradesPerWeek": 299,
+   "auctionSalesPerWeek": 175,
+   "cashTop10": 0.674,
+   "broke": 6,
+   "lendShareMedian": 0,
+   "medianValue": 475,
+   "priceOverValue": 2.683,
+   "priceValueRank": 0.403,
+   "changeCorr20": 0.096
+  },
+  {
+   "week": 2820,
+   "tradesPerWeek": 304,
+   "auctionSalesPerWeek": 193,
+   "cashTop10": 0.618,
+   "broke": 8,
+   "lendShareMedian": 0,
+   "medianValue": 462,
+   "priceOverValue": 2.804,
+   "priceValueRank": 0.411,
+   "changeCorr20": -0.005
+  },
+  {
+   "week": 2840,
+   "tradesPerWeek": 288,
+   "auctionSalesPerWeek": 171,
+   "cashTop10": 0.66,
+   "broke": 2,
+   "lendShareMedian": 0,
+   "medianValue": 481,
+   "priceOverValue": 2.775,
+   "priceValueRank": 0.396,
+   "changeCorr20": 0.259
+  },
+  {
+   "week": 2860,
+   "tradesPerWeek": 316,
+   "auctionSalesPerWeek": 175,
+   "cashTop10": 0.659,
+   "broke": 9,
+   "lendShareMedian": 0,
+   "medianValue": 473,
+   "priceOverValue": 2.779,
+   "priceValueRank": 0.39,
+   "changeCorr20": 0.141
+  },
+  {
+   "week": 2880,
+   "tradesPerWeek": 294,
+   "auctionSalesPerWeek": 184,
+   "cashTop10": 0.692,
+   "broke": 7,
+   "lendShareMedian": 0,
+   "medianValue": 473,
+   "priceOverValue": 3.039,
+   "priceValueRank": 0.368,
+   "changeCorr20": 0.069
+  },
+  {
+   "week": 2900,
+   "tradesPerWeek": 276,
+   "auctionSalesPerWeek": 167,
+   "cashTop10": 0.682,
+   "broke": 9,
+   "lendShareMedian": 0,
+   "medianValue": 471,
+   "priceOverValue": 2.929,
+   "priceValueRank": 0.382,
+   "changeCorr20": 0.092
+  },
+  {
+   "week": 2920,
+   "tradesPerWeek": 290,
+   "auctionSalesPerWeek": 164,
+   "cashTop10": 0.688,
+   "broke": 8,
+   "lendShareMedian": 0,
+   "medianValue": 445.5,
+   "priceOverValue": 2.9,
+   "priceValueRank": 0.416,
+   "changeCorr20": 0.09
+  },
+  {
+   "week": 2940,
+   "tradesPerWeek": 287,
+   "auctionSalesPerWeek": 168,
+   "cashTop10": 0.642,
+   "broke": 4,
+   "lendShareMedian": 0,
+   "medianValue": 456,
+   "priceOverValue": 2.68,
+   "priceValueRank": 0.407,
+   "changeCorr20": 0.195
+  },
+  {
+   "week": 2960,
+   "tradesPerWeek": 331,
+   "auctionSalesPerWeek": 183,
+   "cashTop10": 0.628,
+   "broke": 5,
+   "lendShareMedian": 0,
+   "medianValue": 461.5,
+   "priceOverValue": 2.635,
+   "priceValueRank": 0.397,
+   "changeCorr20": 0.051
+  },
+  {
+   "week": 2980,
+   "tradesPerWeek": 358,
+   "auctionSalesPerWeek": 201,
+   "cashTop10": 0.639,
+   "broke": 8,
+   "lendShareMedian": 0,
+   "medianValue": 454,
+   "priceOverValue": 2.832,
+   "priceValueRank": 0.375,
+   "changeCorr20": 0.152
+  },
+  {
+   "week": 3000,
+   "tradesPerWeek": 363,
+   "auctionSalesPerWeek": 201,
+   "cashTop10": 0.681,
+   "broke": 5,
+   "lendShareMedian": 0,
+   "medianValue": 462,
+   "priceOverValue": 2.595,
+   "priceValueRank": 0.441,
+   "changeCorr20": 0.1
+  }
+ ]
+}

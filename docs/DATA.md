@@ -51,7 +51,7 @@ The save is thin in places: 16 injured seasons in total, 7 MVP and 7 OPOY winner
 The build scripts read a RetroVault checkout. They were written to live in its `sandbox/` folder and use paths
 relative to it (`public/data/...`, `data/y80/...`, `src/...`, `sandbox/data/...`). To rebuild:
 
-1. Clone RetroVault and copy the scripts into `<RetroVault>/sandbox/`.
+1. Clone RetroVault and copy the scripts in this repository's `data-build/` folder into `<RetroVault>/sandbox/`.
 2. Run them from the RetroVault root (or as noted), in this order:
 
 ```bash

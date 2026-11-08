@@ -3,7 +3,7 @@
 The tactic tracker measures what bots actually did, groups bots with similar behaviour into tactics, names each
 tactic in plain words, and follows tactics from one generation to the next. Code: `tkSide`, `tkTrade`, `tkAdd`,
 `tacProfile`, `kmeansSil` and `tacticTrack` in `engine.mjs`. Output: `frame.gen.tactics`, a compact history in
-`W.tacticHist`, the page's Tactics panel, and `tactics_report.mjs`.
+`W.tacticHist`, the page's Tactics panel, and `tools/tactics_report.mjs`.
 
 It is measurement only. It draws nothing from `W.rand` and nothing a bot sees or does depends on it. A run with the
 tracker on is identical week by week to one with it off, apart from the `gen` field.
@@ -140,9 +140,9 @@ cannibalizedBy]` per tactic, plus born and died ids.
 ## 8. Reading a run
 
 ```bash
-node tactics_report.mjs runs/<run>/run.json           # timeline, one block per generation
-node tactics_report.mjs runs/<run>/run.json --grid    # adds a share-by-generation table
-node tactics_report.mjs runs/<run>/run.json --json    # the parsed history as JSON
+node tools/tactics_report.mjs runs/<run>/run.json           # timeline, one block per generation
+node tools/tactics_report.mjs runs/<run>/run.json --grid    # adds a share-by-generation table
+node tools/tactics_report.mjs runs/<run>/run.json --json    # the parsed history as JSON
 ```
 
 The report prints the median returns (at selling value / at marks), each tactic's origins, births with their parent,

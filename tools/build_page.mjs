@@ -1,10 +1,10 @@
 // Builds docs/trading-floor.html: page/style.css + page/body.html + engine.mjs (inlined) + data/library.json
 // + page/ui.js. The output is an artifact page (no <html>/<head>; the artifact host wraps it) that also opens fine
-// from disk. Run: node sandbox/build_page.mjs
+// from disk. Run: node tools/build_page.mjs
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-const here = path.dirname(fileURLToPath(import.meta.url));
+const here = path.join(path.dirname(fileURLToPath(import.meta.url)), '..'); // the repository root
 const read = (p) => fs.readFileSync(path.join(here, p), 'utf8');
 const engine = read('engine.mjs').replace(/^export /gm, '');
 const library = JSON.stringify({ ...JSON.parse(read('data/library.json')), timeline: JSON.parse(read('data/timeline.json')), history: JSON.parse(read('data/history.json')), kits: JSON.parse(read('data/kits.json')), names: JSON.parse(read('data/names.json')), leagueRates: JSON.parse(read('data/league_rates.json')), rookieNames: JSON.parse(read('data/rookie_names.json')), nflAge: JSON.parse(read('data/nfl_age.json')) });
@@ -21,4 +21,4 @@ const html = head + read('page/style.css') + '\n' + read('page/body.html') + '\n
 { const script = html.slice(html.lastIndexOf('<script>') + 8, html.lastIndexOf('</script>')); try { new Function(script); } catch (e) { console.error('page script does not parse:', e.message); process.exit(1); } }
 const out = path.join(here, 'docs', 'trading-floor.html');
 fs.writeFileSync(out, html);
-console.log(`page: ${path.relative(path.join(here, '..'), out)} (${html.length.toLocaleString()} bytes)`);
+console.log(`page: ${path.relative(here, out)} (${html.length.toLocaleString()} bytes)`);
