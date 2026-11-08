@@ -612,18 +612,21 @@ behaviour. Each is scored mechanically at its horizon. They feed H2.
 
 ### 12.1 Split random streams (all arms)
 
-Today one generator drives everything: the league's draws (injuries, Super Bowls, awards, retirements; engine.mjs
-2313–2372) wrap the same `rand` as the bots (line 268). Once any decision changes how many draws the bots make, every
-later injury and champion differs. Requirement: `rngStreams: 'split'` (default off, so ordinary runs stay
-byte-identical) gives independent streams for:
+Before engine 2.x one generator drove everything: the league's draws (injuries, Super Bowls, awards, retirements)
+wrapped the same `rand` as the bots. Once any decision changed how many draws the bots make, every later injury and
+champion differed. Built (2026-11-07): `rngStreams: 'split'`, now the engine default (`'single'` repeats older runs),
+gives independent streams for:
 
 - the league;
 - the market and the bots;
 - entry and shocks;
 - diagnostics and display sampling.
 
-Each is seeded from the run seed and a fixed stream id, recorded in the fingerprint. Every arm uses it. Test: the
-league's output is identical under the do-nothing, greedy and generous scripted governments on one seed (17.3).
+Each is seeded from the run seed and a fixed stream id (`RNG_STREAMS`: market 17, league 171, people 313, display 29;
+diagnostics keep private fixed-seed generators), recorded in the run file (`meta.rng`) and to be recorded in the
+fingerprint. Every arm uses it. Already tested: the league's output is identical under different market settings on
+one seed (`tests/rng.test.mjs league`). Still to test once governments exist: the same under the do-nothing, greedy
+and generous scripted governments (17.3).
 Split streams reduce divergence but do not remove it: bots react to prices, so paths separate once any price differs.
 Arm differences are therefore reported as distributions over seeds, never as a single-seed effect.
 

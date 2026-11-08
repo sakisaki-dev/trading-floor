@@ -51,7 +51,7 @@ it is tuned to:
 
 | Entity | What it is | Key state variables |
 |---|---|---|
-| World `W` | One simulated market | `t` (week), `cfg` (settings), `rand` (the one random stream), `cards`, `players`, `bots`, `loans`, `cardLoans`, `auctions`, `items`, `liq` (liquidator stock), `coll` (dealers), `treasury`, `house` (fees, pack revenue, money ledger), `hist` (index histories), `L` (league state) |
+| World `W` | One simulated market | `t` (week), `cfg` (settings), `rand` (the market's random stream; `rngLeague`, `rngPeople` and `drand` are the others), `cards`, `players`, `bots`, `loans`, `cardLoans`, `auctions`, `items`, `liq` (liquidator stock), `coll` (dealers), `treasury`, `house` (fees, pack revenue, money ledger), `hist` (index histories), `L` (league state) |
 | Player | A football player with cards | `F` (hidden value of his base card, coins), `P` (implied price), `pool` (unminted copies), `S0` (print run), `lg` (league record: career totals `tot`, per-game `rates`, form window `win`, `active`, `seasons`, `legacy` (Career Legacy), injury spell `out`, `age0`), `guide` (published price-guide value) |
 | Card market | One of 16 per player: 4 designs (Prizm, Jersey, Topps, Locker) × 4 finishes (Base, Silver, Gold, Holo) | `mult` (rarity multiplier), `P` (mark), `circ` (copies in circulation), `Ph` (price history), `volH` (volume history), `bb`/`ba` (last week's best unfilled bid and ask), `askLvl`/`bidLvl` (book levels), `lastRoy` (royalty per copy) |
 | Item | A one-of-a-kind copy: an autograph, a Prizm colour parallel, an alternate or throwback kit | `mult`, `owner`, `cost`; traded only at sealed auction |
@@ -81,7 +81,7 @@ neural bots only.
 
 ## 3. Process overview and scheduling
 
-`step(W)` runs one week. The order is fixed. Bots act in a random order (shuffled with `W.rand` each week) in the
+`step(W)` runs one week. The order is fixed. Bots act in a random order (shuffled with the market stream each week) in the
 order phase; every other phase visits bots in list order.
 
 1. **Week start.** `t` advances. Each player's last week's value is made public to dealers (`p.Fpub = p.F`).
@@ -177,11 +177,25 @@ card-lending pool. Direct: note swaps (offered and accepted through each bot's o
 victim and its friends refuse to trade with the thief for 26 weeks), and contests (entrants' stakes are redistributed
 to the best scores).
 
-**Stochasticity.** One seeded stream (`W.rand`, a 32-bit generator seeded from `seed × 7919 + 17`) drives everything
-random: the league (games, injuries, champion, awards, retirements, rookies), pack pulls, the order in which bots act,
-research errors, mutations and trials, entries (Poisson), newcomers' cash, quitting, cash shocks, card loss and
-estate-sale rounding. Diagnostics use private generators and never draw from `W.rand`. Because the league and the
-bots share the stream, any change in the bots' draws changes later football (AUDIT.md, methods finding 1).
+**Stochasticity.** With `rngStreams: 'split'` (the default from engine 2.x) each subsystem draws from its own seeded
+stream, a 32-bit mulberry32 generator seeded from `seed × 7919 + id` with a fixed id per stream (`RNG_STREAMS`):
+
+| Stream | Id | Draws |
+|---|---|---|
+| League (`W.rngLeague`) | 171 | Weekly games, injuries and their spells, the champion, awards, retirements, rookies and generated veterans, entry ages, each season's form swing; in the older value models the season draws (`nextSeason`), the OVR walk and test league updates |
+| Market and bots (`W.rngMarket`, also `W.rand`, `W.gauss`, `W.pick`, `W.shuffle`) | 17 | The order bots act in, orders, research errors, pack pulls and rolls, auctions, dealers, notes and theft, contests, lifetime-learning trials, evolution and mutation, the starting bots' networks and the opening endowment, fashion |
+| People (`W.rngPeople`) | 313 | Newcomers (how many, and everything about each: parent, networks, name, cash), quitting and random retirement, deaths (lifespans, heirs' networks and names, estate-sale rounding), AI bots' arrival and succession, cash shocks, card loss |
+| Display (`W.drand`) | 29 | The trade arcs drawn on the page only |
+| Diagnostics | fixed seeds | Clusters, probes and the tactic tracker (private `prng`); they never touch a world stream |
+
+Because mulberry32 walks one cycle of 2^32 states, two streams are the same sequence shifted; the ids put every pair at
+least 0.22 × 2^32 draws apart for every seed. A practice world gets the same layout from its own seed. The league reads
+nothing the market sets (form reads hidden value, never price), so on one seed the league's output (games, injuries,
+champions, awards, retirements, hidden values) is identical under any market setting: `node tests/rng.test.mjs league`
+checks fee 0.01 against 0.05 and allowance 200 against 400 over 100 weeks. The market's and people's streams still
+diverge between such runs, since bots react to prices. `rngStreams: 'single'` is the earlier engine's one shared stream
+(id 17 for everything), kept to repeat runs made before 2.x exactly (`node tests/rng.test.mjs single`). `sim.mjs`
+records the layout in the run file's `meta.rng`.
 
 **Collectives.** None act as units. Lineages (bots that share descent, `lineage`) and tactics (clusters of behaviour,
 [TACTICS.md](TACTICS.md)) are observer categories. Wealth groups (top 10%, next 40%, bottom 50%) are for display.
@@ -571,8 +585,9 @@ royalty yield (`royaltyRate` × the note's estimate ÷ price); input 32 carries 
 
 ## Known limits
 
-- One random stream drives both the league and the bots, so the football is not held constant between runs that
-  differ in the bots' behaviour (AUDIT.md, methods finding 1).
+- The league is held constant between runs on one seed (split streams), but the market and people streams are not:
+  once any price differs, the bots' paths separate, so same-seed arms are paired only in their football. Arm
+  differences still need distributions over seeds.
 - Research reads hidden value with noise; the valuation contest and some diagnostics read it exactly. AUDIT.md section
   5a lists the channels found.
 - Code findings from the audit (AUDIT.md section 5) are marked Open, Fixed or Deferred one by one.

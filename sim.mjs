@@ -22,5 +22,5 @@ console.log(`world ready in ${((Date.now() - t0) / 1000).toFixed(0)} s; ${W.bots
 const t1 = Date.now();
 for (let i = 1; i <= weeks; i++) { E.step(W); frames.push(E.frame(W, { full: true }));
   if (i % 10 === 0 || i === weeks) { const s = (Date.now() - t1) / 1000 / i; console.log(`week ${i}/${weeks} · ${s.toFixed(2)} s/week · Vault ${W.hist.p.at(-1).toFixed(1)} · ${W.bots.filter((b) => b.kind === 'rule').length} bots`); }
-  if (i % 50 === 0 || i === weeks) fs.writeFileSync(path.join(out, 'run.json'), JSON.stringify({ format: 'rv-sandbox-run/1', meta: { id: path.basename(out), seed, preset, weeks: i, engine: 'engine.mjs', secsPerWeek: (Date.now() - t1) / 1000 / i }, config: W.cfg, frames })); }
+  if (i % 50 === 0 || i === weeks) fs.writeFileSync(path.join(out, 'run.json'), JSON.stringify({ format: 'rv-sandbox-run/1', meta: { id: path.basename(out), seed, preset, weeks: i, engine: 'engine.mjs', rng: W.rngLayout, secsPerWeek: (Date.now() - t1) / 1000 / i }, config: W.cfg, frames })); }
 console.log(`saved ${path.join(out, 'run.json')}`);

@@ -14,6 +14,13 @@ let PRACTICE_HOOK = null; // called (week, of) during practice generations, so a
 export function setPracticeHook(f) { PRACTICE_HOOK = f; }
 export const DEFAULTS = {
   seed: 88,
+  // rngStreams 'split' (default; a fix, audit methods 1): independent seeded generators per subsystem, each seeded from the
+  // run seed and a fixed id (RNG_STREAMS): the league (games, injuries, awards, retirements, rookies, season draws), the
+  // market and bots (orders, research, packs, auctions, social, evolution, mutation, the opening endowment) and people
+  // (newcomers, quits, deaths and lifespans, estate rounding, cash shocks, card loss). A market rule that changes how many
+  // draws the bots make then cannot change a game: on one seed the football is the same under every market setting.
+  // 'single': the old one shared stream (the market's), kept to replay runs made before engine 2.x exactly
+  rngStreams: 'split',
   weeksPerGeneration: 20, // evolution and royalties happen at the end of each generation
   valueDivisor: 1, // the site's card values are divided by this to get coins (1 = the site's exact prices)
   // coinScale: scales only the small coin amounts written into the code as multiples of it: the value floor (0.05×), the worth
@@ -348,6 +355,19 @@ export const FINISH_MULTS = [1, 1.5, 2.5, 6], DESIGN_MULTS = [1, 1.2, 1.8, 2.5, 
 export const bandOf = (ovr) => { let k = 0; for (let i = 0; i < OVR_BANDS.length; i++) if ((ovr ?? 60) >= OVR_BANDS[i].lo) k = i; return k; };
 
 /* ---------- Random ---------- */
+// The stream ids: a stream's seed is seed × 7919 + its id. mulberry32 walks one cycle of 2^32 states, so two streams are
+// the same sequence shifted; these ids put every pair at least 0.22 × 2^32 (about 960 million draws) apart on it, for
+// every run seed (the seed term cancels). market 17 is the old shared stream; display 29 is the trade-arc sample (W.drand)
+export const RNG_STREAMS = { market: 17, league: 171, people: 313, display: 29 };
+function rngStream(seed) { const rand = seeded(seed); return {
+  rand, gauss: () => { let u = 0, v = 0; while (u === 0) u = rand(); while (v === 0) v = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); },
+  pick: (a) => a[Math.floor(rand() * a.length)],
+  shuffle: (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }, // seeded Fisher-Yates: every order equally likely (a random-comparator sort is not)
+}; }
+// Run f with W.rand, W.gauss, W.pick and W.shuffle drawing from stream S (for code deep in shared helpers, such as a
+// newcomer's new networks); restored after. With rngStreams 'single' every stream is the market's, so it changes nothing
+function onStream(W, S, f) { if (S === W.rngMarket) return f(); const o = [W.rand, W.gauss, W.pick, W.shuffle]; W.rand = S.rand; W.gauss = S.gauss; W.pick = S.pick; W.shuffle = S.shuffle; try { return f(); } finally { [W.rand, W.gauss, W.pick, W.shuffle] = o; } }
+export const rngLayout = (cfg) => ({ mode: cfg.rngStreams === 'single' ? 'single' : 'split', seedRule: 'seed * 7919 + id', ids: cfg.rngStreams === 'single' ? { all: RNG_STREAMS.market, display: RNG_STREAMS.display } : { ...RNG_STREAMS }, diagnostics: 'private prng, fixed seeds' });
 function seeded(a) {
   return function () {
     a |= 0; a = (a + 0x6d2b79f5) | 0;
@@ -377,7 +397,8 @@ export function createWorld(library, overrides = {}) {
   overrides = canonCfg(overrides);
   const cfg = { ...DEFAULTS, ...overrides, social: { ...DEFAULTS.social, ...(overrides.social || {}) } };
   if (cfg.outsideCollectors && cfg.outsideMode === 'band') throw new Error("outsideMode 'band' is retired (it destroyed the copies it bought and paid in new coins at hidden value): use 'value' or 'budget'");
-  const rand = seeded(cfg.seed * 7919 + 17), lib0 = library;
+  if (cfg.rngStreams !== 'split' && cfg.rngStreams !== 'single') throw new Error(`rngStreams must be 'split' or 'single', not ${JSON.stringify(cfg.rngStreams)}`);
+  const S0 = (id) => cfg.seed * 7919 + id, mk = rngStream(S0(RNG_STREAMS.market)), split = cfg.rngStreams === 'split', rand = mk.rand, lib0 = library;
   if (fullLeague(cfg)) library = { ...library, players: library.players.slice() }; // generated players go into this world's own list, never the caller's (a practice world shares it)
   packCache = null; hot = []; mood = { drop: 0 }; // module state belongs to the newest world
   const W = {
@@ -395,10 +416,11 @@ export function createWorld(library, overrides = {}) {
   W.kitInfo = library.kits?.kits || null; W.kitMeta = library.kits || null;
   if (!(W.kitMeta?.autographMeanMult > 0)) throw new Error('library.kits.autographMeanMult is missing (data/kits.json): pack prices need the autograph mean multiplier');
   library.players.forEach((p, i) => { (W.byPos[p.pos] ||= []).push(p); W.libIndex.set(p, i); });
-  W.gauss = () => { let u = 0, v = 0; while (u === 0) u = rand(); while (v === 0) v = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
-  W.pick = (a) => a[Math.floor(rand() * a.length)];
-  W.shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }; // seeded Fisher-Yates: every order equally likely (a random-comparator sort is not)
-  W.drand = seeded(cfg.seed * 7919 + 29); // a private stream for display-only sampling, so a measurement never shifts the world's draws
+  // W.rand, W.gauss, W.pick and W.shuffle are the market's stream (most of the code); the league and people draw from their own
+  W.rngMarket = mk; W.rngLeague = split ? rngStream(S0(RNG_STREAMS.league)) : mk; W.rngPeople = split ? rngStream(S0(RNG_STREAMS.people)) : mk;
+  W.gauss = mk.gauss; W.pick = mk.pick; W.shuffle = mk.shuffle;
+  W.rngLayout = rngLayout(cfg); // the stream layout this world was built with (run files record it)
+  W.drand = seeded(S0(RNG_STREAMS.display)); // a private stream for display-only sampling, so a measurement never shifts the world's draws
   // Players hold the player-level facts; each has 16 card markets (4 designs × 4 finishes). A player's F is the
   // intrinsic value of his Prizm Base card: the site's price for it (card value)
   W.players = [];
@@ -460,8 +482,8 @@ export function teamShort(t) { const w = String(t || 'FA').split(' '); return t 
 
 // AI bots join on equal terms: the same starting cash plus a basket as big as the average rule bot's, minted from the pool.
 export function addAiBot(W, extra = {}) {
-  const b = newBot(W, AI, null, { social: extra.social || 'reciprocator', ...extra });
-  const lw = W.cfg.aiLifespanWeeks; if (lw) { b.lifespanW = lw[0] + Math.floor(W.rand() * (lw[1] - lw[0] + 1)); }
+  const b = onStream(W, W.rngPeople, () => newBot(W, AI, null, { social: extra.social || 'reciprocator', ...extra })); // entry draws: the people stream
+  const lw = W.cfg.aiLifespanWeeks; if (lw) { b.lifespanW = lw[0] + Math.floor(W.rngPeople.rand() * (lw[1] - lw[0] + 1)); }
   b.line = extra.line || 1;
   const rule = W.bots.filter((x) => x.kind === 'rule'), avg = rule.length ? Math.round(rule.reduce((s, x) => s + x.n, 0) / rule.length) : 0;
   for (let k = 0; k < avg; k++) { const pk = packInfo(W, 'standard'); if (!pk.tot) break; const p = drawTier(W, pk, PACK_TYPES.standard.tiers, wpick(W, PACK_TYPES.standard.tiers), new Map()); if (!p) break; const x = rollCopy(W, p, 'standard'); mintCopy(W, b, x, p.P * copyMult(x)); } // cost basis at the public price, never the hidden value
@@ -1789,7 +1811,7 @@ export function step(W) {
   if (guideOn(cfg)) priceGuide(W);
   if (W.timeline && W.t % cfg.seasonWeeks === 0) nextSeason(W);
   if (cfg.lossRate > 0 && W.t % cfg.seasonWeeks === 0) { // card loss: each copy in a bot's hands (not lent out) is lost with chance lossRate, never picked by value
-    let lost = 0; for (const b of W.bots) for (const [id, q] of [...b.h]) { const free = q - (b.lentOut?.get(id) || 0); let k = 0; for (let j = 0; j < free; j++) if (W.rand() < cfg.lossRate) k++;
+    let lost = 0; for (const b of W.bots) for (const [id, q] of [...b.h]) { const free = q - (b.lentOut?.get(id) || 0); let k = 0; for (let j = 0; j < free; j++) if (W.rngPeople.rand() < cfg.lossRate) k++; // the people stream
       if (k) { const c = W.cards[id]; give(b, c, -k); c.circ = Math.max(0, c.circ - k); const L = b.lots?.get(id); if (L) L.splice(0, k); lost += k; } }
     W.lostSeason = lost; if (lost) jot(W, { type: 'lost', count: lost }); (W.house.mint ||= {}).lostCards = (W.house.mint.lostCards || 0) + lost; }
   if (cfg.valueModel === 'league') { // the simulated league takes over after the last real season
@@ -1832,7 +1854,7 @@ export function step(W) {
   livingAndCredit(W); peopleChange(W); fashionStep(W);
   if (cfg.holdCost > 0) for (const b of W.bots) { // a cost per card held, a share of its mark a week, to the house: a cash squeeze shows up as selling
     let cost = 0; for (const [id, q] of b.h) cost += q * W.cards[id].P * cfg.holdCost; if (cost > 0) bill(W, b, 'holding', cost); } // unpaid: owed, and sold for
-  { const ch = cfg.cashShockChance ?? 0, sz = cfg.cashShockSize ?? 0; if (ch > 0 && sz > 0) for (const b of W.bots) { if (!(W.rand() < ch)) continue; // a life event: a need for cash that doesn't come from the market
+  { const ch = cfg.cashShockChance ?? 0, sz = cfg.cashShockSize ?? 0; if (ch > 0 && sz > 0) for (const b of W.bots) { if (!(W.rngPeople.rand() < ch)) continue; // a life event (the people stream): a need for cash that doesn't come from the market
     const need = sz * Math.max(0, worth(W, b)), paidS = bill(W, b, 'shocks', need); jot(W, { type: 'shock', bot: b.name, need: r2(need), short: r2(need - paidS) }); (W.shockWeek ||= 0); W.shockWeek++; } }
   liftFlags(W);
   socialPhase(W); aiSocial(W);
@@ -2104,7 +2126,7 @@ export function bookMark(c, t, fade, need) {
 }
 function leagueUpdate(W) {
   const moved = [];
-  for (const c of W.players) if (W.rand() < 0.12) { const k = Math.exp(W.gauss() * 0.3); c.F = Math.max(0.05 * W.cfg.coinScale, c.F * k); moved.push([c, k]); }
+  for (const c of W.players) if (W.rngLeague.rand() < 0.12) { const k = Math.exp(W.rngLeague.gauss() * 0.3); c.F = Math.max(0.05 * W.cfg.coinScale, c.F * k); moved.push([c, k]); }
   moved.sort((a, b) => b[1] - a[1]);
   const up = moved[0], dn = moved[moved.length - 1];
   log(W, 'update', `League update (test): ${moved.length} players' values moved${up ? `, led by ${up[0].pos} ${up[0].name} up ${Math.round((up[1] - 1) * 100)}%` : ''}${dn ? ` and ${dn[0].pos} ${dn[0].name} down ${Math.round((1 - dn[1]) * 100)}%` : ''}. Every note on them is now out of date.`);
@@ -2360,7 +2382,8 @@ function sharedFitness(rule, strength, radius = 0.5) {
   return out;
 }
 // A newcomer: a brand-new random network, or (entrants 'offspring') a mutated copy of a parent from the last generation's top
-function newcomer(W) {
+function newcomer(W) { return onStream(W, W.rngPeople, () => newcomerOn(W)); } // every draw of an arrival (parent, network, name, cash) from the people stream
+function newcomerOn(W) {
   const cfg = W.cfg; let parent = null;
   if (cfg.entrants === 'offspring' && W.parentIds?.length) { const alive = new Map(W.bots.map((b) => [b.id, b])), ps = W.parentIds.map((id) => alive.get(id)).filter((b) => b?.g?.nn); if (ps.length) parent = W.pick(ps); }
   const b = parent ? newBot(W, null, parent) : newBot(W, null); if (parent) { b.src = parent.id; b.srcT = W.t; b.offspring = true; }
@@ -2401,7 +2424,7 @@ function generationEnd(W) {
     const kinds = (xs) => Object.entries(xs.reduce((o, b) => ((o[ARCH[b.a].label] = (o[ARCH[b.a].label] || 0) + 1), o), {})).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${v} ${k}`).join(', ');
     log(W, 'evolve', `Generation ${gen}: best returns ${best.slice(0, 3).map((b) => `${b.name} ${b.roc >= 0 ? '+' : ''}${Math.round(b.roc * 100)}%`).join(', ')}. The ${n} worst-returning bots adopt their strategies and keep their own capital (now ${kinds(worst)}).`);
   }
-  if (cfg.mortality) {
+  if (cfg.mortality) onStream(W, W.rngPeople, () => { // deaths: lifespans, heirs (their networks and names) and the estate's rounding draw from the people stream
     let died = 0, born = 0;
     for (const b of rule) {
       if (b.lifespan == null) b.lifespan = cfg.lifespan[0] + Math.floor(W.rand() * (cfg.lifespan[1] - cfg.lifespan[0] + 1));
@@ -2416,7 +2439,7 @@ function generationEnd(W) {
     const poorest = W.bots.filter((b) => b.kind === 'rule').map((b) => [b, worth(W, b)]).sort((x, y) => x[1] - y[1]);
     let out = 0; while (W.bots.filter((b) => b.kind === 'rule').length > cap && poorest.length) { removeBot(W, poorest.shift()[0], 'priced out'); out++; }
     if (died) log(W, 'evolve', `Generation ${gen}: ${died} bots die of old age; their estates pass to ${born} heirs carrying their strategies${out ? `, and ${out} of the poorest bots leave the market` : ''}.`);
-  }
+  });
   for (const b of W.bots) { b.genStart = worth(W, b); b.genStartBid = realValue(W, b); b.exo = 0; } // the selling-value start is kept whatever fitnessValue is (diagnostics); only 'bid' fitness reads it
   genIOClose(W, G); W.genRec = G;
   if (bidFit) W.fitStats = { gen, copies: fst.copies, noBid: fst.noBid, shareNoBid: fst.copies ? fst.noBid / fst.copies : 0 };
@@ -2697,7 +2720,7 @@ function libTotals(p) {
 const LIB_NAMES = { g: 'Games', yds: (pos) => (pos === 'QB' ? 'Pass Yds' : 'Rec Yds'), td: (pos) => (pos === 'QB' ? 'Pass TD' : 'TDs'), int: 'INT', ryds: 'Rush Yds', rtd: 'Rush TD', recyds: 'Rec Yds', rectd: 'Rec TD', fum: (pos) => (pos === 'RB' ? 'Fum' : 'Fumbles'), rec: 'Rec', blk: 'Blocks', tkl: 'Tackles', sck: 'Sacks', ff: 'FF', rings: 'Rings', mvp: 'MVP', opoy: 'OPOY', dpoy: 'DPOY', sbmvp: 'SBMVP', roty: 'ROTY' };
 const libStats = (pos, t) => Object.fromEntries(Object.entries(t).map(([k, v]) => { const n = LIB_NAMES[k]; return [typeof n === 'function' ? n(pos) : n || k, Math.round(v)]; }));
 const lgStage = (seasons) => (seasons <= 1 ? '1-2' : seasons <= 4 ? '3-5' : seasons <= 7 ? '6-8' : '9+');
-function poisson1(W, lam) { if (!(lam > 0)) return 0; if (lam > 30) return Math.max(0, Math.round(lam + Math.sqrt(lam) * W.gauss())); let k = 0, p = Math.exp(-lam), s = p; const u = W.rand(); while (u > s && k < 200) { k++; p *= lam / k; s += p; } return k; }
+function poisson1(S, lam) { if (!(lam > 0)) return 0; if (lam > 30) return Math.max(0, Math.round(lam + Math.sqrt(lam) * S.gauss())); let k = 0, p = Math.exp(-lam), s = p; const u = S.rand(); while (u > s && k < 200) { k++; p *= lam / k; s += p; } return k; } // S: a stream (the league's)
 
 function leagueStart(W) {
   const R = W.library.leagueRates; if (!R || W.L) return;
@@ -2711,7 +2734,7 @@ function leagueStart(W) {
     const cpg = (tot.g || 0) > 0 ? lgProduction(p.pos, tot) / tot.g : 0, N = (W.cfg.formSeasons ?? 2) * W.L.full;
     p.lg = { tot, season: { g: 0 }, last: row && pr && lastG >= 1 ? { ...line, g: lastG } : null, win: Array(N).fill(cpg), rates, active: p.on !== false && lastG > 0, seasons: Math.round((tot.g || 0) / W.L.full), legacy: lp.careerLegacy || 0, skill: lp.skill ?? null, inducted: !!lp.hallOfFame, out: null };
   }
-  const A = W.library.nflAge; for (const p of W.players) if (p.lg) p.lg.age0 = A?.rookieAge?.draws?.length ? W.pick(A.rookieAge.draws) : W.cfg.entryAgeFallback; // the save has no ages: his entry age is a random draw from real NFL rookie ages (an assumption, not his real age)
+  const A = W.library.nflAge; for (const p of W.players) if (p.lg) p.lg.age0 = A?.rookieAge?.draws?.length ? W.rngLeague.pick(A.rookieAge.draws) : W.cfg.entryAgeFallback; // the save has no ages: his entry age is a random draw from real NFL rookie ages (an assumption, not his real age)
   leagueInjuries(W); leagueValues(W); for (const p of W.players) if (p.lg) p.lg.v0 = p.F;
 }
 // Injuries: each active player's games missed this season, drawn from the real active seasons at his position and stage;
@@ -2726,13 +2749,13 @@ function leagueInjuries(W) {
   for (const p of act) { const L = p.lg; L.out = null; if (W.cfg.injuries === false) continue;
     let chance = base * (W.cfg.injuryByAge !== false ? rrAt(lgAge(p)) / mean : 1);
     const hi = W.cfg.hypeInjury || 0; if (hi > 0 && (L.hype || 0) > 0) chance += base * hi * L.hype; // the owner's setting, not measured
-    if (!(W.rand() < Math.min(1, chance))) continue;
+    if (!(W.rngLeague.rand() < Math.min(1, chance))) continue;
     let xs = hurt.filter((x) => x[0] === p.pos); if (xs.length < W.cfg.injuryPoolMin) { xs = hurt; if (!(W.L.injuryFallback ||= []).includes(p.pos)) W.L.injuryFallback.push(p.pos); } // the spell: a real injured season's games missed (too few at his position: any position's)
-    const miss = Math.min(full, W.pick(xs)[2]); const from = 1 + Math.floor(W.rand() * (full - miss + 1)); L.out = [from, from + miss - 1]; }
+    const miss = Math.min(full, W.rngLeague.pick(xs)[2]); const from = 1 + Math.floor(W.rngLeague.rand() * (full - miss + 1)); L.out = [from, from + miss - 1]; }
 }
 const lgAge = (p) => (p.lg.age0 ?? 23) + (p.lg.seasons || 0);
 // One game at a player's per-game rates: yards log-normal around the rate, counts Poisson
-function lgGame(W, pos, rates, noise) { const game = { g: 1 }; for (const k of LSTATS[pos]) { const r = rates[k] || 0; game[k] = LYARDS.has(k) ? Math.max(0, Math.round(r * Math.exp(noise * W.gauss() - (noise * noise) / 2))) : poisson1(W, r); } return game; }
+function lgGame(W, pos, rates, noise) { const game = { g: 1 }; for (const k of LSTATS[pos]) { const r = rates[k] || 0; game[k] = LYARDS.has(k) ? Math.max(0, Math.round(r * Math.exp(noise * W.rngLeague.gauss() - (noise * noise) / 2))) : poisson1(W.rngLeague, r); } return game; }
 // One week of football
 function leagueWeek(W) {
   const L = W.L, wk = ((W.t - 1) % W.cfg.seasonWeeks) + 1; L.week = wk; if (wk > L.full) return;
@@ -2759,14 +2782,14 @@ function leagueSeasonEnd(W) {
     // Super Bowl: the champion club, weighted by the season production of its card players (championWeight, an assumption; with
     // leagueFill 'save' it favours clubs with more card players) or evenly; every active player on it gets a ring
     const eq = cfg.championWeight === 'equal', clubs = new Map(); for (const p of act) clubs.set(p.team, eq ? 1 : (clubs.get(p.team) || 0) + Math.max(0, prod(p)));
-    const tot = [...clubs.values()].reduce((a, b) => a + b, 0); let r = W.rand() * tot, champ = null; for (const [c, v] of clubs) { r -= v; if (r <= 0) { champ = c; break; } }
+    const tot = [...clubs.values()].reduce((a, b) => a + b, 0); let r = W.rngLeague.rand() * tot, champ = null; for (const [c, v] of clubs) { r -= v; if (r <= 0) { champ = c; break; } }
     if (champ) { const roster = act.filter((p) => p.team === champ); for (const p of roster) give(p, 'rings'); L.champions.push([W.seasonLabel, champ]); log(W, 'champion', `${champ} win the Super Bowl: ${roster.length} card players get rings.`);
-      if (W.rand() < (R.awards.sbmvp.meanPerSeason || 0)) { const best = roster.slice().sort((a, b) => prod(b) - prod(a))[0]; if (best) { give(best, 'sbmvp'); won.push(['Super Bowl MVP', best]); } } }
+      if (W.rngLeague.rand() < (R.awards.sbmvp.meanPerSeason || 0)) { const best = roster.slice().sort((a, b) => prod(b) - prod(a))[0]; if (best) { give(best, 'sbmvp'); won.push(['Super Bowl MVP', best]); } } }
     // MVP, OPOY, DPOY: as many a season as the save had, at the positions they went to, to that position's top producer this season
     // (awardWinner 'top', an assumption: the save's winners were not always the top producer)
     for (const [a, label] of [['mvp', 'MVP'], ['opoy', 'Offensive Player of the Year'], ['dpoy', 'Defensive Player of the Year']]) {
-      const A = R.awards[a]; if (!A || !(W.rand() < Math.min(1, A.meanPerSeason))) continue;
-      const pos = Object.entries(A.positions); if (!pos.length) continue; const t = pos.reduce((x, [, n]) => x + n, 0); let rr = W.rand() * t, at = pos[0][0]; for (const [ps, n] of pos) { rr -= n; if (rr <= 0) { at = ps; break; } }
+      const A = R.awards[a]; if (!A || !(W.rngLeague.rand() < Math.min(1, A.meanPerSeason))) continue;
+      const pos = Object.entries(A.positions); if (!pos.length) continue; const t = pos.reduce((x, [, n]) => x + n, 0); let rr = W.rngLeague.rand() * t, at = pos[0][0]; for (const [ps, n] of pos) { rr -= n; if (rr <= 0) { at = ps; break; } }
       const best = act.filter((p) => p.pos === at).sort((x, y) => prod(y) - prod(x))[0]; if (best) { give(best, a); won.push([label, best]); }
     }
     for (const [label, p] of won) log(W, 'award', `${label}: ${p.pos} ${p.name}.`);
@@ -2788,18 +2811,18 @@ function leagueSeasonEnd(W) {
       let cell = R.retirement.rates[`${st}|${third}`]; if (!cell || cell.n < 20) { const all = ['bottom third', 'middle third', 'top third'].map((t) => R.retirement.rates[`${st}|${t}`]); const n = all.reduce((a, c) => a + c.n, 0), k = all.reduce((a, c) => a + c.retired, 0); cell = { rate: n ? k / n : 0 }; }
       const e = byAge ? endAt(lgAge(p) + 1) : null; // next season's age
       const chance = byAge ? (e == null ? 1 : Math.min(1, (saveRate * e) / meanEnd)) : cell.rate;
-      if (W.rand() < chance) { s.active = false; retired.push(p); jot(W, { type: 'retired', player: p.key, name: `${p.pos} ${p.name}`, seasons: s.seasons }); log(W, 'retire', `${p.pos} ${p.name} retires at ${Math.round(lgAge(p))} after ${s.seasons + ((s.season.g || 0) > 0 ? 1 : 0)} seasons (${Math.round(s.legacy).toLocaleString()} Career Legacy).`); } }
+      if (W.rngLeague.rand() < chance) { s.active = false; retired.push(p); jot(W, { type: 'retired', player: p.key, name: `${p.pos} ${p.name}`, seasons: s.seasons }); log(W, 'retire', `${p.pos} ${p.name} retires at ${Math.round(lgAge(p))} after ${s.seasons + ((s.season.g || 0) > 0 ? 1 : 0)} seasons (${Math.round(s.legacy).toLocaleString()} Career Legacy).`); } }
     if (cfg.rookies !== false && W.fullL) fillRosters(W, retired); // a full league: back to rosterSize at every club × position, nothing on top
     else if (cfg.rookies !== false) {
       if (cfg.rookieRule === 'replace' || cfg.rookieRule === 'replacePlus') for (const p of retired) addRookie(W, p);
       if (cfg.rookieRule === 'replacePlus') { // and extraRookies more a season, at positions in the save's real mix of new players, at clubs drawn from the league
         const mix = Object.entries(R.arrivals?.positionMix || {}).filter(([, k]) => k > 0), tot = mix.reduce((a, [, k]) => a + k, 0);
-        for (let k = 0; k < (cfg.extraRookies ?? 3) && tot > 0; k++) { let r = W.rand() * tot, pos = mix[0][0]; for (const [ps, m] of mix) { r -= m; if (r <= 0) { pos = ps; break; } } const like = W.players.filter((p) => p.pos === pos), model = like.length ? W.pick(like) : W.pick(W.players); addRookie(W, { ...model, id: model.id, pos, team: W.pick(W.players).team, fam: model.fam, name: null }); }
+        for (let k = 0; k < (cfg.extraRookies ?? 3) && tot > 0; k++) { let r = W.rngLeague.rand() * tot, pos = mix[0][0]; for (const [ps, m] of mix) { r -= m; if (r <= 0) { pos = ps; break; } } const like = W.players.filter((p) => p.pos === pos), model = like.length ? W.rngLeague.pick(like) : W.rngLeague.pick(W.players); addRookie(W, { ...model, id: model.id, pos, team: W.rngLeague.pick(W.players).team, fam: model.fam, name: null }); }
       } else if (cfg.rookieRule === 'measured') { // arrivals at the measured rate: as many as one real season brought (league_rates.json arrivals), positions in the real mix,
         // independent of who retired; each joins a club drawn from the league's players
-        const A = R.arrivals, n = A?.perSeason?.length ? W.pick(A.perSeason).n : 0, mix = Object.entries(A?.positionMix || {}).filter(([, k]) => k > 0), tot = mix.reduce((a, [, k]) => a + k, 0);
-        for (let k = 0; k < n && tot > 0; k++) { let r = W.rand() * tot, pos = mix[0][0]; for (const [ps, m] of mix) { r -= m; if (r <= 0) { pos = ps; break; } }
-          const like = W.players.filter((p) => p.pos === pos), model = like.length ? W.pick(like) : W.pick(W.players); addRookie(W, { ...model, id: model.id, pos, team: W.pick(W.players).team, fam: model.fam, name: null }); } }
+        const A = R.arrivals, n = A?.perSeason?.length ? W.rngLeague.pick(A.perSeason).n : 0, mix = Object.entries(A?.positionMix || {}).filter(([, k]) => k > 0), tot = mix.reduce((a, [, k]) => a + k, 0);
+        for (let k = 0; k < n && tot > 0; k++) { let r = W.rngLeague.rand() * tot, pos = mix[0][0]; for (const [ps, m] of mix) { r -= m; if (r <= 0) { pos = ps; break; } }
+          const like = W.players.filter((p) => p.pos === pos), model = like.length ? W.rngLeague.pick(like) : W.rngLeague.pick(W.players); addRookie(W, { ...model, id: model.id, pos, team: W.rngLeague.pick(W.players).team, fam: model.fam, name: null }); } }
     }
   }
   // Hall of Fame: Career Legacy 7,500
@@ -2807,7 +2830,7 @@ function leagueSeasonEnd(W) {
   // Form: each active player's per-game rates move by one real season-to-season change at his position and stage
   for (const p of W.players) { const s = p.lg; if (!s?.active) continue;
     if ((s.season.g || 0) > 0) { s.last = { ...s.season }; s.seasons++; }
-    if (!s.rookieNew) { const cell = R.formSwings.cells[`${p.pos}|${lgStage(s.seasons)}`]; let sw = W.pick(cell?.draws?.length ? cell.draws : [0]);
+    if (!s.rookieNew) { const cell = R.formSwings.cells[`${p.pos}|${lgStage(s.seasons)}`]; let sw = W.rngLeague.pick(cell?.draws?.length ? cell.draws : [0]);
       const P = R.pressure, dv = s.v0 > 0 ? Math.log(p.F / s.v0) : 0; // pressure: how his card moved this season shifts next season's form, as measured in the save
       if (P && W.cfg.pressure !== false) sw += (W.cfg.pressureStrength ?? 1) * P.shift[dv < P.cuts[0] ? 0 : dv < P.cuts[1] ? 1 : 2];
       s.hype = dv; for (const st of Object.keys(s.rates)) s.rates[st] *= Math.exp(sw); }
@@ -2831,7 +2854,7 @@ function addRookie(W, old) {
 function leaguePlayer(W, old) {
   const R = W.library.leagueRates, L = W.L, id = W.players.length;
   let name; do { name = L.names[L.nameIx++ % Math.max(1, L.names.length)] || `Rookie ${id}`; } while (W.byKey.has(`${old.pos}:${name}`) && L.nameIx < L.names.length * 2);
-  const key = `${old.pos}:${name}`, tpl = W.pick(R.earlySeasons.filter((x) => x.pos === old.pos).length ? R.earlySeasons.filter((x) => x.pos === old.pos) : R.earlySeasons);
+  const key = `${old.pos}:${name}`, tpl = W.rngLeague.pick(R.earlySeasons.filter((x) => x.pos === old.pos).length ? R.earlySeasons.filter((x) => x.pos === old.pos) : R.earlySeasons);
   const rates = {}; for (const k of LSTATS[old.pos]) rates[k] = (tpl.d[k] || 0) / tpl.g;
   if (!rates.fum && LSTATS[old.pos].includes('fum')) { const lp = W.library.players[old.id], t = libTotals(lp); rates.fum = (t.fum || 0) / Math.max(1, t.g || 1); }
   const src = W.library.players[W.byKey.get(tpl.key)?.id ?? old.id]; // he inherits the template player's skill and grade (an assumption: skill moves value 0.8–1.2×)
@@ -2841,7 +2864,7 @@ function leaguePlayer(W, old) {
   const p = { id, key, name, pos: old.pos, team: old.team, F: 1, F0: 1, P: 1, P0: 1, S0, circ: 0, pool: S0 * W.cfg.poolMultiplier, Ph: [1], volH: [], isPlayer: true, fam: old.fam, rookie: true };
   const tplPg = lgProduction(old.pos, Object.fromEntries(Object.entries(rates).map(([k, v]) => [k, v]))), N = (W.cfg.formSeasons ?? 2) * W.L.full;
   const A = W.library.nflAge;
-  p.lg = { age0: A?.rookieAge?.draws?.length ? W.pick(A.rookieAge.draws) : W.cfg.entryAgeFallback, tot: { g: 0 }, season: { g: 0 }, last: null, win: Array(N).fill(tplPg), rates, active: true, seasons: 0, legacy: 0, skill: lib.skill, inducted: false, out: null, rookieNew: true };
+  p.lg = { age0: A?.rookieAge?.draws?.length ? W.rngLeague.pick(A.rookieAge.draws) : W.cfg.entryAgeFallback, tot: { g: 0 }, season: { g: 0 }, last: null, win: Array(N).fill(tplPg), rates, active: true, seasons: 0, legacy: 0, skill: lib.skill, inducted: false, out: null, rookieNew: true };
   W.players.push(p); W.byKey.set(key, p); W.era[id] = { on: true, ovr: W.cfg.rookieOvr, skill: lib.skill, grade: lib.grade, legacy: 0, totals: { g: 0 }, perGame: {} };
   return { p, lib, name };
 }
@@ -2910,8 +2933,8 @@ function fillRosters(W, retired, seasons = null) {
   for (const p of W.players) if (p.lg?.active) { const k = p.team + '|' + p.pos; n.set(k, (n.get(k) || 0) + 1); }
   for (const [team, teamFull] of W.L.clubs) for (const [pos, size] of Object.entries(shape)) for (let k = n.get(team + '|' + pos) || 0; k < size; k++) {
     const i = left.findIndex((r) => r.team === team && r.pos === pos), was = i >= 0 ? left.splice(i, 1)[0] : null, like = W.players.filter((p) => p.pos === pos && p.ref);
-    const model = was || (like.length ? W.pick(like) : W.pick(W.players)), old = { ...model, id: model.id, pos, team, teamFull, fam: model.fam, name: was ? was.name : null };
-    if (seasons) veteran(W, old, seasons.length ? W.pick(seasons) : 0); else addRookie(W, old);
+    const model = was || (like.length ? W.rngLeague.pick(like) : W.rngLeague.pick(W.players)), old = { ...model, id: model.id, pos, team, teamFull, fam: model.fam, name: was ? was.name : null };
+    if (seasons) veteran(W, old, seasons.length ? W.rngLeague.pick(seasons) : 0); else addRookie(W, old);
   }
 }
 // A generated veteran: a rookie (leaguePlayer) who then plays s seasons under the league's own rules: an injury spell at the
@@ -2924,7 +2947,7 @@ function veteran(W, old, s) {
   const A = W.library.nflAge?.relativeRiskByAge, ages = Object.keys(A || {}).map(Number).sort((a, b) => a - b), rrAt = (age) => (!ages.length ? 1 : A[Math.min(ages[ages.length - 1], Math.max(ages[0], Math.round(age)))] ?? 1);
   const act = W.players.filter((x) => x.lg?.active && x.ref), mean = act.reduce((a, x) => a + rrAt(lgAge(x)), 0) / Math.max(1, act.length) || 1;
   for (let y = 0; L.seasons < s && y < s + 5; y++) { // a season lost to injury does not count as one played (as in the league)
-    const ch = W.cfg.injuries === false || !xs.length ? 0 : base * (W.cfg.injuryByAge !== false ? rrAt(lgAge(p)) / mean : 1), miss = W.rand() < ch ? Math.min(full, W.pick(xs)[2]) : 0, from = 1 + Math.floor(W.rand() * (full - miss + 1));
+    const ch = W.cfg.injuries === false || !xs.length ? 0 : base * (W.cfg.injuryByAge !== false ? rrAt(lgAge(p)) / mean : 1), miss = W.rngLeague.rand() < ch ? Math.min(full, W.rngLeague.pick(xs)[2]) : 0, from = 1 + Math.floor(W.rngLeague.rand() * (full - miss + 1));
     L.season = { g: 0 };
     for (let wk = 1; wk <= full; wk++) {
       if (miss && wk >= from && wk < from + miss) { if (W.cfg.injuryCountsInForm !== false) { L.win.push(0); L.win.shift(); } continue; }
@@ -2932,7 +2955,7 @@ function veteran(W, old, s) {
       const G = R.legacyGrowth[p.pos], pr = lgProduction(p.pos, game); if (G) L.legacy += G.perScore * pr + G.perGame; L.win.push(pr); L.win.shift();
     }
     if ((L.season.g || 0) > 0) { L.last = { ...L.season }; L.seasons++; }
-    const cell = R.formSwings.cells[`${p.pos}|${lgStage(L.seasons)}`], sw = W.pick(cell?.draws?.length ? cell.draws : [0]); for (const st of Object.keys(L.rates)) L.rates[st] *= Math.exp(sw);
+    const cell = R.formSwings.cells[`${p.pos}|${lgStage(L.seasons)}`], sw = W.rngLeague.pick(cell?.draws?.length ? cell.draws : [0]); for (const st of Object.keys(L.rates)) L.rates[st] *= Math.exp(sw);
   }
   L.season = { g: 0 }; lib.seasons = L.seasons; return p;
 }
@@ -3018,11 +3041,11 @@ function nextSeason(W) {
       if (W.cfg.priceOnly || walk) continue; // nothing to draw: price-only has no value, the OVR walk moves weekly
       if (W.cfg.valueModel === 'league') continue; // the league simulation moves values (leagueSeasonEnd)
       if (fac && W.cfg.pastSave !== 'draw') continue; // no real data past the save, so no change: the player factor holds and only supply moves the value
-      if (fac) { c.B = Math.max(0.05 * W.cfg.coinScale, (c.B ?? c.F) * Math.exp(W.pick(W.rawRatios?.[c.pos] || [0]))); moves.push([c, c.B / before]); continue; } // 'draw': one real season's change from his position's history
+      if (fac) { c.B = Math.max(0.05 * W.cfg.coinScale, (c.B ?? c.F) * Math.exp(W.rngLeague.pick(W.rawRatios?.[c.pos] || [0]))); moves.push([c, c.B / before]); continue; } // 'draw': one real season's change from his position's history
       // Mean-reverting in log terms around the last real value, aimed sd²/2 low so the average value stays put
       const PULL = W.cfg.formulaPull ?? 0.25, anchor = ((W.anchorF ||= {})[c.id] ??= c.F), sd = W.ratios.sd[c.pos] || 0, v = PULL > 0 ? (sd * sd) / (2 * PULL - PULL * PULL) : 0; // (no pull: no aim either)
       const target = Math.log(anchor) - v / 2, lf = Math.log(c.F);
-      c.F = Math.max(1, Math.exp(lf + PULL * (target - lf) + W.pick(W.ratios[c.pos] || [0])));
+      c.F = Math.max(1, Math.exp(lf + PULL * (target - lf) + W.rngLeague.pick(W.ratios[c.pos] || [0])));
     }
     moves.push([c, walk ? (W.era[c.id]?.ovr || 60) / before : fac ? (c.B ?? c.F) / before : c.F / before]);
   }
@@ -3035,7 +3058,7 @@ function nextSeason(W) {
 
 // 2. People change: newcomers arrive faster after rallies (and are mostly speculators, as in real hype cycles), each
 //    bringing outside money; bots that lose most of their peak worth give up, and a few retire, selling everything.
-function poisson(W, lam) { let k = 0, p = Math.exp(-lam), s = p, u = W.rand(); while (u > s && k < 20) { k++; p *= lam / k; s += p; } return k; }
+function poisson(S, lam) { let k = 0, p = Math.exp(-lam), s = p, u = S.rand(); while (u > s && k < 20) { k++; p *= lam / k; s += p; } return k; } // S: a stream (the people's)
 // Word of mouth: the median bot's own return over the last 11 weeks (worth change less money it didn't earn), bots with 12 weeks of history
 function botReturn11(W) { const r = []; for (const b of W.bots) { if (b.kind !== 'rule' || !b.nwh || b.nwh.length < 12 || !b.exoh || b.exoh.length < 12) continue; const w0 = b.nwh[0], w1 = b.nwh[b.nwh.length - 1], e = b.exoh[b.exoh.length - 1] - b.exoh[0]; if (w0 > 0) r.push((w1 - e) / w0 - 1); } if (!r.length) return 0; r.sort((a, b) => a - b); return r[r.length >> 1]; }
 // League news flow: league news items this last 4 weeks over their 52-week weekly average, minus 1, floored at 0
@@ -3050,15 +3073,15 @@ function peopleChange(W) {
   // Neutral turnover: newcomers with random genomes arrive at a steady rate; bots that lose 70% of their peak quit
   const hp = W.hist.p, r20 = hp.length > 20 ? hp[hp.length - 1] / hp[hp.length - 21] - 1 : 0, wom = cfg.entryReturns > 0 ? botReturn11(W) : 0, nf = cfg.entryNews > 0 ? newsFlow(W) : 0;
   const mH = 1 + (cfg.entryHype || 0) * Math.max(0, r20), mR = 1 + (cfg.entryReturns || 0) * Math.max(0, wom), mN = 1 + (cfg.entryNews || 0) * nf, m = mH * mR * mN; // entryHype: more arrive after rallies (only how many, never what they do)
-  const lam = cfg.entryRate * (W.botK ?? 1) * mH * mR * mN, n = poisson(W, lam); W.entryWom = wom; let joined = 0, left = 0; // the same product order as before, so old runs repeat exactly
+  const lam = cfg.entryRate * (W.botK ?? 1) * mH * mR * mN, n = poisson(W.rngPeople, lam); W.entryWom = wom; let joined = 0, left = 0; // the same product order as before, so old runs repeat exactly
   W.entryDiag = cfg.entryHype > 0 || cfg.entryReturns > 0 || cfg.entryNews > 0 ? entryDiag(m, [mH, mR, mN], lam, [r20, cfg.entryReturns > 0 ? wom : botReturn11(W), cfg.entryNews > 0 ? nf : newsFlow(W)]) : null; // measurement only (the raw signals too, read even when their factor is 0)
   for (let k = 0; k < n; k++) { newcomer(W); joined++; }
   for (const b of W.bots.slice()) {
     if (b.kind !== 'rule') continue;
     const w = worth(W, b); b.peak = Math.max(b.peak || 0, w);
-    const gaveUp = cfg.quitRule === 'network' ? b.g?.nn && W.t - (b.joined ?? 0) > (cfg.quitMinWeeks ?? 20) && W.rand() < (cfg.quitChance ?? 0.25) * Math.max(0, (b._nnQuit ?? 0) - 0.5) * 2 // its network decides: above 0.5 it may leave, at most quitChance a week
-      : w < (1 - (cfg.quitDrawdown ?? 0.7)) * b.peak && W.t - (b.joined ?? 0) > (cfg.quitMinWeeks ?? 20) && W.rand() < (cfg.quitChance ?? 0.25);
-    if (!gaveUp && !(W.rand() < (cfg.retireRate ?? 0))) continue; // giving up after heavy losses is the market's doing; retiring at random is a rate we set (0 by default)
+    const gaveUp = cfg.quitRule === 'network' ? b.g?.nn && W.t - (b.joined ?? 0) > (cfg.quitMinWeeks ?? 20) && W.rngPeople.rand() < (cfg.quitChance ?? 0.25) * Math.max(0, (b._nnQuit ?? 0) - 0.5) * 2 // its network decides: above 0.5 it may leave, at most quitChance a week
+      : w < (1 - (cfg.quitDrawdown ?? 0.7)) * b.peak && W.t - (b.joined ?? 0) > (cfg.quitMinWeeks ?? 20) && W.rngPeople.rand() < (cfg.quitChance ?? 0.25);
+    if (!gaveUp && !(W.rngPeople.rand() < (cfg.retireRate ?? 0))) continue; // giving up after heavy losses is the market's doing; retiring at random is a rate we set (0 by default)
     removeBot(W, b, gaveUp ? (cfg.quitRule === 'network' ? 'chose to leave' : 'gave up after heavy losses') : 'retired'); left++;
   }
   if (cfg.populationFloor > 0) { const floor = Math.round(cfg.populationFloor * popOf(W)); let k = 0; while (W.bots.filter((b) => b.kind === 'rule').length < floor && k++ < floor) { newcomer(W); joined++; W.floorAdds = (W.floorAdds || 0) + 1; } } // only the head count is kept up
@@ -3114,7 +3137,8 @@ export function endow(W, bots = W.bots) {
 // An AI bot's life ends: one heir takes the whole estate (cash, cards, loans, notes, reputation) and the memo, and
 // carries on under the same seat (same model), as the next generation of its line
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
-function aiSuccession(W, b) {
+function aiSuccession(W, b) { onStream(W, W.rngPeople, () => aiSuccessionOn(W, b)); } // a death: the people stream
+function aiSuccessionOn(W, b) {
   const line = (b.line || 1) + 1, base = b.name.replace(/ [IVX]+$/, '');
   const heir = newBot(W, AI, null, { name: `${base} ${ROMAN[line] || line}`, model: b.model, seat: b.seat, social: b.social });
   heir.line = line; heir.born = W.t; const lw = W.cfg.aiLifespanWeeks; heir.lifespanW = lw[0] + Math.floor(W.rand() * (lw[1] - lw[0] + 1));
@@ -3148,7 +3172,7 @@ function ovrWalk(W) {
   for (const c of W.players) {
     if (c.on === false) continue;
     const v = walkVol(W, riskRating(W, c));
-    c.F = Math.max(0.01 * c.F0, c.F * (W.rand() < W.cfg.walkUp ? 1 + v : 1 - v));
+    c.F = Math.max(0.01 * c.F0, c.F * (W.rngLeague.rand() < W.cfg.walkUp ? 1 + v : 1 - v));
   }
   packCache = null; packCacheT = null;
 }

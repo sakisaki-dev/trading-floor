@@ -88,6 +88,9 @@ These four govern every change. They are stated in regulator-spec section 1.
 - **Round 5** (`1487fd4`). The engine was made about 2.4 times faster with every frame hash unchanged. Three world
   factors were added: an attention budget (off in Realism), bots that scale with the cards (on in Realism), and entry
   driven by league news (on in Realism with rallies and returns). Each changes how many, never what.
+- **Split random streams** (audit methods 1). The league, the market and bots, and people (entry, exits, shocks) draw
+  from separate seeded streams (`rngStreams: 'split'`, the default), so on one seed the football is identical under
+  every market setting; `'single'` repeats older runs.
 - **A stand-alone repository** (`85ffd9a`). The sandbox moved out of RetroVault with `sim.mjs` as a headless runner
   and `configs/realism.json`.
 

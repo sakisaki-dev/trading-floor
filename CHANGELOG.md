@@ -15,6 +15,25 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 
 ## [Unreleased]
 
+### Split random streams (audit methods 1; code finding "Single shared random stream")
+Real fix: default results change. New setting `rngStreams`: `'split'` (default) gives the league (`W.rngLeague`: games,
+injuries, champion, awards, retirements, rookies and generated veterans, entry ages, form swings, the older value
+models' season draws), the market and bots (`W.rngMarket`, still `W.rand`/`W.gauss`/`W.pick`/`W.shuffle`: orders,
+research, packs, auctions, notes, contests, learning trials, evolution, mutation, the starting bots and endowment) and
+people (`W.rngPeople`: newcomers and everything about them, quits, deaths, lifespans, heirs, estate rounding, AI bots'
+arrival and succession, cash shocks, card loss) their own mulberry32 streams, seeded `seed × 7919 + id` with fixed ids
+(`RNG_STREAMS`: market 17, league 171, people 313, display 29), every pair at least 0.22 × 2^32 draws apart on the
+generator's cycle for every seed. Diagnostics keep their private fixed-seed generators. `'single'` is the old shared
+stream. Practice worlds get the same layout from their own seeds. `sim.mjs` writes the layout to `meta.rng`; the page
+has a Random streams control (applies on Restart); `configs/realism.json` and the page's Realism preset state `'split'`.
+Tests (`tests/rng.test.mjs`): on seed 31761, Realism, practiceGens 0, 100 weeks, the league (every player's hidden value,
+injury spells, status, career totals with awards and rings, the champions) is identical every week between fee 0.01 and
+0.05 and between allowance 200 and 400, while the markets differ; with `'single'` the same pairs diverge from week 2
+(different champions every season). `'single'` repeats the merge commit's (`f957e95`) frames exactly for 45 weeks at
+the engine defaults (practice included) and on Realism. Two 60-week Realism runs give identical frame hashes; no NaN or
+Infinity. Week 60, Realism, seed 31761, practiceGens 0 (reported, not tuned): 312 bots (base 301), 712 trades a week
+over weeks 51 to 60 (944), Vault index 68.3 (76.0), marks index 207.8 (211.2), Gini 0.568 (0.566).
+
 ### Merged: the four audit branches together
 `fix/assume`, `fix/mech`, `fix/info` and `fix/nets` are merged in that order. Each subsection below describes its
 branch alone (fix/assume's byte-identical claim holds for that branch, not the merge). Where two branches fixed the

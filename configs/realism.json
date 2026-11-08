@@ -117,5 +117,6 @@
  "gameNoise": 0.4,
  "formBlendSeasons": 2,
  "championWeight": "production",
- "awardWinner": "top"
+ "awardWinner": "top",
+ "rngStreams": "split"
 }
