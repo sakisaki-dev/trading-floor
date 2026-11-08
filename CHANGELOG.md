@@ -15,6 +15,18 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 
 ## [Unreleased]
 
+### Merged: the four audit branches together
+`fix/assume`, `fix/mech`, `fix/info` and `fix/nets` are merged in that order. Each subsection below describes its
+branch alone (fix/assume's byte-identical claim holds for that branch, not the merge). Where two branches fixed the
+same thing, the merge keeps one mechanism: bills owed (`fix/mech`) are booked through the ledger (`fix/info`) and take
+a lump sum out of fitness in full when charged; the living bill is the flat cost and lifestyle separately;
+`settleForced` (traced per sale, bills first) replaces `repayForced`; pass and ticket prices use `fix/mech`'s map around
+the last clearing price; the most-traded list uses `hotVolWeeks`, `hotRetWeeks`, `hotFloor` with `hotRank` (no
+`hotWeeks`); a default or a leaver's open listings go to the liquidator carrying the lenders' claim. New ledger tag:
+liquidator to lenders and borrowers (`liqClaims`), also a treasury line. Week 60, Realism, seed 31761, practiceGens 0
+(reported, not tuned): 301 bots (base 311), 944 trades a week over weeks 51 to 60 (653), Vault index 76.0 (85.0), marks
+index 211.2 (89.4), Gini 0.566 (0.410); ledger and treasury "other" 0.
+
 ### Audit 5e: undisclosed assumptions (`fix/assume`)
 - Every constant in AUDIT.md section 5e is now a named setting in `DEFAULTS` with a doc comment saying it is an
   assumption, at the value the code always used: the print run (`printRunK`, `printRunExp`, `printRunMin`,
