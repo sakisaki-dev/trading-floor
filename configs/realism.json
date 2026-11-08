@@ -95,7 +95,6 @@
  "positionLimit": 0,
  "capPoorest": false,
  "leagueUpdates": false,
- "lenderCycle": false,
  "printRunK": 40,
  "printRunExp": 0.5,
  "printRunMin": 2,

@@ -93,15 +93,17 @@ order phase; every other phase visits bots in list order.
 5. **Royalties** (`payRoyalties`): each holder is paid a weekly share of each card's value, scaled by that week's game.
 6. **Bookkeeping**: wealth groups, weekly counters; 3 research passes and 3 game tickets granted to every bot.
 7. **Allowance**: paid to every bot equally (new money in Realism).
-8. **Wealth tax** (every 4 weeks): charged on worth above twice the median and paid back equally.
+8. **Wealth tax** (every `wealthTaxEvery` = 4 weeks): charged on worth above `wealthTaxThreshold` (2) × the median and
+   paid back equally. What a bot can't pay is owed.
 9. **Market state**: market drawdown (`mood`), set-aside of dormant retired players (`dormancy`), the list of live
    cards.
 10. **Bot stance** (`nnThink`): every neural bot runs its bot network once. With an attention budget, each bot also
     draws the cards it will look at this week (`attendWeek`; off in Realism).
-11. **Living costs and credit** (`livingAndCredit`, `creditMarket`): living costs are charged; loan interest, maturities,
+11. **Living costs and credit** (`livingAndCredit`, `creditMarket`): bills still owed (arrears) are collected from cash and
+    put up for a forced sale again; living costs are charged; loan interest, maturities,
     margin calls and defaults are settled; the weekly credit auction clears new loans.
 12. **Entry and exit** (`peopleChange`): newcomers arrive; bots may quit.
-13. **Holding costs and cash shocks.** Unpaid amounts become forced sales.
+13. **Holding costs and cash shocks.** Unpaid amounts are owed by cause (`b.arrears`) and become forced sales.
 14. **Notes** (`socialPhase`): note swaps and theft; theft flags lift after 26 weeks (`liftFlags`).
 15. **Research** (`passPhase`): a call auction for passes (`tokenMarket`), then each bot researches the players its
     card network ranks highest (`nnResearchWish`).
@@ -117,7 +119,8 @@ order phase; every other phase visits bots in list order.
 22. **Dealers** (`valueCollectors`): sell into bids and buy asks around their reference value.
 23. **Forced sales** (`forcedSales`): into the best remaining bids, then to auction with no minimum.
 24. **Shorts settle** (`settleShorts`); the liquidator's non-auction asks are cut (`liqCut`, unused in Realism);
-    proceeds of forced sellers repay their lenders.
+    `settleForced`: bills owed are paid from cash first, then lenders, only from the proceeds of sales a margin call or
+    loan default forced.
 25. **Records**: worth histories, the crash, rally, bubble and corner detector (`detect`).
 26. **Learning within a lifetime** (`adaptStep`, every 10 weeks).
 27. **Generation end** (`generationEnd`, every 20 weeks): fitness, diagnostics and the tactic tracker (`genDiag`,
@@ -317,13 +320,25 @@ network's buy output is positive and above its sell output, at the price from `n
   pair. Loans run 8 weeks. Interest is paid weekly (or added to the loan). Past 75% of the cards' value a borrower
   gets a margin call (a forced sale down to 60%). At maturity it must repay or sell. A borrower whose debt exceeds its
   cash plus cards, or that is 3 weeks late, defaults: lenders recover its cash pro rata, its cards go to the
-  liquidator, and the bot stays in the market with nothing.
+  liquidator carrying the lenders' unpaid claim, and the bot stays in the market. Each liquidator sale of a seized copy
+  pays the claimants pro rata to what each is still owed; anything over goes to the borrower (to the treasury if it
+  has left). A bot that leaves repays its loans from cash first; its lenders keep the same claim on its cards. New
+  offers and requests need only be above the matcher's dust floor (0.5 coins). A neural bot lends up to
+  `lendShareMax` (all) of its idle cash and asks to borrow a share of `maxLTV` × its cards' value.
+- **Bills owed** (`bill`, `collectArrears`). Living costs, holding costs, the wealth tax and cash shocks are paid from
+  cash; the rest is owed, by cause, and counts as a debt in worth. It is collected from later cash (at the start of
+  the week and after the forced sales) and paid where the bill was going (living costs and shocks leave the economy,
+  holding costs go to the treasury, the tax to the tax pot or the treasury). While owed, it is put up for a forced sale
+  each week (the wealth tax only with `wealthTaxForced`). Heirs inherit it; only a bot that leaves is excused.
 - **Card lending and shorts** (`lendPool`, `borrowCard`, `shortUpkeep`, `settleShorts`). Each bot lends a share of
   its copies (bot-network output). A bot with no copy of a card may borrow one and sell it, posting 50% of the price as
   collateral and paying 0.5% of the price a week to the lender; a short seller also pays the lender any royalty the
   card earns. The card must be returned within 12 weeks or when the short seller's worth falls below 25% of what it
-  owes. A forced cover bids up to 1.15× the price for 3 weeks, then settles in cash at 1.1× the price. A short whose
-  sale did not fill is undone.
+  owes, or when it can't pay a fee or royalty (it pays from its cash only; the shortfall is the lender's loss). A lender
+  is drawn in proportion to the copies it offers. A forced cover bids up to `coverBid` (1.15) × the price for
+  `coverGraceWeeks` (3) weeks, then settles in cash at `coverSettle` (1.1) × the price (all three the owner's
+  settings). A short whose sale did not fill is undone. A short seller holding a copy of a card it owes returns it at
+  settlement (plain netting): a bot can't be long and short the same card.
 
 ### 7.6 Outside dealers and the liquidator
 
@@ -371,15 +386,18 @@ could bid in (`nnAuctionBid`). Without an attention budget a bot looks at every 
 - Outputs (`CARD_OUT`): buy, sell, price offset, size, research, auction, short, anchor to its own estimate, and with
   the guide on, anchor to the guide.
 - **Actions from outputs** (`nnAct`): buy if buy > 0 and buy > sell; sell (ask) if it holds copies and sell > 0; list
-  at auction if auction > 1; short if it holds none, short > 0.5 and short > buy. Size is `1 + floor(2 × sigmoid)`
-  copies. Buy orders are placed in order of the buy output, up to 40 a week (`deployOrders`) while cash above the cash
+  at auction if auction > 1; short if it holds none, short > 0.5 and short > buy. Size is
+  `1 + min(maxOrderQty − 1, floor(maxOrderQty × sigmoid))` copies (1 to 3, every size reachable). Buy orders are placed in order of the buy output, up to 40 a week (`deployOrders`) while cash above the cash
   target lasts. Up to 10 auction listings (`maxListings`), 30 short sales (`maxShorts`) and 8 packs (`maxPacks`) a week.
 - **Price** (`nnPrice`): the base starts at the mark, moves toward the guide by `sigmoid(anchor to the guide)`, then
   toward its own fresh research estimate by `sigmoid(anchor to my estimate)`. The order price is
   `base × exp(0.6 × price offset)` (`priceMap: 'log'`), held only by a safety clamp of ×50 either way.
 - **Research** (`nnResearchWish`): players it has no fresh note on, ranked by the research output plus its research
-  aim for the position; it researches up to its research count (passes permitting). Notes go stale after 12 weeks and
-  a bot keeps at most 25.
+  aim for the position; it researches up to its research count, `passesPerWeek × exp(output)` (passes permitting; the
+  pass price binds, `maxResearchPerWeek` 60 is a safety bound). Notes go stale after 12 weeks and are forgotten at 24
+  (`memoryCap` 0: no count limit). Pass and ticket bids and asks are the last clearing price × exp(output) on the pack
+  bid's scale (before the first trade, `passOpen` 10 or `ticketOpen` 4 × coinScale). Packs: 0 to `maxPacks` of each
+  type, `maxPacks` in all.
 - **Forced sales** (`forcedSales`, `forcedOrder: 'network'`): a forced seller sells the cards its own network most
   wants to sell, first into standing bids, then at auction with no minimum.
 
@@ -420,7 +438,7 @@ All are settings; with each at its engine default a run matches the earlier engi
 | Living cost (`livingCost`, `lifestyle`) | 200 a week + 0.05% of worth a week | **Assumption** |
 | Royalties (`royaltyRate`, `royaltyFunding: 'minted'`) | 5% of value per 20 weeks, paid weekly, scaled by each game's production ÷ career pace; new money | **Assumption** |
 | Holding cost (`holdCost`) | 0.05% of the mark a week, to the house | **Assumption** |
-| Wealth tax (`wealthTax`, `wealthTaxTo: 'equal'`, `wealthTaxForced`) | 0.1% a week (charged every 4 weeks) on worth above twice the median, paid back equally; unpaid tax is a forced sale | **Assumption** |
+| Wealth tax (`wealthTax`, `wealthTaxThreshold`, `wealthTaxEvery`, `wealthTaxTo: 'equal'`, `wealthTaxForced`) | 0.1% a week (charged every 4 weeks) on worth above twice the median, paid back equally; unpaid tax is owed and sold for | **Assumption** |
 | Trade fee (`fee`) | 1% of each sale | **Assumption** |
 | Dealers (`outsideBudget`, `outsideNews`) | 100,000 a week, 25 dealers; see 7.6 | **Assumption** |
 | Price guide (`guideOn`, `guideEvery`, `guideLag`) | Every 4 weeks, 1 week old | **Assumption**, modelled on printed price guides |
@@ -509,6 +527,6 @@ royalty yield (`royaltyRate` × the note's estimate ÷ price); input 32 carries 
   differ in the bots' behaviour (AUDIT.md, methods finding 1).
 - Research reads hidden value with noise; the valuation contest and some diagnostics read it exactly. AUDIT.md section
   5a lists the channels found.
-- 141 code findings from the audit (AUDIT.md section 5) are open.
+- Code findings from the audit (AUDIT.md section 5) are marked Open, Fixed or Deferred one by one.
 - The league's weekly stat draws, injury spells, champion draw and award winners are assumptions; only season totals
   are known from the save.
