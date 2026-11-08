@@ -4574,6 +4574,12 @@ const PRESETS = {
   priceonly: { label: 'Price-only world', set: { priceOnly: true }, hyp: '<b>Price-only world.</b> No hidden value anywhere: a card is worth only what someone pays. No royalties, packs priced from market prices, research shows past trades. With nothing to anchor them, prices drift toward zero.' },
   policy: { label: 'Policy: all safeguards', set: { store: true, priceLimit: 0.15, centralBank: true, wealthTax: 0.002, positionLimit: 0.25 }, hyp: '<b>Policy: all safeguards.</b> Store ceiling, price limits, central bank, wealth tax and position caps, for comparison.' },
 };
+// Realism with the starting population left at 250 (botScale 1 instead of 'cards', about 500 bots with the full league).
+// Same laws and the same total money (the allowance is split over fewer bots), about twice as fast to watch. The page
+// opens on it; 'Realism' stays identical to configs/realism.json for research runs.
+{ const r = PRESETS.realism, light = { label: 'Realism · 250 bots (faster)', set: { ...r.set, botScale: 1 }, hyp: r.hyp.replace('<b>Realism.</b>', '<b>Realism, 250 bots.</b> The Realism laws with half the bots (no scaling with the full league), so weeks run about twice as fast.') };
+  const keys = Object.keys(PRESETS), rest = Object.fromEntries(keys.map((k) => [k, PRESETS[k]])); for (const k of keys) delete PRESETS[k];
+  Object.assign(PRESETS, { realismLight: light }, rest); }
 const SOC = ['Sharer', 'Reciprocator', 'Thief'];
 const TAGS = { return: 'Back', champion: 'Champion', award: 'Award', hof: 'Hall of Fame', retire: 'Retired', rookie: 'Rookie', injury: 'Injury', season: 'Season', people: 'People', credit: 'Credit', fashion: 'Fashion', margin: 'Margin', start: 'Open', gen: 'Gen', evolve: 'Evolution', crash: 'Crash', bubble: 'Bubble', corner: 'Corner', flag: 'Flagged', pool: 'Pool', update: 'Update', auction: 'Auction', games: 'Games' };
 
@@ -4639,7 +4645,7 @@ function sheet(el, open) {
 
 /* ---------- State ---------- */
 const randSeed = () => 1 + Math.floor(Math.random() * 99999); // every new run gets a new seed (type one in Seed to replay a run)
-let opts = { seed: randSeed() }, presetKey = 'realism'; // the page opens on the Realism preset; Default laws stays selectable
+let opts = { seed: randSeed() }, presetKey = 'realismLight'; // the page opens on Realism with 250 bots (faster to watch); full Realism and Default laws stay selectable
 let FRAMES = [], H = null, mode = 'live', RUN = null, cursor = 0;
 // The live world runs in a background worker (the same engine), so a slow week never freezes the page. The worker sends
 // each finished week as a frame, the world's settings, and details for whatever player and bot are selected.
