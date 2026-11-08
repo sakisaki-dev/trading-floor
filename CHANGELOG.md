@@ -13,6 +13,42 @@ changes results only where the bug occurred.
 Versions before 1.0.0 were not tagged at the time. They are assigned here to the development rounds in
 `docs/DEVLOG.md`, with the commit that closed each round.
 
+## [Unreleased]
+
+### Fixed: mechanism bugs and walls (audit 5c and 5d, branch `fix/mech`)
+
+Real fixes: default results change (a major version once merged). Tests: `node tests/mech.test.mjs` (one per fix);
+`node tests/run_check.mjs` hashes every frame of a Realism run and scans it for NaN or Infinity.
+- **Money and cards no longer created, destroyed or forgiven.** Unpaid bills (living costs, holding costs, the wealth
+  tax, cash shocks) are owed by cause (`b.arrears`), count against worth, are collected from later cash and forced-sale
+  proceeds and paid where the bill was going; only leavers are excused. A default's seized cards carry the lenders'
+  unpaid claim and each liquidator sale pays them, the surplus to the borrower; a leaver repays from cash first. Only
+  the proceeds of sales a margin call or loan default forced repay lenders (bills first). Dealers' starting stock comes
+  from the unminted pool. Card lending fees and short sellers' royalties are paid from cash only (the shortfall is the
+  lender's loss and calls the short). The house prize pool is paid from the treasury, capped at its balance. Packs are
+  charged only for the copies they held; the pool is checked before a mint is counted. Pending predictions pass to
+  heirs; a leaver's stakes are refunded. The wealth tax's forced sale (`wealthTaxForced`) now actually happens.
+- **Matching and draws.** `clear()` matches each bid to the cheapest ask it may trade with and that can settle, with no
+  shared cursor or swaps, so a bot's own ask or a cash-short buyer no longer removes liquidity. One seeded Fisher-Yates
+  shuffle (`W.shuffle`) replaces the biased random-comparator sorts (bot order, duel pairs, imposter options, the rule
+  bots' book) and the dealers' order is shuffled weekly. A short seller's lender is drawn by copies offered. Pack draws
+  use the live pool and re-roll an exhausted tier with the pack's own odds; pack EV weights the kit premium by the clubs
+  that have kits. Trade-arc sampling (display only) has its own random stream.
+- **Walls widened or made costs.** Order size reaches `maxOrderQty`; packs reach `maxPacks` per type; research count
+  is open (`passesPerWeek × exp(output)`, `maxResearchPerWeek` 60 only a safety bound); pass and ticket prices map
+  around the last clearing price, the same way for bids and asks; lending up to all idle cash (`lendShareMax` 1);
+  borrowing a share of `maxLTV` capacity; credit offers and requests above the 0.5-coin dust floor; notes forgotten by
+  age, not count (`memoryCap` 0); the bid cash check is cumulative; retirement past 40 carries the pooled tail rate;
+  AI bots get the neural bots' caps.
+- **Settings and disclosure.** New: `wealthTaxThreshold`, `wealthTaxEvery`, `compsSource`, `quitMinWeeks`,
+  `lendShareMax`, `coverBid`, `coverSettle`, `coverGraceWeeks`, `passOpen`, `ticketOpen`, `aiCaps` (page controls for
+  the first eight and `memoryCap`). One spelling per setting: `priceGuide`, `cashShocks` and `adapt` objects are mapped
+  onto the flat keys. Removed: `lenderCycle` (dead code) and `outsideMode: 'band'` (rejected). The value floor is
+  0.05 × coinScale everywhere. New frame fields: `predPending`, `arrears`, `bookD.distUnit`; the money ledger adds
+  "liquidator to lenders and borrowers".
+- **Deferred to the government build:** per-subsystem random streams, per-world module state, `positionLimit` as a
+  concentration tax.
+
 ## [1.0.0] - 2026-11-07
 
 Round 5 (commit `1487fd4`), moved to a stand-alone repository (`85ffd9a`). This is the state documented in
