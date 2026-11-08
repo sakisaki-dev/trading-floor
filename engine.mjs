@@ -624,7 +624,7 @@ function mintCopy(W, b, x, cost, t = W.t, fromPool = true) {
   if (fromPool) { p.pool--; if (p.pool === 0) log(W, 'pool', `The pool has run out of ${p.pos} ${p.name} cards.`); }
   if (x.d < 4 && x.kit === 'home' && !x.par) { const m = W.cards[mktId(x.pid, x.d, x.f)]; m.circ++; if (!fromPool) m.S0++; if (b) { give(b, m, 1); addLot(b, m, cost, t); } return m; }
   const it = { uid: `I${(W.itemSeq = (W.itemSeq || 0) + 1)}`, pid: x.pid, d: x.d, f: x.f, kit: x.kit || 'home', par: x.par || null, auto: x.auto || null, mult: copyMult(x), owner: b, cost, last: null };
-  it.label = itemLabel(W, it); W.items.set(it.uid, it); if (b) (b.items ||= new ItemSet()).add(it.uid);
+  it.label = itemLabel(W, it); W.items.set(it.uid, it); ITEM_ROY.set(it, W._royN || 0); if (b) (b.items ||= new ItemSet()).add(it.uid);
   return it;
 }
 // An item's mark-to-market: its plain card's price × (its premium ÷ the plain card's), not its own trades (an assumption:
@@ -1420,7 +1420,7 @@ function cardWeek(W, c, id) {
 // The card network's inputs for one bot and one card (or one-of-a-kind item), into x from offset xo
 function cardInputs(W, b, c, nw, ctx, it, x = XC, xo = 0, id = c.id) {
   const o = cardWeek(W, c, id), m = W._cw, pid = m[o], cm = m[o + 12];
-  const S = SNAP && id < SNAP.n ? SNAP : null, n = b.notes.get(pid), q = b.h.get(id) || 0, P = Math.max(0.01, S ? S.P[id] : c.P), mult = it ? it.mult : cm, price = it ? markItem(W, it) : P, fr = fresh(W, n);
+  const S = SNAP && id < SNAP.n ? snapRow(SNAP, id) : null, n = b.notes.get(pid), q = b.h.get(id) || 0, P = Math.max(0.01, S ? S.P[id] : c.P), mult = it ? it.mult : cm, price = it ? markItem(W, it) : P, fr = fresh(W, n);
   x[xo] = 1; x[xo + 1] = it ? Math.log10(price) / 5 : m[o + 1]; x[xo + 2] = it ? Math.log(mult) / 2 : m[o + 2]; x[xo + 3] = m[o + 3]; x[xo + 4] = m[o + 4];
   x[xo + 5] = m[o + 5]; x[xo + 6] = m[o + 6]; x[xo + 7] = m[o + 7]; x[xo + 8] = m[o + 8]; x[xo + 9] = m[o + 9]; x[xo + 10] = m[o + 10]; x[xo + 11] = m[o + 11];
   x[xo + 12] = fr ? 1 : 0; x[xo + 13] = fr ? clamp((n.est * mult - price) / price, -1, 1) : 0; x[xo + 14] = n ? clamp((W.t - n.week) / W.cfg.knowledgeWeeks, 0, 2) : 1; x[xo + 15] = fr && n.ovr ? (n.ovr - 80) / 20 : 0;
@@ -1431,7 +1431,7 @@ function cardInputs(W, b, c, nw, ctx, it, x = XC, xo = 0, id = c.id) {
   x[xo + 28] = b._life ?? 1; const ow = b.owed?.get(id), ld = W.lendable?.get(id); x[xo + 29] = ow ? Math.log1p(ow) : 0; x[xo + 30] = ld ? Math.log1p(ld) / 3 : 0; x[xo + 31] = W.cfg.shorting ? W.cfg.cardLendFee * 100 : 0; // (log1p(0) is 0, so absent counts skip it)
   const N = S ? S.news : playerNews(W, W.players[pid], NEWS1, 0), no = S ? pid * NWN : 0;
   if (S && !it) { const k = snapCx(S, c, id), X = S.cx; x[xo + 32] = X[k]; x[xo + 33] = m[o + 13]; x[xo + 34] = X[k + 1]; x[xo + 35] = X[k + 2]; if (SHAPE_G) x[xo + 41] = X[k + 3]; } // the same for every bot in a snapshot phase
-  else { cardMarketInputs(it ? it.lastRoy : S ? S.roy[id] : cardRoy(W, c), S ? S.bb[id] : c.bb, S ? S.ba[id] : c.ba, price, P, N, no, mult, x, xo); x[xo + 33] = m[o + 13]; }
+  else { cardMarketInputs(it ? itemRoy(W, it) : S ? S.roy[id] : cardRoy(W, c), S ? S.bb[id] : c.bb, S ? S.ba[id] : c.ba, price, P, N, no, mult, x, xo); x[xo + 33] = m[o + 13]; }
   x[xo + 36] = N[no]; x[xo + 37] = N[no + 1]; x[xo + 38] = N[no + 2]; x[xo + 39] = N[no + 3]; x[xo + 40] = N[no + 4];
   if (SHAPE_G) x[xo + 42] = N[no + 5] === 1 ? N[no + 7] : 0;
   return x;
@@ -1448,7 +1448,7 @@ function rowConsts(W, b, nw, ctx) {
   return K;
 }
 function cardInputsSnap(W, K, c, id, x, xo) {
-  const o = cardWeek(W, c, id), m = W._cw, pid = m[o], cm = m[o + 12], S = SNAP, b = K.b, nw = K.nw, ctx = K.ctx;
+  const o = cardWeek(W, c, id), m = W._cw, pid = m[o], cm = m[o + 12], S = snapRow(SNAP, id), b = K.b, nw = K.nw, ctx = K.ctx;
   const n = b.notes.get(pid), q = b.h.get(id) || 0, P = Math.max(0.01, S.P[id]), fr = n && K.t - n.week <= K.kw;
   x[xo] = 1; x[xo + 1] = m[o + 1]; x[xo + 2] = m[o + 2]; x[xo + 3] = m[o + 3]; x[xo + 4] = m[o + 4];
   x[xo + 5] = m[o + 5]; x[xo + 6] = m[o + 6]; x[xo + 7] = m[o + 7]; x[xo + 8] = m[o + 8]; x[xo + 9] = m[o + 9]; x[xo + 10] = m[o + 10]; x[xo + 11] = m[o + 11];
@@ -1522,8 +1522,7 @@ const nnRate = (W, v) => (W.cfg.rateMap === 'log' ? Math.min(W.cfg.rateClamp ?? 
 // the phase's end makes sure of it: a rule that changes one of them inside such a phase must clear SNAP before it does.
 let SNAP = null;
 function snapCards(W) {
-  const n = W.cards.length, S = { n, P: new Float64Array(n), bb: new Float64Array(n), ba: new Float64Array(n), roy: new Float64Array(n), off: new Uint8Array(n) };
-  for (const c of W.cards) { const id = c.id; S.P[id] = c.P; S.bb[id] = c.bb; S.ba[id] = c.ba; S.roy[id] = cardRoy(W, c); S.off[id] = c.on === false ? 1 : 0; } // undefined is stored as NaN: both read as "none"
+  const n = W.cards.length, S = { n, W, ok: new Uint8Array(n), P: new Float64Array(n), bb: new Float64Array(n), ba: new Float64Array(n), roy: new Float64Array(n), off: new Uint8Array(n) }; // a card's row is copied when the phase first reads it (snapRow): nothing it holds can change in the phase, so it is what a copy at the start would hold
   S.news = new Float64Array(W.players.length * NWN); W.players.forEach((pl, i) => playerNews(W, pl, S.news, i * NWN)); // (players are indexed by id)
   S.cx = new Float64Array(n * 4); S.cxOk = new Uint8Array(n); S.T = new Float64Array(43); // each plain card's inputs 32, 34, 35, 41, as cardInputs reads them: worked out from the snapshot the first time a bot reads the card (snapCx)
   return S;
@@ -1531,15 +1530,20 @@ function snapCards(W) {
 // A card's inputs 32, 34, 35 and 41 in a snapshot phase, from the snapshot's own values (so the same whenever they are worked out); returns their offset in S.cx
 // What one copy of a card paid over the last generation: his player's roySum (set by payRoyalties) × the card's multiplier,
 // as payRoyalties used to store on every card each week (undefined before the first payment, which every reader takes as none)
+// The same for a one-of-a-kind card: none until a payment has been made since it was minted (ITEM_ROY: the payments made before it)
+const ITEM_ROY = new WeakMap();
+function itemRoy(W, it) { const n0 = ITEM_ROY.get(it) ?? 0; return (W._royN || 0) > n0 ? (W.players[it.pid]?.roySum || 0) * (it.mult / Math.max(1e-9, W.cards[mktId(it.pid, it.d === 4 ? 0 : it.d, it.f)]?.mult || 1)) : undefined; }
 function cardRoy(W, c) { return W._royPaid ? (W.players[c.pid].roySum || 0) * c.mult : undefined; }
+// The snapshot with card id's row filled in (undefined is stored as NaN: both read as "none")
+function snapRow(S, id) { if (!S.ok[id]) { const c = S.W.cards[id]; S.P[id] = c.P; S.bb[id] = c.bb; S.ba[id] = c.ba; S.roy[id] = cardRoy(S.W, c); S.off[id] = c.on === false ? 1 : 0; S.ok[id] = 1; } return S; }
 function snapCx(S, c, id) {
-  const k = id * 4; if (S.cxOk[id]) return k;
+  const k = id * 4; if (S.cxOk[id]) return k; snapRow(S, id);
   const T = S.T, P = Math.max(0.01, S.P[id]); cardMarketInputs(S.roy[id], S.bb[id], S.ba[id], P, P, S.news, c.pid * NWN, c.mult, T, 0); S.cx[k] = T[32]; S.cx[k + 1] = T[34]; S.cx[k + 2] = T[35]; S.cx[k + 3] = T[41]; S.cxOk[id] = 1;
   return k;
 }
 function endSnap(W, S) {
   if (SNAP !== S) return; SNAP = null; const same = (a, v) => Object.is(a, v) || (Number.isNaN(a) && v == null) || (a === 0 && v === null); // null and undefined were stored as 0 and NaN
-  for (const c of W.cards) { const id = c.id; if (id >= S.n) continue; if (!same(S.P[id], c.P) || !same(S.bb[id], c.bb) || !same(S.ba[id], c.ba) || !same(S.roy[id], cardRoy(W, c)) || S.off[id] !== (c.on === false ? 1 : 0)) throw new Error(`card ${c.key}: price, quotes, royalty or status changed during a phase that reads them from a snapshot`); }
+  for (let id = 0; id < S.n; id++) { if (!S.ok[id]) continue; const c = W.cards[id]; if (!same(S.P[id], c.P) || !same(S.bb[id], c.bb) || !same(S.ba[id], c.ba) || !same(S.roy[id], cardRoy(W, c)) || S.off[id] !== (c.on === false ? 1 : 0)) throw new Error(`card ${c.key}: price, quotes, royalty or status changed during a phase that reads them from a snapshot`); }
   for (let i = 0; i < W.players.length && (i + 1) * NWN <= S.news.length; i++) { playerNews(W, W.players[i], NEWS1, 0); for (let k = 0; k < NWN; k++) if (!Object.is(NEWS1[k], S.news[i * NWN + k])) throw new Error(`player ${W.players[i].key}: league news or guide changed during a phase that reads them from a snapshot`); }
 }
 // Row buffers for scoring many cards for one bot at once (reused, grown when needed)
@@ -1551,7 +1555,7 @@ function nnResearchWish(W, b) {
   const nw = Math.max(NW_FLOOR * W.cfg.coinScale, worth(W, b)), ctx = marketCtx(W), NI = CARD_SHAPE[0], N3 = CARD_SHAPE[3];
   const pidOf = cardIndex(W), live = W._live, lid = W._liveId, ids = [];
   if (!W._seen || W._seen.length < W.players.length) { W._seen = new Int32Array(W.players.length + 64); W._seenN = 0; } const seen = W._seen, sn = ++W._seenN; // players already looked at: seen[pid] === sn
-  const S = SNAP, look = (id) => { const pid = pidOf[id]; if (seen[pid] === sn || (S && id < S.n ? S.off[id] === 1 : W.players[pid].on === false)) return; seen[pid] = sn; if (!fresh(W, b.notes.get(pid))) ids.push(id); }; // a card's status is its player's
+  const S = SNAP, look = (id) => { const pid = pidOf[id]; if (seen[pid] === sn || (S && id < S.n ? snapRow(S, id).off[id] === 1 : W.players[pid].on === false)) return; seen[pid] = sn; if (!fresh(W, b.notes.get(pid))) ids.push(id); }; // a card's status is its player's
   if (W.cfg.attention > 0) { for (const c of attended(W, b)) if (c) look(c.id); } // (attention budget) only the cards it looks at this week, in that order
   else { for (const id of b.h.keys()) look(id); for (let i = 0; i < live.length; i++) look(lid[i]); } // the cards it holds first, then every live card
   rowBufs(ids.length); const K = rowConsts(W, b, nw, ctx); for (let r = 0; r < ids.length; r++) { const id = ids[r]; S && id < S.n ? cardInputsSnap(W, K, W.cards[id], id, ROW_X, r * NI) : cardInputs(W, b, W.cards[id], nw, ctx, undefined, ROW_X, r * NI, id); } // nothing changes while it looks, so all its cards are scored in one batch
@@ -1619,7 +1623,7 @@ function nnAct(W, b) {
   const dO = W.cfg.deployOrders, K = Number.isFinite(dO) ? Math.max(0, Math.ceil(dO)) + 1 : Infinity, topK = K <= 4096;
   let BX = topK ? (ACT_BX.length >= K * NI ? ACT_BX : (ACT_BX = new Float64Array(K * NI))) : new Float64Array(64 * NI);
   while (ci < cand.length) {
-    const KR = rowConsts(W, b, nw, ctx); let nR = 0, j = ci; for (; j < cand.length && nR < CH; j++) { const id = j < nL ? cL[j] : cE[j - nL]; if (id < 0 || (S && id < S.n ? S.off[id] === 1 : W.players[pidOf[id]].on === false)) continue; const c = W.cards[id]; ROW_C[nR] = c; ROW_I[nR] = j; ROW_ID[nR] = id; S && id < S.n ? cardInputsSnap(W, KR, c, id, ROW_X, nR * NI) : cardInputs(W, b, c, nw, ctx, undefined, ROW_X, nR * NI, id); nR++; }
+    const KR = rowConsts(W, b, nw, ctx); let nR = 0, j = ci; for (; j < cand.length && nR < CH; j++) { const id = j < nL ? cL[j] : cE[j - nL]; if (id < 0 || (S && id < S.n ? snapRow(S, id).off[id] === 1 : W.players[pidOf[id]].on === false)) continue; const c = W.cards[id]; ROW_C[nR] = c; ROW_I[nR] = j; ROW_ID[nR] = id; S && id < S.n ? cardInputsSnap(W, KR, c, id, ROW_X, nR * NI) : cardInputs(W, b, c, nw, ctx, undefined, ROW_X, nR * NI, id); nR++; }
     scoreRows(g.card, ROW_X, ROW_O, 0, nR); ci = j;
     for (let r = 0; r < nR; r++) {
       const c = ROW_C[r], id = ROW_ID[r], o = ROW_OUT; for (let k = 0; k < N3; k++) o[k] = ROW_O[r * N3 + k];
@@ -1660,7 +1664,7 @@ function nnPrice(W, b, c, o, it, base0, id) { // id: a plain card cardInputs rea
 // nnPrice's first part: the base price, pulled toward the public guide (which adds to the guideUse measurement)
 function nnPriceStart(W, c, o, it, base0, id) {
   const k = id != null && !it ? id * CWN : -1, pid = k >= 0 ? W._cw[k] : c.pid, cm = k >= 0 ? W._cw[k + 12] : c.mult;
-  const P = base0 ?? (it ? markItem(W, it) : k >= 0 && SNAP && id < SNAP.n ? SNAP.P[id] : c.P);
+  const P = base0 ?? (it ? markItem(W, it) : k >= 0 && SNAP && id < SNAP.n ? snapRow(SNAP, id).P[id] : c.P);
   let base = P; const pl = W.players[pid];
   if (SHAPE_G && guideOn(W.cfg) && pl?.guide > 0) { const a = sigm(o[8]); base += (pl.guide * (it ? it.mult : cm) - base) * a; const U = (W.guideUse ||= { s: 0, n: 0 }); U.s += a; U.n++; } // first toward the public guide
   return base;
@@ -1929,7 +1933,7 @@ export function step(W) {
   { const ph = W.hist.p, peak = Math.max(...ph.slice(-cfg.moodWeeks)); mood.drop = ph.length ? 1 - ph[ph.length - 1] / peak : 0; }
   if (W.fullL) dormancy(W);
   W._live = W.cards.filter((c) => c.on !== false && c.circ > 0);
-  { const hv = cfg.hotVolWeeks, hr = cfg.hotRetWeeks, hf = cfg.hotFloor, mo = cfg.hotRank === 'momentum', hs = (c) => recentVol(c, hv) * (mo ? Math.max(hf, 1 + ret(c, hr)) : 1); hot = W._live.slice().sort((x, y) => hs(y) - hs(x)); } // the most-traded list (hotRank)
+  { const hv = cfg.hotVolWeeks, hr = cfg.hotRetWeeks, hf = cfg.hotFloor, mo = cfg.hotRank === 'momentum', hs = (c) => recentVol(c, hv) * (mo ? Math.max(hf, 1 + ret(c, hr)) : 1); const L = W._live, sc = new Float64Array(L.length); for (let i = 0; i < L.length; i++) sc[i] = hs(L[i]); const ix = Array.from({ length: L.length }, (_, i) => i).sort((x, y) => sc[y] - sc[x]); hot = ix.map((i) => L[i]); } // (each score worked out once: the same comparisons, so the same order) // the most-traded list (hotRank)
   for (const b of W.bots) if (b.kind === 'rule') b.a = styleOf(b.g.w); // a style is just the dominant weight, which mutation can change
   { const nn = W.bots.filter((b) => b.g?.nn); if (nn.length) { const ws = nn.map((b) => worth(W, b)).sort((x, y) => x - y), med = ws[Math.floor(ws.length / 2)]; for (const b of nn) nnThink(W, b, med); if (cfg.attention > 0) attendWeek(W, nn); } }
   livingAndCredit(W); peopleChange(W); fashionStep(W);
@@ -2233,7 +2237,7 @@ function payRoyalties(W, share) {
   // what each card paid over the last weeksPerGeneration weeks, per copy (a disclosed channel of hidden value: it is F × the
   // royalty rate × his games, so with royalties on F is close to public; public: every holder saw it)
   const n = cfg.weeksPerGeneration; for (const p of W.players) { const r = (p.royWin ||= []); r.push(cfg.royaltyRate * share * p.F * (k.get(p.id) ?? 1) * scaleR); if (r.length > (share >= 1 ? 1 : n)) r.shift(); p.roySum = r.reduce((a, b) => a + b, 0); }
-  W._royPaid = true; /* a card's last royalty is cardRoy(): his player's roySum × its multiplier, worked out when read */ for (const it of W.items.values()) it.lastRoy = (W.players[it.pid]?.roySum || 0) * (it.mult / Math.max(1e-9, W.cards[mktId(it.pid, it.d === 4 ? 0 : it.d, it.f)]?.mult || 1));
+  W._royPaid = true; W._royN = (W._royN || 0) + 1; // a card's or one-of-a-kind card's last royalty is worked out when read (cardRoy, itemRoy)
 }
 // Learning within a lifetime (adapt): every `every` weeks each neural bot scores the period just ended exactly as fitness
 // (fitnessValue applies; allowance and the like excluded). If it was running a trial (its networks plus W.gauss() × size),
@@ -2739,7 +2743,7 @@ export function frame(W, { full = false } = {}) {
     f.aiDetail = Object.fromEntries(W.bots.filter((b) => b.kind === 'ai').map((b) => [b.name, { cash: Math.round(b.cash), debt: Math.round(b.debt || 0), realized: Math.round(b.stats.realized || 0), positions: [...b.h].map(([id, q]) => [id, q, r1(avgCost(b, id) ?? 0)]), notes: [...b.notes].map(([id, n]) => [id, r1(n.est), n.week]) }]));
     { const ai = new Set(); for (const b of W.bots) if (b.kind === 'ai') ai.add(b.name); f.aiLog = W.journal.filter((j) => WHO.some((k) => typeof j[k] === 'string' && ai.has(j[k]))); }
     f.si = W.players.map(() => 0); for (const L of W.cardLoans || []) f.si[W.cards[L.id].pid]++;
-    f.circ = W.players.map((c) => circOf(W, c)); f.pool = W.players.map((c) => c.pool); f.ovr = W.players.map((c) => W.era?.[c.id]?.ovr ?? null); f.risk = W.players.map((c) => (c.on === false ? null : Math.round(riskRating(W, c) * 10) / 10));
+    { const own = ownedItemCounts(W); f.circ = W.players.map((c) => circOf(W, c, own)); } f.pool = W.players.map((c) => c.pool); f.ovr = W.players.map((c) => W.era?.[c.id]?.ovr ?? null); f.risk = W.players.map((c) => (c.on === false ? null : Math.round(riskRating(W, c) * 10) / 10));
     f.prices = W.players.map((c) => r1(c.P)); if (W.t === 0 || W.cfg.valueModel !== 'formula' || (W.cfg.leagueUpdates && W.t % W.cfg.updateEvery === 0)) f.values = W.players.map((c) => r1(c.F)); }
   return f;
 }
@@ -3309,7 +3313,9 @@ function impliedPrices(W) {
     (p.ohlc ||= []).push([r2(prev), r2(Math.max(prev, p.P)), r2(Math.min(prev, p.P)), r2(p.P), vol]); if (p.ohlc.length > 120) p.ohlc.shift();
   }
 }
-export function circOf(W, p) { if (p.dorm) return 0; let n = 0; for (let k = 0; k < 16; k++) n += W.cards[p.id * 16 + k].circ; for (const it of W.items.values()) if (it.pid === p.id && it.owner) n++; return n; }
+export function circOf(W, p, own = null) { if (p.dorm) return 0; let n = 0; for (let k = 0; k < 16; k++) n += W.cards[p.id * 16 + k].circ; if (own) return n + (own[p.id] || 0); for (const it of W.items.values()) if (it.pid === p.id && it.owner) n++; return n; }
+// One-of-a-kind cards with an owner, counted by player (for circOf over many players: one pass over the items)
+function ownedItemCounts(W) { const a = new Int32Array(W.players.length); for (const it of W.items.values()) if (it.owner && it.pid < a.length) a[it.pid]++; return a; }
 export function resolvePlayer(W, key) { const m = W.mktByKey.get(key), it = W.items.get(key); return W.byKey.get(key) || (m && W.players[m.pid]) || (it && W.players[it.pid]) || null; }
 export function resolveMarket(W, key) { const p = W.byKey.get(key); return W.mktByKey.get(key) || (p && W.cards[mktId(p.id, 0, 0)]) || null; }
 export function itemsOf(W, b) { return heldItems(W, b).slice(); }
