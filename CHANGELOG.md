@@ -18,7 +18,7 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 ### Changed
 
 - The page is dark by default (`data-theme="light"` for light). The README figures are drawn dark. No engine change.
-- README rewritten: shorter, findings first, figure after them.
+- README rewritten: shorter, findings first, figure after them. Then the long-run findings (engine 1.x, seeds 12864 and 11906) and what we got wrong along the way; the banner gains a second ticker row for the long run.
 
 ## [2.0.0] - 2026-11-07
 

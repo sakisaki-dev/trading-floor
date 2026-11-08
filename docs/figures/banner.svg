@@ -1,14 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="800" height="150" viewBox="0 0 800 150" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" role="img" aria-label="Trading Floor. 200 weeks, seed 31761: bots 501 to 344, Vault index 100 to 77, marks index 100 to 385, 2 tactics">
-<rect width="800" height="150" rx="12" fill="#0d1117"/>
-<rect x="0.5" y="0.5" width="799" height="149" rx="12" fill="none" stroke="#30363d"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="190" viewBox="0 0 800 190" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" role="img" aria-label="Trading Floor. 500 bots, one card market, no instructions. 200 weeks on engine 2.0, seed 31761: bots 501 to 344, Vault index 100 to 77, marks index 100 to 385, 2 tactics. 7,973 weeks on engine 1.x, seed 11906: the top family reached 93% of bots, bots fell to 64 and recovered to 303, the 10% with the most cash held 85% of coins, bots took 2,500 weeks to relearn trading with each other.">
+<rect width="800" height="190" rx="12" fill="#0d1117"/>
+<rect x="0.5" y="0.5" width="799" height="189" rx="12" fill="none" stroke="#30363d"/>
 <text x="32" y="58" font-size="34" font-weight="700" fill="#f0f3f6" letter-spacing="-0.5">Trading Floor</text>
-<text x="32" y="86" font-size="15" fill="#9ea7b3">500 bots, one card market, no instructions.</text>
+<text x="32" y="86" font-size="15" fill="#9ea7b3">500 bots, one card market, no instructions. Evolution does the rest.</text>
 <line x1="32" x2="768" y1="106" y2="106" stroke="#21262d"/>
 <g font-family="ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace" font-size="13">
-<text x="32" y="131"><tspan fill="#6e7681">BOTS</tspan> <tspan fill="#f0f3f6">344</tspan> <tspan fill="#ff6b6b">▼ 157</tspan></text>
-<text x="190" y="131"><tspan fill="#6e7681">VAULT</tspan> <tspan fill="#f0f3f6">77</tspan> <tspan fill="#ff6b6b">▼ 23%</tspan></text>
-<text x="350" y="131"><tspan fill="#6e7681">MARKS</tspan> <tspan fill="#f0f3f6">385</tspan> <tspan fill="#3fd49a">▲ 285%</tspan></text>
-<text x="530" y="131"><tspan fill="#6e7681">TACTICS</tspan> <tspan fill="#f0f3f6">2</tspan></text>
-<text x="650" y="131"><tspan fill="#6e7681">WEEK</tspan> <tspan fill="#f0f3f6">200</tspan></text>
+<text x="32" y="133" font-size="11" fill="#6e7681" letter-spacing="0.5">200 WK · v2.0</text>
+<text x="158" y="133"><tspan fill="#6e7681">BOTS</tspan> <tspan fill="#f0f3f6">344</tspan> <tspan fill="#ff6b6b">▼ 157</tspan></text>
+<text x="293" y="133"><tspan fill="#6e7681">VAULT</tspan> <tspan fill="#f0f3f6">77</tspan> <tspan fill="#ff6b6b">▼ 23%</tspan></text>
+<text x="433" y="133"><tspan fill="#6e7681">MARKS</tspan> <tspan fill="#f0f3f6">385</tspan> <tspan fill="#3fd49a">▲ 285%</tspan></text>
+<text x="600" y="133"><tspan fill="#6e7681">TACTICS</tspan> <tspan fill="#f0f3f6">2</tspan></text>
+<line x1="32" x2="768" y1="149" y2="149" stroke="#161b22"/>
+<text x="32" y="171" font-size="11" fill="#6e7681" letter-spacing="0.5">7,973 WK · v1.x</text>
+<text x="158" y="171"><tspan fill="#6e7681">BOTS</tspan> <tspan fill="#f0f3f6">64</tspan> <tspan fill="#3fd49a">→ 303</tspan></text>
+<text x="293" y="171"><tspan fill="#6e7681">TOP FAMILY</tspan> <tspan fill="#f0f3f6">93%</tspan></text>
+<text x="433" y="171"><tspan fill="#6e7681">TOP 10% CASH</tspan> <tspan fill="#f0f3f6">85%</tspan></text>
+<text x="600" y="171"><tspan fill="#6e7681">RELEARN</tspan> <tspan fill="#f0f3f6">2,500 WK</tspan></text>
 </g>
 </svg>
