@@ -50,18 +50,18 @@ Real fixes: default results change. Tests: `node tests/info.test.mjs`.
 
 Week 60, Realism, seed 31761, practiceGens 0 (reported, not tuned):
 
-| | Base (`847bf14`) | fix/info |
-|---|---|---|
-| Bots | 311 | 287 |
-| Trades a week (mean of weeks 51–60) | 653 | 623 |
-| Vault index | 85.0 | 61.2 |
-| Marks index | 89.4 | 197.7 |
-| Gini | 0.410 | 0.429 |
-| Ledger "other", weeks 1–60, absolute sum | 2,630,385 | 0 |
+| | Base (`847bf14`) | fix/info | fix/info with `openPrice: 'value'` |
+|---|---|---|---|
+| Bots | 311 | 287 | 295 |
+| Trades a week (mean of weeks 51–60) | 653 | 623 | 505 |
+| Vault index | 85.0 | 61.2 | 87.1 |
+| Marks index | 89.4 | 197.7 | 83.8 |
+| Gini | 0.410 | 0.429 | 0.406 |
+| Ledger "other", weeks 1–60, absolute sum | 2,630,385 | 0 | 0 |
 
 Generated veterans now open at comparable save players' prices: hidden value ÷ opening price has a median of 0.81
 (10th–90th percentile 0.49–3.24), so most open above their hidden value and the most valuable far below it. Both
-indexes are measured against the openings.
+indexes are measured against the openings; with the old opening the indexes stay near the base run.
 
 ## [1.0.0] - 2026-11-07
 
