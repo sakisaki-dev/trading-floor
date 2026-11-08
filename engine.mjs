@@ -726,9 +726,9 @@ let hot = [], mood = { drop: 0 };
 // swaps' output, an AI bot its accept list, a genome bot its scripted social style
 function willing(W, x, y) { return x.g?.nn ? !!x._nnAccept : x.kind === 'ai' ? (x.pendingShares || []).includes(y.id) || !!x.acceptAll : x.social === 'sharer' || (x.social === 'reciprocator' && (x.friends.has(y.id) || y.flaggedBy === 0)) || (x.social === 'thief' && W.rand() < 0.5); }
 // A neural bot's pick among candidates: its partner weights (PARTNER_IN) times what it sees of each; ties go to a uniform draw
-function nnPickBot(W, b, xs, w) {
+function nnPickBot(W, b, xs, w, ok, age) { // ok: which of xs are candidates (all when absent); age: each one's log1p(weeks in the market), worked out once
   let best = -Infinity, top = [];
-  for (const y of xs) { const v = w[0] * (b.friends.has(y.id) ? 1 : 0) + w[1] * clamp((y.flaggedBy || 0) / 5, 0, 2) + w[2] * Math.log1p(Math.max(0, W.t - (y.joined ?? y.born ?? 0))) / 5;
+  for (let i = 0; i < xs.length; i++) { const y = xs[i]; if (ok && !ok(y)) continue; const v = w[0] * (b.friends.has(y.id) ? 1 : 0) + w[1] * clamp((y.flaggedBy || 0) / 5, 0, 2) + w[2] * (age ? age[i] : Math.log1p(Math.max(0, W.t - (y.joined ?? y.born ?? 0)))) / 5;
     if (v > best) { best = v; top = [y]; } else if (v === best) top.push(y); }
   return top.length ? (top.length > 1 ? W.pick(top) : top[0]) : null;
 }
@@ -737,11 +737,11 @@ function nnPickBot(W, b, xs, w) {
 // empty victim or partner is a lost try. Genome bots keep their scripted styles (the 0.5 and 0.4 draws, the filters).
 function socialPhase(W) {
   const cfg = W.cfg;
-  const rule = W.bots.filter((b) => b.kind === 'rule');
+  const rule = W.bots.filter((b) => b.kind === 'rule'); let age = null; // (no bot joins or leaves in this phase, so W.bots[i] keeps its age)
   for (const b of rule) {
-    if (b.g?.nn) {
-      if (b._nnSteal && cfg.stealing) { const v = nnPickBot(W, b, W.bots.filter((v) => v !== b), b._nnStealW || [0, 0, 0]); if (v) steal(W, b, v); }
-      if (b._nnShare && cfg.sharing && b.notes.size) { const p = nnPickBot(W, b, W.bots.filter((p) => p !== b && !b.flags.has(p.id) && !p.flags.has(b.id)), b._nnShareW || [0, 0, 0]); if (p && willing(W, p, b)) swap(W, b, p); }
+    if (b.g?.nn) { if (!age && ((b._nnSteal && cfg.stealing) || (b._nnShare && cfg.sharing && b.notes.size))) age = W.bots.map((y) => Math.log1p(Math.max(0, W.t - (y.joined ?? y.born ?? 0))));
+      if (b._nnSteal && cfg.stealing) { const v = nnPickBot(W, b, W.bots, b._nnStealW || [0, 0, 0], (v) => v !== b, age); if (v) steal(W, b, v); }
+      if (b._nnShare && cfg.sharing && b.notes.size) { const p = nnPickBot(W, b, W.bots, b._nnShareW || [0, 0, 0], (p) => p !== b && !b.flags.has(p.id) && !p.flags.has(b.id), age); if (p && willing(W, p, b)) swap(W, b, p); }
       continue;
     }
     if (b.notes.size === 0 && b.social !== 'thief') continue;
@@ -1145,7 +1145,8 @@ function gamePhase(W) {
   // Prediction league: settle the predictions made 4 weeks ago (Brier score: lower is better, so score = −Brier)
   const due = (W.predictions || []).filter((p) => p.settle <= W.t); W.predictions = (W.predictions || []).filter((p) => p.settle > W.t);
   if (due.length) payout(W, 'prediction', due.map((p) => ({ b: p.b, know: p.know, score: -p.qs.reduce((s, [id, P0], i) => s + (p.probs[i] - (W.players[id].P > P0 ? 1 : 0)) ** 2, 0) / p.qs.length })), (pool * counts.prediction) / totN);
-  for (const b of W.bots) b.gameResults = W.journal.filter((j) => j.type === 'game' && j.bot === b.name && j.t === W.t).map(({ game, won, net }) => ({ game, won, net })); // no score: a valuation score inverts to the hidden value
+  { const by = new Map(); for (const j of W.journal) if (j.type === 'game' && j.t === W.t) { const l = by.get(j.bot); l ? l.push(j) : by.set(j.bot, [j]); } // this week's game entries by bot, in journal order
+    for (const b of W.bots) b.gameResults = (by.get(b.name) || []).map(({ game, won, net }) => ({ game, won, net })); } // no score: a valuation score inverts to the hidden value
   publishContests(W);
 }
 // A rule bot wants game tickets in proportion to what it knows
@@ -1324,17 +1325,26 @@ const bufs = (sh) => sh.slice(1).map((m) => new Float64Array(m));
 // into a bias once per bot and week (`fold`); inputs that are zero are skipped. The result is the same.
 const VARY_BASE = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 24, 25, 26, 27, 29, 30, 32, 33, 34, 35, 36, 37, 38, 39, 40]; let VARY = VARY_BASE; const FIXED = [0, 19, 20, 21, 22, 23, 28, 31];
 const FOLD = new Float64Array(16), FOLD_X = new Float64Array(16); let foldKey = null, foldT = -1;
+// FOLDS (only while the sealed auctions run, when bots take turns card by card and no network changes): each network's last
+// fold, so a bot's next bid reuses it when its fixed inputs are bit-for-bit the same instead of working it out again
+let FOLDS = null;
 function foldFor(w, x, t, o = 0) {
   if (foldKey === w && foldT === t) { let same = true; for (let k = 0; k < FIXED.length; k++) if (x[o + FIXED[k]] !== FOLD_X[k]) { same = false; break; } if (same) return; }
+  foldFill(w, x, t, o);
+}
+function foldFill(w, x, t, o) {
+  const e = FOLDS ? FOLDS.get(w) : undefined;
+  if (e && e.t === t) { let same = true; for (let k = 0; k < FIXED.length; k++) if (!Object.is(x[o + FIXED[k]], e.x[k])) { same = false; break; } if (same) { FOLD.set(e.f); FOLD_X.set(e.x); foldKey = w; foldT = t; return; } }
   const N0 = CARD_SHAPE[0]; for (let j = 0, k = 0; j < CARD_SHAPE[1]; j++, k += N0 + 1) { let s = w[k + N0]; for (const i of FIXED) s += w[k + i] * x[o + i]; FOLD[j] = s; }
   foldKey = w; foldT = t; for (let k = 0; k < FIXED.length; k++) FOLD_X[k] = x[o + FIXED[k]];
+  if (FOLDS) { if (e) { e.t = t; e.x.set(FOLD_X); e.f.set(FOLD); } else FOLDS.set(w, { t, x: Float64Array.from(FOLD_X), f: Float64Array.from(FOLD) }); }
 }
 function forwardCard(w, x, buf) { foldFor(w, x, CUR_T); cardKernel(w, x, 0, buf[2], 0, buf); return buf[2]; }
 // One card's pass through the card network: inputs x[o..], outputs to out[oo..]. The 16 first-layer sums run side by side
 // (one pass over the inputs feeds all of them) and the later layers are written out: every sum adds the same terms in
 // the same order as the plain loops did, so each result is bit-identical, but the CPU overlaps the chains (2.5× faster).
-function cardKernel(w, x, o, out, oo, buf) {
-  const R = CARD_SHAPE[0] + 1, N3 = CARD_SHAPE[3], V = VARY, NV = V.length, F = FOLD;
+function cardKernel(w, x, o, out, oo, buf, j0 = 0, j1 = CARD_SHAPE[3]) { // j0..j1: the outputs wanted (all by default)
+  const R = CARD_SHAPE[0] + 1, V = VARY, NV = V.length, F = FOLD;
   let s0 = F[0], s1 = F[1], s2 = F[2], s3 = F[3], s4 = F[4], s5 = F[5], s6 = F[6], s7 = F[7], s8 = F[8], s9 = F[9], s10 = F[10], s11 = F[11], s12 = F[12], s13 = F[13], s14 = F[14], s15 = F[15];
   for (let v = 0; v < NV; v++) { const i = V[v], xi = x[o + i]; if (xi === 0) continue; // zero inputs are skipped, as before
     s0 += w[i] * xi; s1 += w[i + R] * xi; s2 += w[i + 2 * R] * xi; s3 += w[i + 3 * R] * xi; s4 += w[i + 4 * R] * xi; s5 += w[i + 5 * R] * xi; s6 += w[i + 6 * R] * xi; s7 += w[i + 7 * R] * xi;
@@ -1344,11 +1354,11 @@ function cardKernel(w, x, o, out, oo, buf) {
   let k = 16 * R; const h2 = KERN_H2;
   for (let j = 0; j < 8; j++, k += 17) h2[j] = fastTanh(w[k + 16] + w[k] * a0 + w[k + 1] * a1 + w[k + 2] * a2 + w[k + 3] * a3 + w[k + 4] * a4 + w[k + 5] * a5 + w[k + 6] * a6 + w[k + 7] * a7 + w[k + 8] * a8 + w[k + 9] * a9 + w[k + 10] * a10 + w[k + 11] * a11 + w[k + 12] * a12 + w[k + 13] * a13 + w[k + 14] * a14 + w[k + 15] * a15);
   const b0 = h2[0], b1 = h2[1], b2 = h2[2], b3 = h2[3], b4 = h2[4], b5 = h2[5], b6 = h2[6], b7 = h2[7]; if (buf) buf[1].set(h2);
-  for (let j = 0; j < N3; j++, k += 9) out[oo + j] = w[k + 8] + w[k] * b0 + w[k + 1] * b1 + w[k + 2] * b2 + w[k + 3] * b3 + w[k + 4] * b4 + w[k + 5] * b5 + w[k + 6] * b6 + w[k + 7] * b7;
+  for (let j = j0, k3 = k + 9 * j0; j < j1; j++, k3 += 9) out[oo + j] = w[k3 + 8] + w[k3] * b0 + w[k3 + 1] * b1 + w[k3 + 2] * b2 + w[k3 + 3] * b3 + w[k3 + 4] * b4 + w[k3 + 5] * b5 + w[k3 + 6] * b6 + w[k3 + 7] * b7;
 }
 const KERN_H2 = new Float64Array(8);
 // Many cards for one bot: rows from..to of X (inputs, CARD_SHAPE[0] wide) into O (outputs, CARD_SHAPE[3] wide)
-function scoreRows(w, X, O, from, to) { const NI = CARD_SHAPE[0], N3 = CARD_SHAPE[3]; for (let r = from; r < to; r++) { foldFor(w, X, CUR_T, r * NI); cardKernel(w, X, r * NI, O, r * N3, null); } }
+function scoreRows(w, X, O, from, to, j0 = 0, j1 = CARD_SHAPE[3]) { const NI = CARD_SHAPE[0], N3 = CARD_SHAPE[3]; for (let r = from; r < to; r++) { foldFor(w, X, CUR_T, r * NI); cardKernel(w, X, r * NI, O, r * N3, null, j0, j1); } }
 function fastTanh(v) { if (v > 9) return 1; if (v < -9) return -1; const e = Math.exp(2 * v); return (e - 1) / (e + 1); }
 let CB = bufs(CARD_SHAPE), XC = new Float64Array(CARD_SHAPE[0]); let SHAPE_G = false;
 // Switch the card network's shape to this world's (the guide inputs and output, or not)
@@ -1413,17 +1423,44 @@ function cardInputs(W, b, c, nw, ctx, it, x = XC, xo = 0, id = c.id) {
   x[xo] = 1; x[xo + 1] = it ? Math.log10(price) / 5 : m[o + 1]; x[xo + 2] = it ? Math.log(mult) / 2 : m[o + 2]; x[xo + 3] = m[o + 3]; x[xo + 4] = m[o + 4];
   x[xo + 5] = m[o + 5]; x[xo + 6] = m[o + 6]; x[xo + 7] = m[o + 7]; x[xo + 8] = m[o + 8]; x[xo + 9] = m[o + 9]; x[xo + 10] = m[o + 10]; x[xo + 11] = m[o + 11];
   x[xo + 12] = fr ? 1 : 0; x[xo + 13] = fr ? clamp((n.est * mult - price) / price, -1, 1) : 0; x[xo + 14] = n ? clamp((W.t - n.week) / W.cfg.knowledgeWeeks, 0, 2) : 1; x[xo + 15] = fr && n.ovr ? (n.ovr - 80) / 20 : 0;
-  x[xo + 16] = it ? 1 : Math.log1p(q) / 2; const ac = q ? avgCost(b, id) : null; x[xo + 17] = it ? clamp(it.cost ? price / it.cost - 1 : 0, -1, 1) : ac ? clamp(P / ac - 1, -1, 1) : 0; x[xo + 18] = clamp(((it ? 1 : q) * price) / nw, 0, 1);
+  x[xo + 16] = it ? 1 : q ? Math.log1p(q) / 2 : 0; const ac = q ? avgCost(b, id) : null; x[xo + 17] = it ? clamp(it.cost ? price / it.cost - 1 : 0, -1, 1) : ac ? clamp(P / ac - 1, -1, 1) : 0; x[xo + 18] = clamp(((it ? 1 : q) * price) / nw, 0, 1);
   x[xo + 19] = clamp(b.cash / nw, -1, 1); x[xo + 20] = clamp((b.debt || 0) / nw, 0, 2); x[xo + 21] = ctx.drop; x[xo + 22] = ctx.m4; x[xo + 23] = ctx.phase;
   x[xo + 24] = it ? 1 : 0; x[xo + 25] = it ? Math.log(it.mult / cm) / 2 : 0; x[xo + 26] = fr && n.risk != null ? (n.risk - 80) / 20 : 0;
   x[xo + 27] = W.cfg.royalties && !W.cfg.priceOnly ? clamp(W.cfg.royaltyRate * 10 * (fr ? (n.est * mult) / price : 1), 0, 3) : 0; // the PROMISED yield: the configured royaltyRate × (its note's estimate ÷ price), not what was paid (input 32 carries that)
-  x[xo + 28] = b._life ?? 1; x[xo + 29] = Math.log1p(b.owed?.get(id) || 0); x[xo + 30] = Math.log1p(W.lendable?.get(id) || 0) / 3; x[xo + 31] = W.cfg.shorting ? W.cfg.cardLendFee * 100 : 0;
+  x[xo + 28] = b._life ?? 1; const ow = b.owed?.get(id), ld = W.lendable?.get(id); x[xo + 29] = ow ? Math.log1p(ow) : 0; x[xo + 30] = ld ? Math.log1p(ld) / 3 : 0; x[xo + 31] = W.cfg.shorting ? W.cfg.cardLendFee * 100 : 0; // (log1p(0) is 0, so absent counts skip it)
   const N = S ? S.news : playerNews(W, W.players[pid], NEWS1, 0), no = S ? pid * NWN : 0;
   if (S && !it) { const k = id * 4, X = S.cx; x[xo + 32] = X[k]; x[xo + 33] = m[o + 13]; x[xo + 34] = X[k + 1]; x[xo + 35] = X[k + 2]; if (SHAPE_G) x[xo + 41] = X[k + 3]; } // the same for every bot in a snapshot phase
   else { cardMarketInputs(it ? it.lastRoy : S ? S.roy[id] : c.lastRoy, S ? S.bb[id] : c.bb, S ? S.ba[id] : c.ba, price, P, N, no, mult, x, xo); x[xo + 33] = m[o + 13]; }
   x[xo + 36] = N[no]; x[xo + 37] = N[no + 1]; x[xo + 38] = N[no + 2]; x[xo + 39] = N[no + 3]; x[xo + 40] = N[no + 4];
   if (SHAPE_G) x[xo + 42] = N[no + 5] === 1 ? N[no + 7] : 0;
   return x;
+}
+// cardInputs for a plain card in a snapshot phase (SNAP set, the card in it), for the batches of nnAct and nnResearchWish:
+// the inputs that are the same for all of one bot's cards are worked out once per batch (rowConsts, while its cash and
+// debt can't change) and the rest line for line as cardInputs does, so every value is the same. TF_CHECK_ROWS=1 in the
+// environment checks each row against cardInputs and throws on any difference.
+const RK = { b: null, nw: 1, ctx: null, x19: 0, x20: 0, roy: false, rr: 0, x27: 0, x28: 1, x31: 0, kw: 0, t: 0 };
+const CHECK_ROWS = typeof process !== 'undefined' && process.env?.TF_CHECK_ROWS === '1', XCHK = new Float64Array(64);
+function rowConsts(W, b, nw, ctx) {
+  const K = RK, cfg = W.cfg; K.b = b; K.nw = nw; K.ctx = ctx; K.x19 = clamp(b.cash / nw, -1, 1); K.x20 = clamp((b.debt || 0) / nw, 0, 2);
+  K.roy = !!(cfg.royalties && !cfg.priceOnly); K.rr = cfg.royaltyRate; K.x27 = K.roy ? clamp(cfg.royaltyRate * 10 * 1, 0, 3) : 0; K.x28 = b._life ?? 1; K.x31 = cfg.shorting ? cfg.cardLendFee * 100 : 0; K.kw = cfg.knowledgeWeeks; K.t = W.t;
+  return K;
+}
+function cardInputsSnap(W, K, c, id, x, xo) {
+  const o = cardWeek(W, c, id), m = W._cw, pid = m[o], cm = m[o + 12], S = SNAP, b = K.b, nw = K.nw, ctx = K.ctx;
+  const n = b.notes.get(pid), q = b.h.get(id) || 0, P = Math.max(0.01, S.P[id]), fr = n && K.t - n.week <= K.kw;
+  x[xo] = 1; x[xo + 1] = m[o + 1]; x[xo + 2] = m[o + 2]; x[xo + 3] = m[o + 3]; x[xo + 4] = m[o + 4];
+  x[xo + 5] = m[o + 5]; x[xo + 6] = m[o + 6]; x[xo + 7] = m[o + 7]; x[xo + 8] = m[o + 8]; x[xo + 9] = m[o + 9]; x[xo + 10] = m[o + 10]; x[xo + 11] = m[o + 11];
+  x[xo + 12] = fr ? 1 : 0; x[xo + 13] = fr ? clamp((n.est * cm - P) / P, -1, 1) : 0; x[xo + 14] = n ? clamp((K.t - n.week) / K.kw, 0, 2) : 1; x[xo + 15] = fr && n.ovr ? (n.ovr - 80) / 20 : 0;
+  x[xo + 16] = q ? Math.log1p(q) / 2 : 0; const ac = q ? avgCost(b, id) : null; x[xo + 17] = ac ? clamp(P / ac - 1, -1, 1) : 0; x[xo + 18] = clamp((q * P) / nw, 0, 1);
+  x[xo + 19] = K.x19; x[xo + 20] = K.x20; x[xo + 21] = ctx.drop; x[xo + 22] = ctx.m4; x[xo + 23] = ctx.phase;
+  x[xo + 24] = 0; x[xo + 25] = 0; x[xo + 26] = fr && n.risk != null ? (n.risk - 80) / 20 : 0;
+  x[xo + 27] = K.roy ? (fr ? clamp(K.rr * 10 * ((n.est * cm) / P), 0, 3) : K.x27) : 0;
+  x[xo + 28] = K.x28; const ow = b.owed?.get(id), ld = W.lendable?.get(id); x[xo + 29] = ow ? Math.log1p(ow) : 0; x[xo + 30] = ld ? Math.log1p(ld) / 3 : 0; x[xo + 31] = K.x31;
+  const k = id * 4, X = S.cx, N = S.news, no = pid * NWN; x[xo + 32] = X[k]; x[xo + 33] = m[o + 13]; x[xo + 34] = X[k + 1]; x[xo + 35] = X[k + 2]; if (SHAPE_G) x[xo + 41] = X[k + 3];
+  x[xo + 36] = N[no]; x[xo + 37] = N[no + 1]; x[xo + 38] = N[no + 2]; x[xo + 39] = N[no + 3]; x[xo + 40] = N[no + 4];
+  if (SHAPE_G) x[xo + 42] = N[no + 5] === 1 ? N[no + 7] : 0;
+  if (CHECK_ROWS) { cardInputs(W, b, c, nw, ctx, undefined, XCHK, 0, id); for (let i = 0; i < CARD_SHAPE[0]; i++) if (!Object.is(XCHK[i], x[xo + i])) throw new Error(`cardInputsSnap: input ${i} of card ${id} is ${x[xo + i]}, cardInputs gives ${XCHK[i]}`); }
 }
 // Inputs 32, 34, 35 and 41 (with the guide): royalty yield, last week's book and the guide, each against the price
 function cardMarketInputs(roy, bb, ba, price, P, N, no, mult, x, xo) {
@@ -1502,15 +1539,22 @@ function rowBufs(n) { const NI = CARD_SHAPE[0], N3 = CARD_SHAPE[3]; if (ROW_X.le
 // Research: the players whose cards most make the network want to look them up (players it has no fresh note on)
 function nnResearchWish(W, b) {
   const want = b._nnResearch || 0; if (!want) return [];
-  const nw = Math.max(NW_FLOOR * W.cfg.coinScale, worth(W, b)), ctx = marketCtx(W), seen = new Set(), NI = CARD_SHAPE[0], N3 = CARD_SHAPE[3];
+  const nw = Math.max(NW_FLOOR * W.cfg.coinScale, worth(W, b)), ctx = marketCtx(W), NI = CARD_SHAPE[0], N3 = CARD_SHAPE[3];
   const pidOf = cardIndex(W), live = W._live, lid = W._liveId, ids = [];
-  const S = SNAP, look = (id) => { const pid = pidOf[id]; if (seen.has(pid) || (S && id < S.n ? S.off[id] === 1 : W.players[pid].on === false)) return; seen.add(pid); if (!fresh(W, b.notes.get(pid))) ids.push(id); }; // a card's status is its player's
+  if (!W._seen || W._seen.length < W.players.length) { W._seen = new Int32Array(W.players.length + 64); W._seenN = 0; } const seen = W._seen, sn = ++W._seenN; // players already looked at: seen[pid] === sn
+  const S = SNAP, look = (id) => { const pid = pidOf[id]; if (seen[pid] === sn || (S && id < S.n ? S.off[id] === 1 : W.players[pid].on === false)) return; seen[pid] = sn; if (!fresh(W, b.notes.get(pid))) ids.push(id); }; // a card's status is its player's
   if (W.cfg.attention > 0) { for (const c of attended(W, b)) if (c) look(c.id); } // (attention budget) only the cards it looks at this week, in that order
   else { for (const id of b.h.keys()) look(id); for (let i = 0; i < live.length; i++) look(lid[i]); } // the cards it holds first, then every live card
-  rowBufs(ids.length); for (let r = 0; r < ids.length; r++) cardInputs(W, b, W.cards[ids[r]], nw, ctx, undefined, ROW_X, r * NI, ids[r]); // nothing changes while it looks, so all its cards are scored in one batch
-  scoreRows(b.g.card, ROW_X, ROW_O, 0, ids.length);
-  const sc = ids.map((id, r) => { const pl = W.players[pidOf[id]]; return [pl, ROW_O[r * N3 + 4] + (b._nnAim?.[pl.pos] || 0)]; });
-  return sc.filter((x) => x[1] > 0).sort((p, q) => q[1] - p[1]).slice(0, want).map((x) => x[0]);
+  rowBufs(ids.length); const K = rowConsts(W, b, nw, ctx); for (let r = 0; r < ids.length; r++) { const id = ids[r]; S && id < S.n ? cardInputsSnap(W, K, W.cards[id], id, ROW_X, r * NI) : cardInputs(W, b, W.cards[id], nw, ctx, undefined, ROW_X, r * NI, id); } // nothing changes while it looks, so all its cards are scored in one batch
+  scoreRows(b.g.card, ROW_X, ROW_O, 0, ids.length, 4, 5); // only the research output is read here
+  if (!(Number.isInteger(want) && want <= 64)) { const sc = ids.map((id, r) => { const pl = W.players[pidOf[id]]; return [pl, ROW_O[r * N3 + 4] + (b._nnAim?.[pl.pos] || 0)]; });
+    return sc.filter((x) => x[1] > 0).sort((p, q) => q[1] - p[1]).slice(0, want).map((x) => x[0]); }
+  // the best `want` positive scores, ranked as the stable sort ranked them (higher first, ties in the order looked at)
+  const tv = [], tp = [];
+  for (let r = 0; r < ids.length; r++) { const pl = W.players[pidOf[ids[r]]], v = ROW_O[r * N3 + 4] + (b._nnAim?.[pl.pos] || 0); if (!(v > 0)) continue;
+    let L = tv.length; if (L >= want) { if (!(v > tv[L - 1])) continue; tv.pop(); tp.pop(); L--; }
+    let p = L; tv.push(v); tp.push(pl); while (p > 0 && tv[p - 1] < v) { tv[p] = tv[p - 1]; tp[p] = tp[p - 1]; p--; } tv[p] = v; tp[p] = pl; }
+  return tp;
 }
 // Attention budget (cfg.attention > 0): each week every neural bot gets K live cards drawn at random (uniformly, or by public
 // trade volume), never by its own network or by hidden values; with its holdings and watchlist they are all it looks at.
@@ -1543,36 +1587,54 @@ function cardIndex(W) {
   return W._cpid;
 }
 // Every live card, then the cards a bot holds or has notes on that aren't live (or missing: -1), each once, in that order
+// (returned as the week's live ids and the extras after them, read through candAt, instead of one copied array)
 function candidates(W, b) {
-  cardIndex(W); const lid = W._liveId, m = W._inLive, ex = new Set(), cand = Array.from(lid), add = (id) => { const c = W.cards[id]; if (c && m[id]) return; const k = c ? id : -1; if (!ex.has(k)) { ex.add(k); cand.push(k); } };
+  cardIndex(W); const lid = W._liveId, m = W._inLive, ex = new Set(), extra = [], add = (id) => { const c = W.cards[id]; if (c && m[id]) return; const k = c ? id : -1; if (!ex.has(k)) { ex.add(k); extra.push(k); } };
   for (const id of b.h.keys()) add(id); for (const pid of b.notes.keys()) add(mktId(pid, 0, 0));
-  return cand;
+  return { lid, extra, length: lid.length + extra.length };
 }
-const ROW_OUT = new Float64Array(16);
+const ROW_OUT = new Float64Array(16); let ACT_BX = new Float64Array(0);
 // Copies per order from the size output: 1 to qMax in equal bins of the sigmoid, so every size up to qMax is reachable (qtyEdge counts the top bin)
 const qtyOf = (qMax, v) => 1 + Math.min(qMax - 1, Math.floor(qMax * sigm(v)));
 function nnAct(W, b) {
   const pend = new Map(), g = b.g, nw = Math.max(NW_FLOOR * W.cfg.coinScale, worth(W, b)), ctx = marketCtx(W);
-  const att = W.cfg.attention > 0 ? attended(W, b) : null, cand = att ? Array.from(att, (c) => (c ? c.id : -1)) : candidates(W, b), NI = CARD_SHAPE[0], N3 = CARD_SHAPE[3], CH = 256; if (att && W.attDiag) W.attDiag.cards += att.size;
+  const att = W.cfg.attention > 0 ? attended(W, b) : null, cand = att ? { lid: Int32Array.from(att, (c) => (c ? c.id : -1)), extra: [], length: att.size } : candidates(W, b), cL = cand.lid, cE = cand.extra, nL = cL.length, NI = CARD_SHAPE[0], N3 = CARD_SHAPE[3], CH = 256; if (att && W.attDiag) W.attDiag.cards += att.size;
   const buys = [], D = W.limDiag; let listed = 0, shorts = 0, lBlock = 0, sBlock = 0, oBlock = 0, iBlock = 0;
   // The cards are scored in batches of up to CH. Only a short sale changes what the bot sees of its later cards (its
   // cash), so after one the rest of the batch is scored again from that state: every score is the one it saw before.
-  const pidOf = W._cpid, qMax = W.cfg.maxOrderQty ?? 3, S = SNAP; rowBufs(CH); let ci = 0, BX = new Float64Array(64 * NI), nB = 0;
+  const pidOf = W._cpid, qMax = W.cfg.maxOrderQty ?? 3, S = SNAP; rowBufs(CH); let ci = 0, nB = 0;
+  // The buy wishes are placed strongest first, and the loop below reads at most the first ceil(deployOrders) + 1 of them
+  // (the last one only to see whether the count stopped an order). So only that many are kept, ranked as the stable sort
+  // ranked them (a stronger wish first, equal wishes in the order the cards were scored); each keeps its inputs in a slot of
+  // BX that an evicted wish frees. With no finite deployOrders (or a huge one) every wish is kept and sorted, as before.
+  const dO = W.cfg.deployOrders, K = Number.isFinite(dO) ? Math.max(0, Math.ceil(dO)) + 1 : Infinity, topK = K <= 4096;
+  let BX = topK ? (ACT_BX.length >= K * NI ? ACT_BX : (ACT_BX = new Float64Array(K * NI))) : new Float64Array(64 * NI);
   while (ci < cand.length) {
-    let nR = 0, j = ci; for (; j < cand.length && nR < CH; j++) { const id = cand[j]; if (id < 0 || (S && id < S.n ? S.off[id] === 1 : W.players[pidOf[id]].on === false)) continue; const c = W.cards[id]; ROW_C[nR] = c; ROW_I[nR] = j; ROW_ID[nR] = id; cardInputs(W, b, c, nw, ctx, undefined, ROW_X, nR * NI, id); nR++; }
+    const KR = rowConsts(W, b, nw, ctx); let nR = 0, j = ci; for (; j < cand.length && nR < CH; j++) { const id = j < nL ? cL[j] : cE[j - nL]; if (id < 0 || (S && id < S.n ? S.off[id] === 1 : W.players[pidOf[id]].on === false)) continue; const c = W.cards[id]; ROW_C[nR] = c; ROW_I[nR] = j; ROW_ID[nR] = id; S && id < S.n ? cardInputsSnap(W, KR, c, id, ROW_X, nR * NI) : cardInputs(W, b, c, nw, ctx, undefined, ROW_X, nR * NI, id); nR++; }
     scoreRows(g.card, ROW_X, ROW_O, 0, nR); ci = j;
     for (let r = 0; r < nR; r++) {
       const c = ROW_C[r], id = ROW_ID[r], o = ROW_OUT; for (let k = 0; k < N3; k++) o[k] = ROW_O[r * N3 + k];
-      const q = b.h.get(id) || 0, px = nnPrice(W, b, c, o, undefined, undefined, id), pEdge = NP.edge, pFar = NP.far;
-      if (o[0] > 0 && o[0] > o[1]) { if (BX.length < (nB + 1) * NI) { const B2 = new Float64Array(BX.length * 2); B2.set(BX); BX = B2; } BX.set(ROW_X.subarray(r * NI, r * NI + NI), nB * NI); // its inputs, kept in one buffer and copied out only for the orders it places
-        buys.push([c, o[0], px, qtyOf(qMax, o[3]), nB++, Math.tanh(o[2]), pEdge, pFar, sigm(o[3]) >= (qMax - 1) / qMax]); }
-      else if (q && o[1] > 0) { const x = ROW_X.slice(r * NI, r * NI + NI); (W.offDiag ||= { bid: [], ask: [] }).ask.push(Math.tanh(o[2])); if (D) { D.ask++; if (pEdge) D.askEdge++; if (pFar) D.askFar++; D.qty++; if (sigm(o[3]) >= (qMax - 1) / qMax) D.qtyEdge++; } for (let k = 0; k < Math.min(q, qtyOf(qMax, o[3])); k++) ask(b, c, px, pend, x); }
+      // the price in two parts: the guide's pull (it feeds a running measurement, so it runs for every card, in order) and the
+      // rest only for a card that gets an order; the same operations as one nnPrice call, so the same price
+      const q = b.h.get(id) || 0, kw = id * CWN, base = nnPriceStart(W, c, o, undefined, undefined, id); let px = 0, pxOk = false, pEdge = false, pFar = false;
+      if (o[0] > 0 && o[0] > o[1]) { px = nnPriceEnd(W, b, o, undefined, W._cw[kw], W._cw[kw + 12], base); pxOk = true; pEdge = NP.edge; pFar = NP.far;
+        if (!topK) { if (BX.length < (nB + 1) * NI) { const B2 = new Float64Array(BX.length * 2); B2.set(BX); BX = B2; } BX.set(ROW_X.subarray(r * NI, r * NI + NI), nB * NI); // its inputs, kept in one buffer and copied out only for the orders it places
+          buys.push([c, o[0], px, qtyOf(qMax, o[3]), nB++, Math.tanh(o[2]), pEdge, pFar, sigm(o[3]) >= (qMax - 1) / qMax]); }
+        else { const v = o[0], L = buys.length; if (L < K || v > buys[L - 1][1]) { let slot; if (L < K) slot = L; else slot = buys.pop()[4];
+          BX.set(ROW_X.subarray(r * NI, r * NI + NI), slot * NI); const e = [c, v, px, qtyOf(qMax, o[3]), slot, Math.tanh(o[2]), pEdge, pFar, sigm(o[3]) >= (qMax - 1) / qMax];
+          let p = buys.length; buys.push(e); while (p > 0 && buys[p - 1][1] < v) { buys[p] = buys[p - 1]; p--; } buys[p] = e; } } }
+      else if (q && o[1] > 0) { px = nnPriceEnd(W, b, o, undefined, W._cw[kw], W._cw[kw + 12], base); pxOk = true; pEdge = NP.edge; pFar = NP.far; const x = ROW_X.slice(r * NI, r * NI + NI); (W.offDiag ||= { bid: [], ask: [] }).ask.push(Math.tanh(o[2])); if (D) { D.ask++; if (pEdge) D.askEdge++; if (pFar) D.askFar++; D.qty++; if (sigm(o[3]) >= (qMax - 1) / qMax) D.qtyEdge++; } for (let k = 0; k < Math.min(q, qtyOf(qMax, o[3])); k++) ask(b, c, px, pend, x); }
       if (q && o[5] > 1 && W.cfg.auctions && (b.h.get(id) || 0) - (pend.get(id) || 0) > 0) { if (listed < (W.cfg.maxListings ?? 1)) { listAuction(W, b, c, nnPrice(W, b, c, o, undefined, undefined, id)); listed++; } else lBlock = 1; }
-      if (W.cfg.shorting && !q && o[6] > 0.5 && o[6] > o[0] && (W.lendable?.get(id) || 0) > 0) { if (shorts < (W.cfg.maxShorts ?? 3)) { if (borrowCard(W, b, c)) { ask(b, c, px, pend); shorts++; ci = ROW_I[r] + 1; break; } } else sBlock = 1; }
+      if (W.cfg.shorting && !q && o[6] > 0.5 && o[6] > o[0] && (W.lendable?.get(id) || 0) > 0) { if (shorts < (W.cfg.maxShorts ?? 3)) { if (!pxOk) px = nnPriceEnd(W, b, o, undefined, W._cw[kw], W._cw[kw + 12], base); if (borrowCard(W, b, c)) { ask(b, c, px, pend); shorts++;
+          // the short sale moved its cash (input 19); nothing else the later cards in this batch show it changed (its holding,
+          // lots, borrowed count and the lendable count moved only for this card), so their rows get the new cash and debt
+          // shares, as cardInputs writes them, and are scored again
+          for (let r2 = r + 1; r2 < nR; r2++) { const xo = r2 * NI; ROW_X[xo + 19] = clamp(b.cash / nw, -1, 1); ROW_X[xo + 20] = clamp((b.debt || 0) / nw, 0, 2); }
+          scoreRows(g.card, ROW_X, ROW_O, r + 1, nR); } } else sBlock = 1; }
     }
   }
   let spare = b.cash - g.keep * nw, n = 0;
-  for (const [c, , px, qn, xi, off, pEdge, pFar, qE] of buys.sort((p, q) => q[1] - p[1])) { if (n >= W.cfg.deployOrders) { if (spare > px) oBlock = 1; break; } const x = BX.slice(xi * NI, xi * NI + NI); if (spare > px) { (W.offDiag ||= { bid: [], ask: [] }).bid.push(off); if (D) { D.bid++; if (pEdge) D.bidEdge++; if (pFar) D.bidFar++; D.qty++; if (qE) D.qtyEdge++; } } for (let k = 0; k < qn && spare > px; k++) { bid(b, c, px, x); spare -= px; } n++; }
+  for (const [c, , px, qn, xi, off, pEdge, pFar, qE] of topK ? buys : buys.sort((p, q) => q[1] - p[1])) { if (n >= W.cfg.deployOrders) { if (spare > px) oBlock = 1; break; } const x = BX.slice(xi * NI, xi * NI + NI); if (spare > px) { (W.offDiag ||= { bid: [], ask: [] }).bid.push(off); if (D) { D.bid++; if (pEdge) D.bidEdge++; if (pFar) D.bidFar++; D.qty++; if (qE) D.qtyEdge++; } } for (let k = 0; k < qn && spare > px; k++) { bid(b, c, px, x); spare -= px; } n++; }
   for (const it of itemsOf(W, b)) { const c = W.cards[mktId(it.pid, it.d === 4 ? 0 : it.d, it.f)], o = cardNet(W, b, c, nw, ctx, it); if (o[1] > 0 && o[5] > 0) { if (listed >= (W.cfg.maxListings ?? 1) + 1) { iBlock = 1; break; } listItem(W, b, it, nnPrice(W, b, c, o, it)); listed++; } }
   let packs = 0, want = 0; for (const [, k] of b._nnPacks || []) want += k;
   for (const [t, k] of b._nnPacks || []) for (let i = 0; i < k && packs < (W.cfg.maxPacks ?? 3); i++, packs++) { const pm = b._nnPackBid?.[t] ?? 1, pp = packInfo(W, t).price * (W.cfg.packSale === 'auction' ? pm : 1); if (!(spare >= pp) || !buyPack(W, b, t, pm)) break; spare -= pp; } // packs spend the same spare cash (above its 'cash target') as its card bids
@@ -1584,9 +1646,19 @@ function nnAct(W, b) {
 const NP = { edge: false, far: false }; // the last nnPrice call: at its wall, and beyond the default range's edge (×0.46 or ×1.54); measurement only
 function nnPrice(W, b, c, o, it, base0, id) { // id: a plain card cardInputs read this week (its player and premium are in the week's array)
   const k = id != null && !it ? id * CWN : -1, pid = k >= 0 ? W._cw[k] : c.pid, cm = k >= 0 ? W._cw[k + 12] : c.mult;
-  const P = base0 ?? (it ? markItem(W, it) : k >= 0 && SNAP && id < SNAP.n ? SNAP.P[id] : c.P), n = b.notes.get(pid), est = fresh(W, n) && n.est > 0 ? n.est * (it ? it.mult : cm) : null;
+  return nnPriceEnd(W, b, o, it, pid, cm, nnPriceStart(W, c, o, it, base0, id));
+}
+// nnPrice's first part: the base price, pulled toward the public guide (which adds to the guideUse measurement)
+function nnPriceStart(W, c, o, it, base0, id) {
+  const k = id != null && !it ? id * CWN : -1, pid = k >= 0 ? W._cw[k] : c.pid, cm = k >= 0 ? W._cw[k + 12] : c.mult;
+  const P = base0 ?? (it ? markItem(W, it) : k >= 0 && SNAP && id < SNAP.n ? SNAP.P[id] : c.P);
   let base = P; const pl = W.players[pid];
   if (SHAPE_G && guideOn(W.cfg) && pl?.guide > 0) { const a = sigm(o[8]); base += (pl.guide * (it ? it.mult : cm) - base) * a; const U = (W.guideUse ||= { s: 0, n: 0 }); U.s += a; U.n++; } // first toward the public guide
+  return base;
+}
+// nnPrice's second part: toward the bot's own fresh research, then the price-offset output (pid, cm: the card's player and premium)
+function nnPriceEnd(W, b, o, it, pid, cm, base) {
+  const n = b.notes.get(pid), est = fresh(W, n) && n.est > 0 ? n.est * (it ? it.mult : cm) : null;
   if (est != null && W.cfg.priceAnchor !== false) base += (est - base) * sigm(o[7]); // then toward its own research
   if (W.cfg.priceMap === 'log') { const lc = Math.log(W.cfg.priceClamp ?? 50), z = (W.cfg.priceLogK ?? 0.6) * o[2]; NP.edge = Math.abs(z) >= lc; NP.far = z > 0.4318 || z < -0.7765; return base * Math.exp(clamp(z, -lc, lc)); } // ln 1.54 and ln 0.46: the edges of the default range at |tanh| 0.9
   const t = Math.tanh(o[2]); NP.edge = Math.abs(t) > 0.9; NP.far = NP.edge; return base * (1 + (W.cfg.priceRange ?? 0.6) * t);
@@ -1860,7 +1932,7 @@ export function step(W) {
   socialPhase(W); aiSocial(W);
   passPhase(W);
   if (cfg.games) { tokenMarket(W, 'ticket'); gamePhase(W); }
-  auctionPhase(W);
+  FOLDS = new Map(); try { auctionPhase(W); } finally { FOLDS = null; }
   bids = W.cards.map(() => []); asks = W.cards.map(() => []);
   if (cfg.shorting) shortUpkeep(W);
   const order = W.shuffle(W.bots.slice()); // a uniform order: no seat acts first more often (first-come resources, ties in the book)
@@ -2003,7 +2075,8 @@ function valueCollectors(W) {
       left > 0 ? C.stock.set(id, left) : C.stock.delete(id); }
     C.cash = Math.min(capC, C.cash);
     // buy: the asks furthest below their reference, at most `per` copies of any one card, while money lasts
-    const cand = askBook.filter(([c, o]) => !o.used && ref(k, c) != null && o.p <= ref(k, c) && (C.stock.get(c.id) || 0) < per).sort((a, b) => a[1].p / ref(k, a[0]) - b[1].p / ref(k, b[0]));
+    const cand = []; for (const e of askBook) { const c = e[0], o = e[1]; if (o.used) continue; const r = ref(k, c); if (r != null && o.p <= r && (C.stock.get(c.id) || 0) < per) cand.push([c, o, o.p / r]); } // each reference worked out once (nothing it reads changes here)
+    cand.sort((a, b) => a[2] - b[2]);
     for (const [c, o] of cand) { if (o.p > C.cash || o.used || (C.stock.get(c.id) || 0) >= per) continue; if (xfer(W, c, 'out', o.b, o.p, null, o)) { const m = (W.house.mint ||= {}); m.outsideIn -= o.p; m.dealerIn = (m.dealerIn || 0) + o.p; o.used = true; C.cash -= o.p; C.n++; C.stock.set(c.id, (C.stock.get(c.id) || 0) + 1); bought++; spent += o.p; } }
   }
   W.outsideWeek = { spent: Math.round(spent), bought, resold: sold, held: W.coll.reduce((a, C) => a + C.n, 0) };
@@ -2651,7 +2724,7 @@ export function frame(W, { full = false } = {}) {
   if (full) {
     f.vol = W.players.map((c) => c.volH[c.volH.length - 1] || 0);
     f.aiDetail = Object.fromEntries(W.bots.filter((b) => b.kind === 'ai').map((b) => [b.name, { cash: Math.round(b.cash), debt: Math.round(b.debt || 0), realized: Math.round(b.stats.realized || 0), positions: [...b.h].map(([id, q]) => [id, q, r1(avgCost(b, id) ?? 0)]), notes: [...b.notes].map(([id, n]) => [id, r1(n.est), n.week]) }]));
-    f.aiLog = W.journal.filter((j) => WHO.some((k) => typeof j[k] === 'string' && W.bots.find((b) => b.kind === 'ai' && b.name === j[k])));
+    { const ai = new Set(); for (const b of W.bots) if (b.kind === 'ai') ai.add(b.name); f.aiLog = W.journal.filter((j) => WHO.some((k) => typeof j[k] === 'string' && ai.has(j[k]))); }
     f.si = W.players.map(() => 0); for (const L of W.cardLoans || []) f.si[W.cards[L.id].pid]++;
     f.circ = W.players.map((c) => circOf(W, c)); f.pool = W.players.map((c) => c.pool); f.ovr = W.players.map((c) => W.era?.[c.id]?.ovr ?? null); f.risk = W.players.map((c) => (c.on === false ? null : Math.round(riskRating(W, c) * 10) / 10));
     f.prices = W.players.map((c) => r1(c.P)); if (W.t === 0 || W.cfg.valueModel !== 'formula' || (W.cfg.leagueUpdates && W.t % W.cfg.updateEvery === 0)) f.values = W.players.map((c) => r1(c.F)); }
@@ -3323,7 +3396,7 @@ function closeLoan(W, L, why, settle, lenderGone) {
     jot(W, { type: 'forcedCover', bot: b.name, lender: ln.name, card: c.key, price: r2(settle), entry: r2(L.entry), why });
     if (W.ord) W.ord.forced = (W.ord.forced || 0) + 1;
   }
-  W.cardLoans = W.cardLoans.filter((x) => x !== L);
+  { const i = W.cardLoans.indexOf(L); if (i >= 0) { W.cardLoans = W.cardLoans.slice(); W.cardLoans.splice(i, 1); } } // a new array, as before (callers loop over a copy)
 }
 // A short seller pays its lender (the lending fee, or a royalty the card earned) from its cash only; what it can't pay is the
 // lender's loss and calls the short (shortUpkeep). Returns the unpaid part.

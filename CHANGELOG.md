@@ -17,6 +17,20 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 
 ### Changed
 
+- Speed: about 1.3 times faster with identical results. Realism, seed 31761, practiceGens 0, 40 weeks, the two engines one
+  after another on a shared machine: 2.84 s/week before (2.99 and 2.70) and 2.17 s/week after (2.20 and 2.15); setup with
+  practice on 140 s before and 112 s after. Same engine version: every week's full frame hashes the same as 2.0.0 on ten
+  worlds (`tests/same_results.mjs`: Realism 40 weeks, Realism with practice, the defaults, `rngStreams: 'single'`, the Vault
+  store, heavy shorting and credit, short lives with deaths and estates, the attention budget, offspring entrants with fitness
+  sharing, and fashion with limits, league updates, fixed pack prices and value openings). What changed: the order phase keeps
+  only the buy wishes it can place (a stable top ceil(deployOrders) + 1 instead of sorting them all) and works out a card's
+  price only for cards that get an order (the guide's pull still runs for every card, in order); after a short sale the rest of
+  the batch is scored again with only its cash and debt inputs rewritten instead of every input rebuilt; plain cards in the
+  research and order phases get their inputs from `cardInputsSnap`, which works out each bot's shared inputs once per batch
+  (`TF_CHECK_ROWS=1` checks every row against `cardInputs`); research scores only its one output and keeps a stable top
+  `want`; sealed auctions reuse each bot's first-layer fold while its fixed inputs are bit-for-bit the same; and several
+  scans over every bot or card are gone (note-partner picks, game results, the AI log in frames, dealer reference prices,
+  candidate copies, closing card loans). `tests/frame_hash.mjs` hashes one run's frames.
 - The page is dark by default (`data-theme="light"` for light). The README figures are drawn dark. No engine change.
 - README rewritten: shorter, findings first, figure after them. Then the long-run findings (engine 1.x, seeds 12864 and 11906) and what we got wrong along the way; the banner gains a second ticker row for the long run.
 
