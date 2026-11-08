@@ -1,0 +1,20 @@
+# The author entry below is a placeholder: replace it with the author's name (given-names, family-names) before
+# the repository is made public.
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Trading Floor: an agent-based simulation of a trading-card market"
+type: software
+authors:
+  - name: "sakisaki-dev"
+version: 1.0.0
+date-released: 2026-11-07
+repository-code: "https://github.com/sakisaki-dev/trading-floor"
+abstract: >-
+  An agent-based simulation of a trading-card market. Neural-network bots trade cards of players from a
+  simulated football league built on one Retro Bowl save's real data. Bots learn within a lifetime and evolve
+  across generations; the engine records diagnostics and a tactic tracker.
+keywords:
+  - agent-based model
+  - neural networks
+  - evolution
+  - market simulation
