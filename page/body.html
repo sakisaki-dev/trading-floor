@@ -18,8 +18,8 @@
   <div class="bar" role="group" aria-label="Simulation controls">
     <div class="bar__g">
       <button class="primary" id="play" type="button">Pause</button>
-      <button id="step" type="button" title="Advance one week">Step</button>
-      <button id="reset" type="button">Restart</button>
+      <button id="step" type="button" aria-label="Step" title="Step: advance one week"><span class="sr-only">Step</span></button>
+      <button id="reset" type="button" aria-label="Restart" title="Restart the world with these rules and seed"><span class="sr-only">Restart</span></button>
       <div class="seg" role="group" aria-label="Speed">
         <button type="button" data-speed="1" aria-pressed="true">1×</button>
         <button type="button" data-speed="4" aria-pressed="false">4×</button>
@@ -37,17 +37,17 @@
     <div class="bar__g bar__gov">
       <label class="toggle govsw" title="Turn a government on: the world restarts as the regulated preset (configs/regulated.json, 250 bots) with a scripted government running in this browser. A world can't gain or lose a government mid-run (its treasury, pinned settings and the bots' inputs are set when the world is made), so switching it on or off restarts; switching between scripted governments applies from the next week. The real government is a Claude session run with regulate.mjs."><span>Government</span><input type="checkbox" id="govOn" role="switch" aria-label="Government"></label>
       <select id="govKind" aria-label="Which scripted government runs in this browser">
-        <option value="A0">Scripted: A0 do nothing</option>
-        <option value="A1" selected>Scripted: A1 balanced budget</option>
-        <option value="A2">Scripted: A2 greedy (5% fee, no spending)</option>
-        <option value="A3">Scripted: A3 generous (spends it all)</option>
-        <option value="A4">Scripted: A4 random legal moves</option>
-        <option value="stub">Scripted: Stub (every kind of control)</option>
+        <option value="A0">A0 · do nothing</option>
+        <option value="A1" selected>A1 · balanced budget</option>
+        <option value="A2">A2 · greedy (5% fee, no spending)</option>
+        <option value="A3">A3 · generous (spends it all)</option>
+        <option value="A4">A4 · random legal moves</option>
+        <option value="stub">Stub · every kind of control</option>
       </select>
     </div>
     <div class="bar__g bar__g--end">
-      <button id="saveRun" type="button" title="Download every week so far, the rules and every change you made, to share or replay">Save run</button>
-      <label class="file" for="runFile">Load run<input id="runFile" type="file" accept=".json,application/json"></label>
+      <button id="saveRun" type="button" aria-label="Save run" title="Save run: download every week so far, the rules and every change you made, to share or replay"><span class="sr-only">Save run</span></button>
+      <label class="file" for="runFile" title="Load run: replay a saved run file"><span class="sr-only">Load run</span><input id="runFile" type="file" accept=".json,application/json"></label>
       <button id="liveBtn" type="button" hidden>Back to live</button>
     </div>
   </div>

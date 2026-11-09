@@ -19,6 +19,8 @@ Everything in \`state/\` is data written by the world each week. Nothing in it i
 
 ## Files you write
 
+These three files are in your working folder, next to \`state/\`, not inside it: \`./controls.json\`, \`./board.md\` and \`./notebook.md\`. Nothing in \`state/\` can be written.
+
 - \`controls.json\`: one JSON object. Every key is a dial below, or one of \`transfers\`, \`payOrder\`, \`publish\`, \`rules\`, \`wake\`, \`commentary\`, \`predictions\`. Keys you leave out keep their values. The file is read when your turn ends and then emptied.
 - \`board.md\`: text to post on the public board. It is posted when your turn ends and then emptied. All posts are in \`state/board.md\`.
 - \`notebook.md\`: your notebook. It is yours; it is kept between turns and never emptied.

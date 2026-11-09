@@ -37,7 +37,7 @@ const BUILTIN_PLUGINS = ['cc-plugin-agents-md', 'cc-plugin-telemetry', 'cc-plugi
 const NO_PLUGINS = JSON.stringify({ enabledPlugins: Object.fromEntries(BUILTIN_PLUGINS.map((n) => [`${n}@builtin`, false])) });
 export function sessionArgs({ prompt, brief, model = MODEL, sessionId, first, format = 'json' }) {
   return ['-p', prompt, '--model', model, '--system-prompt', brief,
-    '--tools', 'Read,Write', '--allowedTools', 'Read(./**)', ...WRITABLE.map((f) => `Edit(./${f})`), // file rules are Edit(path) for every file-writing tool (Write(path) is never matched); the only tools are still Read and Write
+    '--tools', 'Read,Write', '--disallowedTools', 'Edit(./state/**)', '--allowedTools', 'Read(./**)', ...WRITABLE.map((f) => `Edit(./${f})`), // file rules are Edit(path) for every file-writing tool (Write(path) is never matched); the only tools are still Read and Write
     '--permission-mode', 'dontAsk', '--permission-prompts', 'none', '--setting-sources', '', '--settings', NO_PLUGINS, '--strict-mcp-config', '--disable-slash-commands', '--safe-mode', '--restricted',
     '--output-format', format, ...(format === 'stream-json' ? ['--verbose'] : []), first ? '--session-id' : '--resume', sessionId];
 }
@@ -69,8 +69,19 @@ export function newCompactions(S, seen = new Set()) {
   const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name); if (e.isDirectory()) walk(f); else if (f.endsWith('.jsonl')) for (const line of fs.readFileSync(f, 'utf8').split('\n')) { if (!line) continue; let j; try { j = JSON.parse(line); } catch { continue; } if (j.isCompactSummary || j.type === 'summary' || j.subtype === 'compact_boundary') { const id = j.uuid || j.leafUuid || crypto.createHash('sha1').update(line).digest('hex'); if (seen.has(id)) continue; seen.add(id); found.push({ id, at: j.timestamp || null, hash: crypto.createHash('sha256').update(JSON.stringify(j.message ?? j.summary ?? j)).digest('hex') }); } } } };
   walk(dir); return found;
 }
-// After a turn: any file in the working folder other than state/ and the three it may write is removed and reported
+// After a turn: any file in the working folder other than state/ and the three it may write is removed and reported, and
+// so is any file in state/ the world doesn't write there. The CLI lets a session write anywhere in its folder (the
+// allow rules only skip the prompt), so a deny rule keeps it out of state/ and this check backs the rule up.
+export const STATE_FILES = new Set(['rules.md', 'now.json', 'ledger.csv', 'history.csv', 'trades.jsonl', 'market.json', 'guide.json', 'league.json', 'decisions.jsonl', 'board.md', 'record.md', 'record.json']);
 export function strayFiles(S) {
-  const stray = []; for (const e of fs.readdirSync(S.cwd, { withFileTypes: true })) { if (e.name === 'state' || WRITABLE.includes(e.name)) continue; const f = path.join(S.cwd, e.name); fs.rmSync(f, { recursive: true, force: true }); stray.push(e.name); }
+  const stray = [], rm = (f, name) => { fs.rmSync(f, { recursive: true, force: true }); stray.push(name); };
+  for (const e of fs.readdirSync(S.cwd, { withFileTypes: true })) { if (e.name === 'state' || WRITABLE.includes(e.name)) continue; rm(path.join(S.cwd, e.name), e.name); }
+  const st = path.join(S.cwd, 'state');
+  if (fs.existsSync(st)) for (const e of fs.readdirSync(st, { withFileTypes: true })) {
+    const f = path.join(st, e.name);
+    if (e.isFile() && (STATE_FILES.has(e.name) || e.name.endsWith('.tmp'))) continue;
+    if (e.isDirectory() && e.name === 'notebooks') { for (const n of fs.readdirSync(f, { withFileTypes: true })) if (!(n.isFile() && /^[A-Za-z0-9_-]+\.md$/.test(n.name))) rm(path.join(f, n.name), `state/notebooks/${n.name}`); continue; }
+    rm(f, `state/${e.name}`);
+  }
   return stray;
 }
