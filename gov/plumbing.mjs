@@ -9,6 +9,7 @@ import * as CS from './session.mjs'; import { BRIEFS } from './brief.mjs';
 const argv = process.argv.slice(2), opt = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 ? argv[i + 1] : d; };
 const root = opt('session-root'); if (!root) { console.error('usage: node gov/plumbing.mjs --session-root /Users/Shared/tf-gov/plumbing [--brief v1] [--model claude-haiku-5-5]'); process.exit(2); }
 const S = CS.prepareSession(root), brief = BRIEFS[opt('brief', 'v1')], model = opt('model', CS.MODEL), id = crypto.randomUUID();
+CS.strayFiles(S); for (const f of ['controls.json', 'board.md', 'notebook.md']) fs.writeFileSync(path.join(S.cwd, f), ''); // a clean folder: leftovers from an earlier test are not this turn's writes
 fs.writeFileSync(path.join(S.cwd, 'state', 'rules.md'), '# Rules\n\nThis is a plumbing test. Write {"wake": {"inWeeks": 1}} to ./controls.json (in your working folder, next to state/, not inside it) and nothing else.\n');
 const debug = path.join(S.root, 'plumbing-debug.log');
 const args = [...CS.sessionArgs({ prompt: 'Week 0. The state folder, ./state/, is up to date. ./state/rules.md says how everything works.', brief, model, sessionId: id, first: true, format: 'stream-json' }), '--debug-file', debug];
