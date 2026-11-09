@@ -3805,6 +3805,22 @@ function govFrame(W) {
     board: { tone: R(Math.tanh(G.tone) * 1e3) / 1e3, act: R(Math.tanh(G.act) * 1e3) / 1e3, promised: R(Math.tanh(G.promised) * 1e3) / 1e3, placebo: R(Math.tanh(G.placebo) * 1e3) / 1e3, posts: G.posts.length },
     ruleErr: G.ruleErr.length ? G.ruleErr : undefined, approval: G.term ? govApproval(W) : undefined };
 }
+// The page's view of the government layer (display only: the step never calls it and it changes nothing). The public
+// indicators in GOV_INDICATORS order, the bot-independent policy inputs exactly as govBotInputs writes them (the
+// allowance input for a bot at the median worth), what each weekly spending line was owed, the players the board
+// mentions most with their two card inputs, and the lump sums booked out of fitness this week.
+export const GOV_VIEW_IN = ['policy: royaltyRate', 'policy: allowance paid (÷ worth)', 'policy: fee', 'policy: packSalesTax'];
+export function govView(W) {
+  const G = W.gov; if (!G) return null; const R = (x, k = 4) => (typeof x === 'number' && Number.isFinite(x) ? Math.round(x * 10 ** k) / 10 ** k : x ?? null);
+  const ind = govIndicators(W), nw = Math.max(NW_FLOOR * W.cfg.coinScale, ind.medianWorth || 0), x = new Float64Array(BOT_IN_BASE.length + govBotIn(G.boardIn).length);
+  govBotInputs(W, null, x, nw);
+  const inputs = [x[22], x[25], x[26], x[27], ...Array.from(x.subarray(BOT_IN_BASE.length))].map((v) => R(v));
+  const top = []; for (let i = 0; i < G.bm.length; i++) if (G.bm[i] > 1e-3) top.push(i); top.sort((a, b) => G.bm[b] - G.bm[a] || a - b);
+  return { ind: GOV_INDICATORS.map((k) => R(ind[k])), x: inputs, owed: G.owed ? Object.fromEntries(Object.entries(G.owed).map(([k, v]) => [k, R(v, 2)])) : null,
+    board: top.slice(0, 6).map((i) => [W.players[i]?.name, R(G.bIn[2 * i], 3), R(G.bIn[2 * i + 1], 3)]), exo: R(W.exoWk || 0, 2), pending: G.pending.length };
+}
+export const govInputNames = (W) => [...GOV_VIEW_IN, ...govBotIn(!!W.gov?.boardIn)];
+export const govScale = (W) => (W.gov ? { ...W.gov.scale, need0: W.gov.need0, grant: W.gov.grant, d0: govClone(W.gov.d0), lumpSums: [...(EXO[W.cfg.fitnessExo] || EXO.lumpSums)], fitnessExo: W.cfg.fitnessExo } : null);
 // For the mechanism tests (tests/mech.test.mjs): internals, not an API
 export const internals = { clear, borrowCard, lendPool, shortUpkeep, shortPay, creditMarket, livingAndCredit, settleForced, collectArrears, arrearsOf, bill, liqPay, xfer, mintCopy, ripPack, drawTier, packInfo, payout, settleEstate, estateSale, valueCollectors, compsMark, qtyOf, retireTail, writeNote, toLiq, setOrders: (W) => { W_ = W; bids = W.cards.map(() => []); asks = W.cards.map(() => []); }, bid: (b, c, p) => bid(b, c, p), ask: (b, c, p) => ask(b, c, p, new Map()), books: () => ({ bids, asks }) };
 // Internals for the targeted tests in tests/ (not part of the engine's interface)

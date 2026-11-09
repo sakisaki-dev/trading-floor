@@ -32,6 +32,19 @@
       <button id="rulesBtn" type="button" aria-expanded="false" aria-controls="rules">Rules</button>
       <button id="layoutBtn" type="button" aria-expanded="false" aria-controls="layoutP">Layout</button>
     </div>
+    <!-- The government switch: restarts the world as the regulated preset with a scripted government run in this
+         browser's worker (gov/page_gov.mjs). The real government is a Claude session run by regulate.mjs. -->
+    <div class="bar__g bar__gov">
+      <label class="toggle govsw" title="Turn a government on: the world restarts as the regulated preset (configs/regulated.json, 250 bots) with a scripted government running in this browser. A world can't gain or lose a government mid-run (its treasury, pinned settings and the bots' inputs are set when the world is made), so switching it on or off restarts; switching between scripted governments applies from the next week. The real government is a Claude session run with regulate.mjs."><span>Government</span><input type="checkbox" id="govOn" role="switch" aria-label="Government"></label>
+      <select id="govKind" aria-label="Which scripted government runs in this browser">
+        <option value="A0">Scripted: A0 do nothing</option>
+        <option value="A1" selected>Scripted: A1 balanced budget</option>
+        <option value="A2">Scripted: A2 greedy (5% fee, no spending)</option>
+        <option value="A3">Scripted: A3 generous (spends it all)</option>
+        <option value="A4">Scripted: A4 random legal moves</option>
+        <option value="stub">Scripted: Stub (every kind of control)</option>
+      </select>
+    </div>
     <div class="bar__g bar__g--end">
       <button id="saveRun" type="button" title="Download every week so far, the rules and every change you made, to share or replay">Save run</button>
       <label class="file" for="runFile">Load run<input id="runFile" type="file" accept=".json,application/json"></label>
@@ -41,6 +54,10 @@
 
   <div class="rules" id="rules" hidden>
     <div class="rules__bar"><b>Rules</b><span class="note">changes apply to the running world at once · a coloured dot marks a rule changed from its default</span><button type="button" id="rulesReset">Reset all to defaults</button></div>
+    <section class="rgrp" aria-label="Government"><h3>Government<span>the switch in the bar · a scripted government in this browser</span></h3><div class="rgrp__c">
+      <label class="mech" title="Elections (spec 6, run 2): at the end of each term approval is counted mechanically (bots present the whole term whose worth grew; leavers count against). Below the threshold a new government takes office with the treasury, every setting and the old notebooks; the outgoing one keeps its own account. Changing this restarts a government world."><span>Elections</span><select id="govElect"><option value="">Off (run 1)</option><option value="52:0.5">Every 52 weeks, kept at 50% approval</option><option value="26:0.5">Every 26 weeks, kept at 50% approval</option><option value="20:1.01">Every 20 weeks, always replaced (shows the handover)</option></select></label>
+      <p class="note gov__real">The page can't run a Claude session, so the governments here are the scripted ones of <code>gov/arms.mjs</code> and the stub. The real government is a Claude session that <code>regulate.mjs</code> runs on your Mac (your subscription; nothing here starts one): <code>node regulate.mjs --government claude --brief v1 --model claude-haiku-5-5 --session-root /Users/Shared/tf-gov/g1 --seed 1 --weeks 7000 --pace 4 --out runs/g1 --serve 4322</code>, then open <code>http://localhost:4322</code>. See docs/GOVERNMENT.md.</p>
+    </div></section>
     <section class="rgrp" aria-label="Money"><h3>Money<span>what comes in and what leaves every week</span></h3><div class="rgrp__c">
       <div class="slider"><label for="allowance">Allowance / wk <b id="allowanceV"></b></label><input id="allowance" type="range" min="0" max="2000" step="100" value="200"></div>
       <div class="slider"><label for="livingCost">Living cost / wk <b id="livingCostV"></b></label><input id="livingCost" type="range" min="0" max="400" step="20" value="80"></div>
@@ -270,7 +287,7 @@
   <!-- The government (docs/regulator-spec.md §16): shown only for a run with a government (a replayed or followed
        regulate.mjs run). The government never sees this page. -->
   <section class="panel gov" id="govPanel" aria-labelledby="gov-h" hidden>
-    <div class="head"><h2 id="gov-h">Government</h2><span class="note" id="govNote">what it read, changed, posted and wrote · the government never sees this page</span></div>
+    <div class="head"><h2 id="gov-h">Government</h2><span class="note" id="govNote">what it read, changed, posted and wrote · the government never sees this page · how each part works is at the end</span></div>
     <div class="gov__status" id="govStatus" role="status"></div>
     <div class="stats" id="govStats"></div>
     <div class="grid two">
@@ -291,6 +308,10 @@
     </div>
     <div class="head"><h2 class="h3">Dials timeline</h2><span class="note">every setting it touched, old → new, at the week it took effect</span></div>
     <div id="govDials" class="gov__dials"></div>
+    <!-- How the government works: every part of the spec with its live numbers (drawGovHow in ui.js) -->
+    <div class="head gx__head"><h2 class="h3" id="gx-h">How the government works</h2><span class="note">each part of the spec, working, with this week's numbers · § opens that section of the spec</span></div>
+    <div class="gx__real" id="gxReal"></div>
+    <div class="gx" id="gx" aria-labelledby="gx-h"></div>
   </section>
 
   <section class="panel health" id="healthPanel" aria-labelledby="hb2-h">
