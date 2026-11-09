@@ -43,12 +43,13 @@ tools/gov.sh token        # once: claude setup-token, then paste the token into 
 tools/gov.sh plumbing     # the one-turn plumbing test (subscription)
 tools/gov.sh plumbing200  # 200 weeks at 2 s a week, live at http://localhost:4322 (subscription)
 tools/gov.sh replay200    # the replay check of that run (no session)
-tools/gov.sh run1         # run 1, live (subscription); 1,500 weeks at 4 s by default, WEEKS=7000 PACE=4 to override
+tools/gov.sh run1         # run 1, live (subscription); 7,000 weeks at 4 s, WEEKS= PACE= to override
 tools/gov.sh resume       # after a crash
 tools/gov.sh view         # opens the live view; prints the phone address on the same Wi-Fi
 ```
 
-Run 1 defaults to 1,500 weeks because the full league can't hold 4 s a week past about week 900 (spec 24).
+Run 1 is 7,000 weeks (the owner's choice, 2026-11-09). The full league can't hold 4 s a week past about week 900
+(spec 24), so from then on the world runs at engine speed and the run takes well over a day.
 
 ## Before run 1, once
 

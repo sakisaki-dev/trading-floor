@@ -6,7 +6,7 @@
 #   tools/gov.sh plumbing     the one-turn plumbing test (uses the subscription)
 #   tools/gov.sh plumbing200  200 weeks at 2 s a week with a real session, watched live (uses the subscription)
 #   tools/gov.sh replay200    replays plumbing-200 from its decision log and checks every week's hash (no session)
-#   tools/gov.sh run1         run 1, watched live (uses the subscription); WEEKS=7000 PACE=4 to override
+#   tools/gov.sh run1         run 1, watched live (uses the subscription); 7,000 weeks at 4 s, WEEKS= PACE= to override
 #   tools/gov.sh resume [run] picks a run back up after a crash (default runs/g1)
 #   tools/gov.sh view         opens the live view on this Mac and prints the phone address
 set -euo pipefail
@@ -41,7 +41,7 @@ case "${1:-help}" in
   plumbing200) need; watching; caffeinate -dimsu node regulate.mjs --government claude --session-root "$ROOT/plumbing-200" --seed 1 --weeks 200 --pace 2 --out runs/plumbing-200 --serve "$PORT" ;;
   replay200) node regulate.mjs --replay runs/plumbing-200 --out runs/plumbing-200-replay ;;
   run1) need; watching; caffeinate -dimsu node regulate.mjs --government claude --brief v1 --model claude-haiku-5-5 \
-          --session-root "$ROOT/g1" --seed 1 --weeks "${WEEKS:-1500}" --pace "${PACE:-4}" --out runs/g1 --serve "$PORT" ;;
+          --session-root "$ROOT/g1" --seed 1 --weeks "${WEEKS:-7000}" --pace "${PACE:-4}" --out runs/g1 --serve "$PORT" ;;
   resume) need; watching; caffeinate -dimsu node regulate.mjs --resume "${2:-runs/g1}" --serve "$PORT" ;;
   view) open "http://localhost:$PORT"; watching ;;
   *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//' ;;
