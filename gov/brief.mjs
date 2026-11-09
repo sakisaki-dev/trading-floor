@@ -5,7 +5,7 @@ export const BRIEF_NEUTRAL = `You set the rules and the budget. The treasury's b
 export const BRIEFS = { v1: BRIEF_V1, neutral: BRIEF_NEUTRAL };
 // The turn message: facts only (the week the state shows, the files, last turn's errors), no advice
 export function turnPrompt({ week, errors = [], budgetDay = false, handover = false }) {
-  const lines = [budgetDay ? `Week ${week}, budget day: the clock starts when this turn ends.` : `Week ${week}.`, 'The state folder is up to date. Its rules.md says how everything works.'];
+  const lines = [budgetDay ? `Week ${week}, budget day: the clock starts when this turn ends.` : `Week ${week}.`, 'The state folder, ./state/, is up to date. ./state/rules.md says how everything works.'];
   if (handover) lines.push('You have just taken office. Your predecessors\' notebooks are in state/notebooks/.');
   if (errors.length) lines.push(`Your last controls had ${errors.length} error${errors.length > 1 ? 's' : ''}; they are listed in state/now.json under lastErrors.`);
   return lines.join(' ');

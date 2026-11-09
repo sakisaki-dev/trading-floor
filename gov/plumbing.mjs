@@ -11,18 +11,21 @@ const root = opt('session-root'); if (!root) { console.error('usage: node gov/pl
 const S = CS.prepareSession(root), brief = BRIEFS[opt('brief', 'v1')], model = opt('model', CS.MODEL), id = crypto.randomUUID();
 fs.writeFileSync(path.join(S.cwd, 'state', 'rules.md'), '# Rules\n\nThis is a plumbing test. Write {"wake": {"inWeeks": 1}} to controls.json and nothing else.\n');
 const debug = path.join(S.root, 'plumbing-debug.log');
-const args = [...CS.sessionArgs({ prompt: 'Week 0. The state folder is up to date. Its rules.md says how everything works.', brief, model, sessionId: id, first: true, format: 'stream-json' }), '--debug-file', debug];
+const args = [...CS.sessionArgs({ prompt: 'Week 0. The state folder, ./state/, is up to date. ./state/rules.md says how everything works.', brief, model, sessionId: id, first: true, format: 'stream-json' }), '--debug-file', debug];
 console.log(`claude ${args.map((a) => (/\s/.test(a) ? JSON.stringify(a) : a)).join(' ')}\n(cwd ${S.cwd}, HOME ${S.home})`);
 const r = spawnSync(S.bin, args, { cwd: S.cwd, env: CS.sessionEnv(S), encoding: 'utf8', timeout: 10 * 60 * 1000, maxBuffer: 1 << 26 });
 const events = (r.stdout || '').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
 const init = events.find((e) => e.type === 'system' && e.subtype === 'init') || null, result = events.find((e) => e.type === 'result') || null;
 const dbg = fs.existsSync(debug) ? fs.readFileSync(debug, 'utf8') : '';
+// A built-in plugin the machine's managed (MDM) settings seat cannot be switched off from the command line; it is
+// reported as 'look' and recorded, not failed. Any other plugin fails.
+const policyPlugin = (p) => p.path === 'builtin' && new RegExp(`${p.source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} seated outermost: this machine has managed settings`).test(dbg);
 const checks = [
   ['the turn finished', r.status === 0 && result && !result.is_error],
   ['authenticated on the subscription (no API key in the environment)', !process.env.ANTHROPIC_API_KEY && result != null && !/auth|login|credential/i.test(result?.result || '')],
   ['tools are exactly Read and Write', init && JSON.stringify([...(init.tools || [])].sort()) === JSON.stringify(['Read', 'Write'])],
   ['no MCP servers', init && (init.mcp_servers || []).length === 0],
-  ['no slash commands, skills or plugins', init && !(init.slash_commands || []).length && !(init.skills || []).length && !(init.plugins || []).length],
+  ['no slash commands, skills or plugins', init && !(init.slash_commands || []).length && !(init.skills || []).length && (!(init.plugins || []).filter((p) => !policyPlugin(p)).length && ((init.plugins || []).length ? `only ${init.plugins.map((p) => p.name).join(', ')}, which this Mac's managed settings force on (recorded in context-dump.json)` : true))],
   [`the model resolves to ${model}`, init && String(init.model || '').startsWith(model)],
   ['no CLAUDE.md or memory in the request', !/CLAUDE\.md|auto-memory|MEMORY\.md/i.test(dbg)],
   ['the brief is the system prompt', dbg.includes(brief.slice(0, 60)) || 'not visible in the debug log: inspect plumbing-debug.log'],
