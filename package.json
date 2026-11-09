@@ -9,8 +9,10 @@
     "tactics": "node tools/tactics_report.mjs",
     "ai-run": "node run.mjs --config configs/pilot.json",
     "ai-dry": "node run.mjs --config configs/pilot.json --dry",
-    "test": "node tests/mech.test.mjs && node tests/nets.test.mjs && node tests/determinism.test.mjs && node tests/info.test.mjs",
-    "test:quick": "node tests/mech.test.mjs && node tests/determinism.test.mjs"
+    "test": "node tests/mech.test.mjs && node tests/nets.test.mjs && node tests/determinism.test.mjs && node tests/info.test.mjs && node tests/gov.test.mjs",
+    "test:quick": "node tests/mech.test.mjs && node tests/determinism.test.mjs && node tests/gov.test.mjs --quick",
+    "test:gov": "node tests/gov.test.mjs",
+    "gov": "node regulate.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.1.0"

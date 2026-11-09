@@ -17,6 +17,26 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 
 ### Added
 
+- The AI government's build (`docs/regulator-spec.md` section 24; how to run it: `docs/GOVERNMENT.md`). It is off unless
+  `cfg.government` is set. With no government, every week's full frame hashes the same as before on the ten worlds of
+  `tests/same_results.mjs`, so the engine version does not change.
+- Engine, government runs only: a treasury the government owns, with a line for every coin in and out. Dials with legal
+  ranges; an illegal value is rejected, never clipped. Pro rata payments when the treasury is short, or a published pay
+  order. An opening grant. Consumption into the government's own account. Transfers and levies by public attribute.
+  Rule-based dials. Pack and outside sales taxes, an exit tax and a poll tax. Negative rates are subsidies paid from the
+  treasury. Pack, store and gone-borrower money no longer reaches the treasury.
+- Engine, government runs only: the bots read every dial through one bounded input, the allowance actually paid, the
+  treasury's 20-week change, a placebo input and the public board. Board posts become numbers by a published rule.
+- `configs/regulated.json`: Realism with the settings a government run pins. A government world refuses to start without them.
+- `regulate.mjs`: the driver. The world runs on a clock that never waits. The government's changes land the week after its
+  turn ends. Every turn is logged, so a run replays exactly (`--replay`) and continues after a crash (`--resume`).
+  Scripted arms A0 to A4 and elections (`--elections`). `--serve` shows the run live on the page.
+- `gov/`: the whitelist state writer, the rules file, the brief, the isolated Claude session and its plumbing test, the
+  arms and a scripted stub government for tests. No model runs unless the owner starts one.
+- Page: a Government panel, shown only for a run with a government.
+- `tests/gov.test.mjs` (in `npm test`): Gate A checks, from dial legality and both ledgers to the coin to replay of a
+  stub government's run.
+- `docs/AUDIT.md`: 24 of the 25 findings deferred to the government build are resolved.
 - `docs/PARALLELS.md`: real-world parallels for each finding, with sources, how close each mechanism is and where it
   breaks; a summary table in the README. `scripts/summarize_run.mjs` and `results/runs/`: per-generation summaries of
   the four engine 2.0 runs it cites (seeds 83148, 9556, 24306, 38148). Documentation and tooling only.

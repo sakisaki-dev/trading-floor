@@ -1,13 +1,16 @@
 # Spec: an AI government for the Trading Floor
 
-Status: spec only, nothing built. Revised on 2026-11-07 to resolve the scientific audit's methods findings. It covers:
+Status: build steps 3–8 of section 21 are built on branch `government` (2026-11-08); section 24 says what is built, what
+is not, and where the code differs from this text. Revised on 2026-11-07 to resolve the scientific audit's methods
+findings. It covers:
 
 - where the sandbox stands (section 1);
 - the experiment: questions, hypotheses, outcomes (section 2);
 - the economy, the government's money and its rules (sections 3–11);
 - the arms, measurements and engine, driver and page changes (sections 12–16);
 - the rollout, operations, fingerprint and conduct (sections 17–20);
-- the build order, decisions and the repo record (sections 21–23).
+- the build order, decisions and the repo record (sections 21–23);
+- the build status and every place reality differs from this text (section 24).
 
 ## Audit status
 
@@ -1059,3 +1062,101 @@ Limits of the design, reported with the results rather than solved:
 - the summaries of every arm it is compared with;
 - charts of the pre-registered outcomes;
 - a link to the compressed archive (frames and checkpoints) and a one-line command to replay it on the page.
+
+## 24. Build status (2026-11-08, branch `government`)
+
+How to run it: [GOVERNMENT.md](GOVERNMENT.md). Every item below is off unless `cfg.government` is set: with no
+government every week's full frame hashes the same as `main` on the ten worlds of `tests/same_results.mjs`.
+
+### 24.1 Built
+
+| Section | What | Where |
+|---|---|---|
+| 4.1, 17.1 | Revenue lines: fees, holding costs, the wealth tax (into the treasury, per-week rate, every 4 weeks), the pack sales tax (added to the clearing price; pack revenue goes to the publisher, outside), the outside sales tax (dealers and the store; their takings are outside), the exit tax, the poll tax (a negative allowance), levies (negative transfers). A gone borrower's liquidation share leaves the economy | `engine.mjs` (`govPay`, `govOutside`, `govPackTax`, `govExit`, `routeBill`) |
+| 4.2, 5.3 | Spending lines: allowance (coins per bot; fillK applied once), royalties (capped at `royaltyCap` × T), transfers by public attribute, consumption into the own account, subsidies from every negative rate | `govPay`, `govSubsidy` |
+| 4.3 | Pro rata over the weekly lines, or a published `payOrder` | `govFractions` |
+| 4.6 | The opening grant (`treasuryStart` weeks of a typical week's spending at the opening dials, its own line), an optional pre-registered opening dial vector (`government.dials`), the budget-day turn | `govOpen`, `regulate.mjs` |
+| 5.2 | The treasury's books in `state/now.json` and `state/ledger.csv`; its 20-week change as a bot input | `gov/state.mjs` |
+| 6 | Elections: mechanical approval, terms, handover of the treasury, settings and notebooks; the outgoing government keeps its account; the record of governments | `govApproval`, `govHandover`, `regulate.mjs --elections` |
+| 7 | The clock, budget day, wake in N weeks or on a trigger, the lag logged per turn, rule-based dials evaluated weekly | `regulate.mjs`, `checkTriggers`, `govWeekStart` |
+| 8 | The whitelist state writer and its leak scan (every excluded key, every player's F, the F index, price ÷ value, vcap, the seed) | `gov/state.mjs`, `tests/gov.test.mjs` |
+| 9 | The dial table with legal ranges, rejection (never clipping), the allow-list ("not a dial"), transfers, payOrder, publish, rules | `GOV_DIALS`, `applyControls` |
+| 9.4 | Every dial a policy input through one transform, tanh(asinh(v/s) − asinh(v0/s)); the allowance input is what was paid | `govBotInputs` |
+| 10 | Brief v1 and the neutral brief; the rules file generated from the engine's tables; the isolated CLI session (flags, own HOME outside the home tree, pinned and hashed binary, stray files removed, compactions logged); the plumbing script | `gov/brief.mjs`, `gov/rules.mjs`, `gov/session.mjs`, `gov/plumbing.mjs` |
+| 11.1–11.3 | Commentary, the notebook (every version kept), structured predictions scored at their horizon, the board parser (sentences, negation, capitalised unique surnames, dial promises) and its inputs (two per card, three global), fading by half every 4 weeks | `parseBoard`, `noteBoard` |
+| 11.4 | The placebo input, from its own stream | `govWeekStart` |
+| 12.2 | Scripted arms A0–A4 (A0b is `government.board: false`); replays of a log (Y1–Y3 need a log filter, not built) | `gov/arms.mjs` |
+| 15, 18 | The driver: turns as their own processes, the decision log, frames, hashes, replay, resume | `regulate.mjs` |
+| 16 | The page's Government panel, live (`--serve`) and in replay | `page/` |
+| 17.3 | Gate A checks: conservation to a millionth of a coin, every treasury line against the bots' side, the own account, pro rata, the fuzzer, determinism and replay equality, the league identical under A0, greedy and generous governments, the leak scan, the channels wired (board, stance, placebo) | `tests/gov.test.mjs` |
+| 19 | The fingerprint in `meta.json`; the driver refuses a `claude` run with a dirty tree | `regulate.mjs` |
+
+### 24.2 Not built yet
+
+- **Snapshot and restore (18.1).** The world holds closures (its random streams) and many Maps; a full snapshot needs a
+  refactor of the generators. Instead the decision log is the checkpoint: `--resume` re-runs every logged week and checks
+  each week's hash, then continues. That is exact, but late in a 7,000-week run it takes hours (the weeks run at engine
+  speed). Forked counterfactuals (12.3) wait for snapshot and restore.
+- **Tax bases (9.2):** capital gains, interest income, short-borrow fees, the estate tax and progressive brackets are not
+  built (the exit tax and the poll tax are). A royalty income tax would equal a lower `royaltyRate`, since royalties are
+  paid from the treasury, so it is left out. Matching grants and buying from the liquidator (`liqBuy`) are not built.
+- **Bonds and printing (13.5)** are later runs, as planned.
+- **The credibility arms (11.4)** (always-lying against always-true boards), **input-sensitivity ablation for H3a**,
+  the Laffer sweep, Gate B, A4's cadence fitted to G1's log, Y1–Y3 log filters, and the frozen analysis script.
+- **Module-level state across worlds** (AUDIT 5c): still one world per process at a time.
+- **A concentration holding tax** in place of `positionLimit` (AUDIT 5d): `positionLimit` stays a dial.
+
+### 24.3 Where the code differs from this text
+
+- **The driver** is `regulate.mjs` at the repository root (the repository is the old `sandbox/`), next to `run.mjs`.
+- **The clock (7):** each week waits out the rest of its own `weekSeconds`. A week that computes longer than the pace is
+  logged (`clock.jsonl`: `behindMs`, `slowWeeks`) and the next starts at once; the world never sprints to make up lost
+  time, so the government's cost of thinking stays one week per week of engine time. The budget-day turn runs with the
+  clock stopped.
+- **Subsidies at a sale** (a negative fee, pack tax or outside tax, or a negative exit tax) are paid only while the
+  treasury holds them, at the sale; they are not added to the weekly pro rata (that would delay a seller's proceeds). The
+  wealth and holding subsidies are weekly lines; the holding subsidy uses the marks at the start of the week.
+- **Dial ranges (9.3), confirmed against the code:** `royaltyRate` 0 to 1 (per 20 weeks of games, the engine's unit);
+  `maxLTV` and `marginCall` 0 with no upper limit; `loanWeeks`, `guideEvery`, `guideLag` whole numbers from 1;
+  `interest` is not a dial (the engine never reads it: rates are set by lenders and borrowers); `cardLendFee` and
+  `shortMargin` are not on the menu.
+- **Wake default:** a turn with no `wake` keeps its last setting; the first default is 10 weeks (`--wake`).
+- **Approval (6)** uses worth at marks. Bots that died during the term (their heirs took over) are excluded with the
+  newcomers, since they did not leave by choice.
+- **State files:** trades carry card, price, quantity and week (no bot names); the trade file keeps a rolling 52 weeks.
+- **The placebo (11.4)** is a random pulse in half the weeks, uniform in −1 to 1, faded and squashed like the board; it
+  is not yet matched to the board's measured distribution (that needs G1's log).
+- **The treasury share on the page** values cards at marks; the primary outcome (2.3) uses bid value, for the analysis script.
+- **Usage visibility (5.4):** the CLI's JSON result has no remaining-usage field, so a used-up window is detected from
+  its error text and reported as an outage, the spec's fallback; the plumbing test confirms it.
+- **The league is held constant only with the full league.** With `leagueFill: 'save'` the player list itself differs
+  between market settings from week 1, on `main` too (found while testing; not a government issue: regulated runs use
+  the full league, where the league is identical across governments).
+
+### 24.4 Pace
+
+Measured on 2026-11-08 (Apple silicon, 8 cores, Node 24): the regulated world's full league (Realism, `botScale:
+'cards'`, practiceGens 0, seed 31761), the engine on `main` (identical to the branch with no government), one process,
+CPU time of step plus compact frame per week. The population opens at 502 bots and drains to 250–330 within a few hundred
+weeks, so "about 500 bots" holds only at the open. Other jobs shared the machine for part of the run; weeks 1,401–1,500
+ran alone.
+
+| Weeks | Mean | Median | 90th percentile | Weeks over 4 s | Bots | Heap |
+|---|---|---|---|---|---|---|
+| 26–50 | 1.60 s | 1.52 s | 1.78 s | 0 of 25 | 437 → 325 | 187 MB |
+| 251–350 | 1.82 s | 1.79 s | 2.07 s | 0 of 100 | 258 → 246 | 332 MB |
+| 551–650 | 2.67 s | 2.58 s | 3.17 s | 0 of 100 | 287 → 284 | 632 MB |
+| 851–950 | 4.18 s | 4.13 s | 4.73 s | 62 of 100 | 295 → 308 | 688 MB |
+| 1,101–1,200 | 4.54 s | 4.46 s | 5.19 s | 87 of 100 | 318 → 323 | 899 MB |
+| 1,401–1,500 | 5.62 s | 5.60 s | 6.38 s | 100 of 100 | 331 → 333 | 925 MB |
+
+The government layer and the driver add little: on the 250-bot preset, weeks 21–60, Realism ran 0.89–0.93 s a week,
+the regulated world 0.93–0.96 s, and the driver with arm A0 (state files, hashes, gzipped frames) 0.94 s.
+
+**4 s a week is not sustainable for 7,000 weeks.** The engine passes 4 s a week around week 900 and keeps slowing (5.6 s
+at week 1,500; later weeks were not measured). Under the clock rule above the world then runs at engine speed: nothing
+is skipped, the government's turns cost fewer weeks than planned late in the run, and the run takes longer than 7.8
+hours (at least 8.5 hours to week 1,500 alone at the measured times, and likely more than a day for 7,000 weeks if the
+slowdown continues). Options for the owner, none taken here: a lower pace that the engine holds late (the clock then
+binds only early), more engine speed work before run 1, or a shorter run. Every slow week is in `clock.jsonl`, so the
+analysis can use the lag the government actually faced.

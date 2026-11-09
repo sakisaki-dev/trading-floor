@@ -411,6 +411,7 @@ export function createWorld(library, overrides = {}) {
     cool: {}, cornered: new Set(), bubbleOn: false, week: { shares: 0, thefts: 0, caught: 0, researched: new Map() },
     library,
   };
+  if (cfg.government) govSetup(W); // a government run (regulated preset): refuses a world without the pinned settings
   W.guideNet = !!guideOn(cfg); useShape(W);
   W.byPos = {}; W.libIndex = new Map(); W.byKey = new Map(); W.mktByKey = new Map(); W.items = new Map(); W.liqItems = [];
   W.kitInfo = library.kits?.kits || null; W.kitMeta = library.kits || null;
@@ -451,6 +452,7 @@ export function createWorld(library, overrides = {}) {
   if (W.bots.length) endow(W, W.bots);
   for (const b of W.bots) { b.nwh = [worth(W, b)]; b.genStart = b.nwh[0]; b.exo = 0; }
   if (cfg.games) { publishContests(W); publishContests(W); } // this week's contests and the ones two weeks out
+  if (W.gov) govOpen(W); // the opening dials and the opening grant (week 0)
   record(W);
   log(W, 'start', `The market opens${W.seasonLabel ? ` in ${W.seasonLabel}` : ''}: ${W.bots.length} bots, ${W.players.filter((p) => p.on !== false).length} players, ${(W.cards.reduce((s, c) => s + c.circ, 0) + W.items.size).toLocaleString()} cards in circulation (${W.items.size} one of a kind) and ${W.players.reduce((s, c) => s + c.pool, 0).toLocaleString()} still in the pool. Every card opens at the site's price for it.`);
   return W;
@@ -686,7 +688,9 @@ function packAuction(W) {
 function ripPack(W, b, free = false, type = 'standard', paid = null) {
   const pk = packInfo(W, type), P = PACK_TYPES[type], cost = paid ?? pk.price;
   if (!pk.tot || (!free && b.cash < cost)) return null;
-  if (!free) { b.cash -= cost; flowOut(W, b, cost); tre(W, 'packs', cost); led(W, 'packs', cost); W.house.packRevenue = (W.house.packRevenue || 0) + cost; }
+  const ptx = W.gov && !free ? govPackTax(W, cost) : 0; if (ptx > 0 && b.cash < cost + ptx) return null; // a government's pack sales tax, added to the price (negative: a subsidy)
+  if (!free) { b.cash -= cost; flowOut(W, b, cost); if (!W.gov) tre(W, 'packs', cost); led(W, 'packs', cost); W.house.packRevenue = (W.house.packRevenue || 0) + cost; } // a government run: the publisher's revenue leaves the economy
+  if (ptx) govPackTaxPay(W, b, ptx, ptx);
   W.house.packs++; tkAdd(W, b, 'packs');
   const rolls = [], taken = new Map();
   for (let k = 0; k < P.size; k++) {
@@ -700,7 +704,7 @@ function ripPack(W, b, free = false, type = 'standard', paid = null) {
   }
   const each = free ? 0 : cost / P.size, out = []; // each copy's share of the price
   for (const x of rolls) { const got = mintCopy(W, b, x, each); if (got) out.push(got); }
-  const back = free ? 0 : cost - each * out.length; if (back > 0.005) { b.cash += back; flowIn(W, b, back); tre(W, 'packs', -back); led(W, 'packs', -back); W.house.packRevenue -= back; W.house.packRefunds = (W.house.packRefunds || 0) + back; } // a short pack is charged only for the copies it held
+  const back = free ? 0 : cost - each * out.length; if (back > 0.005) { b.cash += back; flowIn(W, b, back); if (!W.gov) tre(W, 'packs', -back); led(W, 'packs', -back); W.house.packRevenue -= back; W.house.packRefunds = (W.house.packRefunds || 0) + back; if (ptx) govPackTaxPay(W, b, -ptx * back / cost, ptx); } // a short pack is charged only for the copies it held
   packCache = null; packCacheT = null;
   jot(W, { type: 'pack', bot: b.name, free, packType: type, price: free ? 0 : r2(cost), pulls: out.map((x) => (x.uid ? x.label : x.key)) });
   return out;
@@ -826,8 +830,8 @@ function tokenMarket(W, kind) {
     for (const [bd, ak] of m) {
       if (bd.b.cash < price || !ak.b[field].length || bd.b[field].length >= cap) continue; // (cannot happen now; kept as a guard)
       ak.b[field].sort((x, y) => y - x); const exp = ak.b[field].shift();
-      bd.b[field].push(exp); bd.b.cash -= price; ak.b.cash += price * (1 - cfg.fee); feeTo(W, price * cfg.fee); traded++;
-      flowOut(W, bd.b, price); flowIn(W, ak.b, price * (1 - cfg.fee));
+      const fe = feeOf(W, price); bd.b[field].push(exp); bd.b.cash -= price; ak.b.cash += price * (1 - fe); feeTo(W, price * fe); traded++;
+      flowOut(W, bd.b, price); flowIn(W, ak.b, price * (1 - fe));
       jot(W, { type: kind === 'pass' ? 'passTrade' : 'ticketTrade', buyer: bd.b.name, seller: ak.b.name, price: r2(price) });
     }
   }
@@ -893,13 +897,13 @@ function auctionPhase(W) {
     const top = a.bids[0], second = a.bids[1];
     let result;
     if (top && top.p >= a.reserve) {
-      const price = second ? Math.max(a.reserve, second.p) : W.cfg.singleBidder === 'reserve' ? a.reserve : top.p, net = price * (1 - W.cfg.fee); tkTrade(W, top.b, a.seller, c, price, it ? markItem(W, it) : c.P, 'auc', it); if (W.cfg.attention > 0) attTraded(W, c, top.b, a.seller); // one bidder: no second price, so it pays its own bid ('reserve': the old rule)
+      const price = second ? Math.max(a.reserve, second.p) : W.cfg.singleBidder === 'reserve' ? a.reserve : top.p, fe = feeOf(W, price), net = price * (1 - fe); tkTrade(W, top.b, a.seller, c, price, it ? markItem(W, it) : c.P, 'auc', it); if (W.cfg.attention > 0) attTraded(W, c, top.b, a.seller); // one bidder: no second price, so it pays its own bid ('reserve': the old rule)
       top.b.cash -= price; flowOut(W, top.b, price);
       if (it) { it.owner = top.b; (top.b.items ||= new ItemSet()).add(it.uid); const cost0 = it.cost; it.cost = price; it.last = price; if (a.seller !== 'liq') { const pnl = net - (cost0 ?? 0); a.seller.stats.realized = (a.seller.stats.realized || 0) + pnl; if (W.flow) W.flow.realized[a.seller._grp ?? 2] += pnl; } }
       else { give(top.b, c, 1); addLot(top.b, c, price, W.t); if (a.seller !== 'liq') sellLot(W, a.seller, c, net);
         { const A = (W.aucStats ||= { sold: 0, coins: 0, free: 0, vs: [] }); A.sold++; A.coins += price; if (price <= 1 || price < 0.1 * top.p) A.freeOld = (A.freeOld || 0) + 1; if (price < (W.cfg.fireShare ?? 0.3) * (markBefore.get(c.id) ?? c.P)) A.free++; if (c.P > 0) A.vs.push(price / c.P); } // measurement for the health board: before the sale re-marks the card
         c.P = price; noteTrade(W, c, price, 1); { const pl = W.players[c.pid]; pl.aucBaseP = price / c.mult; pl.aucBaseT = W.t; } c.aucN = (c.aucT === W.t ? c.aucN : 0) + 1; c.aucT = W.t; W.aucWeek = (W.aucWeek || 0) + 1; if (W.ord) W.ord.coins += price; } // a card sold at auction is a trade: it sets the price, feeds comparable sales and the Vault index, and counts
-      feeTo(W, price * W.cfg.fee);
+      feeTo(W, price * fe);
       if (a.seller !== 'liq') { a.seller.cash += net; flowIn(W, a.seller, net); if (a.fk > 0) a.seller.fpC = (a.seller.fpC || 0) + net * a.fk; } else { W.house.outside -= net; led(W, 'liqOut', net); liqPay(W, it ? it.claim : a.claim, net); if (it) it.claim = null; } // the buyer paid net to the liquidator and the fee to the treasury; the liquidator pays any claim on the copy
       result = { type: 'auctionResult', id: a.id, card: label, item: a.uid || null, seller: sellerName, winner: top.b.name, price: r2(price), bids: a.bids.length, topBid: r2(top.p) };
       const ref = it ? markItem(W, it) : c.P;
@@ -948,9 +952,11 @@ function sellLot(W, b, c, net) {
 // positive amount under a tag whose direction record() knows; the treasury keeps its own ledger the same way
 const led = (W, k, x) => { const m = (W.house.mint ||= {}); m[k] = (m[k] || 0) + x; };
 const tre = (W, k, x) => { W.treasury += x; const m = (W.house.tre ||= {}); m[k] = (m[k] || 0) + x; };
-const feeTo = (W, x) => { W.house.fees += x; tre(W, 'fees', x); led(W, 'fees', x); };
+const feeTo = (W, x) => { if (W.gov && x < 0) { govSubsidy(W, 'feeSubsidy', -x); return; } W.house.fees += x; tre(W, 'fees', x); led(W, 'fees', x); }; // a government's negative fee is a subsidy from its treasury
+// The trade fee on one sale: the setting, or (a government run) a negative fee paid only while the treasury holds it
+const feeOf = (W, price) => (W.gov ? govRate(W, W.cfg.fee, price) : W.cfg.fee);
 // Which ledger tags are lump sums taken out of fitness (fitnessExo): the owner's booking, or the old one
-const EXO = { lumpSums: new Set(['allowance', 'taxBack', 'living', 'shocks']), legacy: new Set(['allowance', 'living', 'lifestyle']) };
+const EXO = { lumpSums: new Set(['allowance', 'taxBack', 'living', 'shocks', 'transfer', 'pollTax', 'levy']), legacy: new Set(['allowance', 'living', 'lifestyle']) }; // transfer, pollTax, levy: a government's lump sums (spec 22.1)
 // A non-market flow between a bot and the world (x > 0 paid to it, x < 0 charged): its cash, the ledger and, for a lump
 // sum it did not choose, its exogenous money b.exo all move together, so fitness can never see one without the other
 function transfer(W, b, x, k) { b.cash += x; led(W, k, Math.abs(x)); if ((EXO[W.cfg.fitnessExo] || EXO.lumpSums).has(k)) { b.exo = (b.exo || 0) + x; W.exoWk = (W.exoWk || 0) + x; } }
@@ -1295,13 +1301,14 @@ export const CARD_OUT_BASE = ['buy', 'sell', 'price offset', 'size', 'research',
 // guide is or was on, so with it off the networks, their random draws and every frame stay exactly as before.
 export const GUIDE_IN = ['guide ÷ price', 'weeks since the guide updated'], GUIDE_OUT = ['anchor to the guide'];
 export let CARD_IN = CARD_IN_BASE, CARD_OUT = CARD_OUT_BASE;
-export const BOT_IN = ['bias', 'cash share', 'debt share', 'lent share', 'worth vs median', 'own 4w return', 'age', 'credit rate', 'weeks to my loan due', 'weeks to a loan I made is due', 'pass price', 'ticket price', 'prize pool', 'notes held', 'fresh notes', 'flags on me', 'friends', 'market drawdown', 'market 4w', 'season phase', 'pack value vs price', 'last week games', 'royalty rate', 'living cost share', 'weeks of life left', 'allowance share', 'trade fee', 'pack markup', 'card lending fee', 'short margin', 'my short exposure', 'my cards lent', ...TOPICS.map((t) => `games on ${t} (this + next wk)`)];
+export const BOT_IN_BASE = ['bias', 'cash share', 'debt share', 'lent share', 'worth vs median', 'own 4w return', 'age', 'credit rate', 'weeks to my loan due', 'weeks to a loan I made is due', 'pass price', 'ticket price', 'prize pool', 'notes held', 'fresh notes', 'flags on me', 'friends', 'market drawdown', 'market 4w', 'season phase', 'pack value vs price', 'last week games', 'royalty rate', 'living cost share', 'weeks of life left', 'allowance share', 'trade fee', 'pack markup', 'card lending fee', 'short margin', 'my short exposure', 'my cards lent', ...TOPICS.map((t) => `games on ${t} (this + next wk)`)];
+export let BOT_IN = BOT_IN_BASE; // government runs append their policy and board inputs (govBotIn)
 // What a bot sees of another bot when it picks whom to swap notes with or steal from (all public or its own record, never
 // the other's notes): the bot network's last outputs weigh these, and the best-scoring candidate is chosen (socialPhase)
 export const PARTNER_IN = ['a friend of mine', 'its public flags', 'its weeks in the market'];
 export const BOT_OUT = ['cash target', 'lend share', 'lend rate', 'borrow share', 'max borrow rate', 'pass bid', 'pass ask', 'ticket bid', 'ticket ask', 'research count', 'Standard packs', 'Premium packs', 'Elite packs', 'Holo packs', 'share notes', 'steal notes', 'accept swaps', ...GKEYS.map((g) => `enter ${g}`), 'lend cards share', ...TOPICS.map((t) => `research aim ${t}`), ...Object.keys(PACK_TYPES).map((t) => `pack bid ${t}`), 'quit', ...PARTNER_IN.map((f) => `share partner: ${f}`), ...PARTNER_IN.map((f) => `steal victim: ${f}`)];
 const OUT_QUIT = 17 + GKEYS.length + 1 + TOPICS.length + Object.keys(PACK_TYPES).length, OUT_SHARE_W = OUT_QUIT + 1, OUT_STEAL_W = OUT_SHARE_W + 3; // where the quit and partner-weight outputs sit
-let CARD_SHAPE = [CARD_IN.length, 16, 8, CARD_OUT.length]; const BOT_SHAPE = [BOT_IN.length, 12, BOT_OUT.length];
+let CARD_SHAPE = [CARD_IN.length, 16, 8, CARD_OUT.length], BOT_SHAPE = [BOT_IN.length, 12, BOT_OUT.length];
 const NN = 8;
 const sigm = (x) => 1 / (1 + Math.exp(-x));
 const NW_FLOOR = 50; // × coinScale: the worth a bot's shares (cash, debt, holdings) are measured against when its own is lower, so a broke bot's inputs stay finite
@@ -1361,20 +1368,22 @@ const KERN_H2 = new Float64Array(8);
 // Many cards for one bot: rows from..to of X (inputs, CARD_SHAPE[0] wide) into O (outputs, CARD_SHAPE[3] wide)
 function scoreRows(w, X, O, from, to, j0 = 0, j1 = CARD_SHAPE[3]) { const NI = CARD_SHAPE[0], N3 = CARD_SHAPE[3]; for (let r = from; r < to; r++) { foldFor(w, X, CUR_T, r * NI); cardKernel(w, X, r * NI, O, r * N3, null, j0, j1); } }
 function fastTanh(v) { if (v > 9) return 1; if (v < -9) return -1; const e = Math.exp(2 * v); return (e - 1) / (e + 1); }
-let CB = bufs(CARD_SHAPE), XC = new Float64Array(CARD_SHAPE[0]); let SHAPE_G = false;
+let CB = bufs(CARD_SHAPE), XC = new Float64Array(CARD_SHAPE[0]); let SHAPE_G = false, SHAPE_B = false, SHAPE_V = false, B0 = 41; // SHAPE_B, SHAPE_V: a government run's board and policy inputs (B0: the first board input of the card network)
 // Switch the card network's shape to this world's (the guide inputs and output, or not)
 function useShape(W) {
-  const g = !!W.guideNet; if (g === SHAPE_G) return; SHAPE_G = g;
+  const g = !!W.guideNet, gb = !!W.gov?.boardIn, gv = !!W.gov; if (g === SHAPE_G && gb === SHAPE_B && gv === SHAPE_V) return; SHAPE_G = g;
+  if (gb !== SHAPE_B || gv !== SHAPE_V) { SHAPE_B = gb; SHAPE_V = gv; BOT_IN = gv ? [...BOT_IN_BASE, ...govBotIn(gb)] : BOT_IN_BASE; BOT_SHAPE = [BOT_IN.length, 12, BOT_OUT.length]; BB = bufs(BOT_SHAPE); XB = new Float64Array(BOT_SHAPE[0]); }
   CARD_IN = g ? [...CARD_IN_BASE, ...GUIDE_IN] : CARD_IN_BASE; CARD_OUT = g ? [...CARD_OUT_BASE, ...GUIDE_OUT] : CARD_OUT_BASE;
-  CARD_SHAPE = [CARD_IN.length, 16, 8, CARD_OUT.length]; CB = bufs(CARD_SHAPE); XC = new Float64Array(CARD_SHAPE[0]); VARY = g ? [...VARY_BASE, 41, 42] : VARY_BASE; foldKey = null;
+  if (gb) CARD_IN = [...CARD_IN, ...BOARD_CARD_IN]; B0 = CARD_IN_BASE.length + (g ? GUIDE_IN.length : 0); // government runs: the board's two inputs per card come last
+  CARD_SHAPE = [CARD_IN.length, 16, 8, CARD_OUT.length]; CB = bufs(CARD_SHAPE); XC = new Float64Array(CARD_SHAPE[0]); VARY = g ? [...VARY_BASE, 41, 42] : VARY_BASE; if (gb) VARY = [...VARY, B0, B0 + 1]; foldKey = null;
 }
 // A network from before the guide was turned on: the new input and output weights start small and random, the rest
 // unchanged, so nothing breaks and the bot must learn to use the guide
 function widenCard(W, w) {
-  const N0 = CARD_IN_BASE.length, M = CARD_OUT_BASE.length, A = CARD_SHAPE[0], O = CARD_SHAPE[3];
-  if (w.length === netSize(CARD_SHAPE) || w.length !== netSize([N0, 16, 8, M])) return w;
+  const N0 = CARD_IN_BASE.length, M = CARD_OUT_BASE.length, A = CARD_SHAPE[0], O = CARD_SHAPE[3], NB = SHAPE_B ? BOARD_CARD_IN.length : 0; // NB: a government run's board inputs, kept after the new ones
+  if (w.length === netSize(CARD_SHAPE) || w.length !== netSize([N0 + NB, 16, 8, M])) return w;
   const out = new Float64Array(netSize(CARD_SHAPE)); let i = 0, k = 0;
-  for (let j = 0; j < 16; j++) { for (let q = 0; q < N0; q++) out[k++] = w[i++]; for (let q = N0; q < A; q++) out[k++] = W.gauss() * W.cfg.nnWidenScale; out[k++] = w[i++]; }
+  for (let j = 0; j < 16; j++) { for (let q = 0; q < N0; q++) out[k++] = w[i++]; for (let q = N0; q < A - NB; q++) out[k++] = W.gauss() * W.cfg.nnWidenScale; for (let q = 0; q < NB; q++) out[k++] = w[i++]; out[k++] = w[i++]; }
   for (let q = 0; q < 17 * 8 + M * 9; q++) out[k++] = w[i++];
   for (let q = M; q < O; q++) for (let r = 0; r < 9; r++) out[k++] = W.gauss() * W.cfg.nnWidenScale;
   return out;
@@ -1382,7 +1391,7 @@ function widenCard(W, w) {
 // A bot network from before the partner-weight outputs (one output fewer per weight): the new outputs' weights start small
 // and random, every other weight unchanged (the output layer is the array's end, one row of hidden + 1 per output)
 function widenBot(W, w) { const n = netSize(BOT_SHAPE), h = BOT_SHAPE[1] + 1; if (w.length > n || (n - w.length) % h) return w; const out = new Float64Array(n); out.set(w); for (let i = w.length; i < n; i++) out[i] = W.gauss() * 0.1; return out; }
-const BB = bufs(BOT_SHAPE), XB = new Float64Array(BOT_SHAPE[0]);
+let BB = bufs(BOT_SHAPE), XB = new Float64Array(BOT_SHAPE[0]);
 const FLAT = Object.fromEntries(SIGNALS.map((k) => [k, 0]));
 function startBias(W, card, bot) {
   const b = W.cfg.nnStartBias; if (!b) return;
@@ -1402,6 +1411,7 @@ function mutateBrain(W, g) {
 let CUR_T = -1;
 function marketCtx(W) {
   CUR_T = W.t;
+  if (W.gov && !W.gov.pub.vaultIndex) return { drop: 0, m4: 0, phase: (W.t % W.cfg.weeksPerGeneration) / W.cfg.weeksPerGeneration }; // a government withheld the Vault index: its inputs read as constants
   const ph = W.hist.p; return { drop: clamp(mood.drop * 3, 0, 1), m4: ph.length > 4 ? clamp((ph[ph.length - 1] / ph[ph.length - 5] - 1) * 3, -1, 1) : 0, phase: (W.t % W.cfg.weeksPerGeneration) / W.cfg.weeksPerGeneration };
 }
 // What the card market shows everyone this week, kept for each card in one flat array per world and filled at the card's
@@ -1434,6 +1444,7 @@ function cardInputs(W, b, c, nw, ctx, it, x = XC, xo = 0, id = c.id) {
   else { cardMarketInputs(it ? itemRoy(W, it) : S ? S.roy[id] : cardRoy(W, c), S ? S.bb[id] : c.bb, S ? S.ba[id] : c.ba, price, P, N, no, mult, x, xo); x[xo + 33] = m[o + 13]; }
   x[xo + 36] = N[no]; x[xo + 37] = N[no + 1]; x[xo + 38] = N[no + 2]; x[xo + 39] = N[no + 3]; x[xo + 40] = N[no + 4];
   if (SHAPE_G) x[xo + 42] = N[no + 5] === 1 ? N[no + 7] : 0;
+  if (SHAPE_B) { const bi = W.gov.bIn; x[xo + B0] = bi[2 * pid] || 0; x[xo + B0 + 1] = bi[2 * pid + 1] || 0; } // the board: mentions of this player and their direction (government runs)
   return x;
 }
 // cardInputs for a plain card in a snapshot phase (SNAP set, the card in it), for the batches of nnAct and nnResearchWish:
@@ -1461,6 +1472,7 @@ function cardInputsSnap(W, K, c, id, x, xo) {
   const k = snapCx(S, c, id), X = S.cx, N = S.news, no = pid * NWN; x[xo + 32] = X[k]; x[xo + 33] = m[o + 13]; x[xo + 34] = X[k + 1]; x[xo + 35] = X[k + 2]; if (SHAPE_G) x[xo + 41] = X[k + 3];
   x[xo + 36] = N[no]; x[xo + 37] = N[no + 1]; x[xo + 38] = N[no + 2]; x[xo + 39] = N[no + 3]; x[xo + 40] = N[no + 4];
   if (SHAPE_G) x[xo + 42] = N[no + 5] === 1 ? N[no + 7] : 0;
+  if (SHAPE_B) { const bi = W.gov.bIn; x[xo + B0] = bi[2 * pid] || 0; x[xo + B0 + 1] = bi[2 * pid + 1] || 0; }
   if (CHECK_ROWS) { cardInputs(W, b, c, nw, ctx, undefined, XCHK, 0, id); for (let i = 0; i < CARD_SHAPE[0]; i++) if (!Object.is(XCHK[i], x[xo + i])) throw new Error(`cardInputsSnap: input ${i} of card ${id} is ${x[xo + i]}, cardInputs gives ${XCHK[i]}`); }
 }
 // Inputs 32, 34, 35 and 41 (with the guide): royalty yield, last week's book and the guide, each against the price
@@ -1497,6 +1509,7 @@ function nnThink(W, b, med) {
   x[26] = cfg.fee * 10; x[27] = cfg.packEdge; x[28] = cfg.shorting ? cfg.cardLendFee * 100 : 0; x[29] = cfg.shorting ? cfg.shortMargin : 0;
   x[30] = clamp(owedValue(W, b) / nw, 0, 3); x[31] = clamp(lentValue(W, b) / nw, 0, 3);
   { const tc = W.cfg.games ? topicCount(W) : {}; TOPICS.forEach((t, i) => { x[32 + i] = (tc[t] || 0) / 4; }); }
+  if (SHAPE_V) govBotInputs(W, b, x, nw); // government runs: every policy dial, the board and the placebo (inputs 22, 25-27 become the policy's own)
   if (g.bot.length !== netSize(BOT_SHAPE)) g.bot = widenBot(W, g.bot);
   const o = forward(BOT_SHAPE, g.bot, x, BB);
   g.lendCards = Math.max(0, Math.tanh(o[27]));
@@ -1717,13 +1730,13 @@ function seize(W, b) {
 function liqPay(W, cl, net) {
   if (!cl) return; cl.left--; const live = cl.lenders.filter((e) => !e[0].gone && e[1] > 0), tot = live.reduce((a, e) => a + e[1], 0), x = Math.min(Math.max(0, net), tot), m = (W.house.mint ||= {}); let paid = 0;
   for (const e of live) { const y = tot > 0 ? (x * e[1]) / tot : 0; if (!(y > 0)) continue; e[0].cash += y; e[1] -= y; flowIn(W, e[0], y); paid += y; e[0].stats.recovered = (e[0].stats.recovered || 0) + y; }
-  const rest = Math.max(0, net) - paid; if (rest > 0) { if (!cl.borrower.gone) { cl.borrower.cash += rest; flowIn(W, cl.borrower, rest); led(W, 'liqClaims', rest); } else tre(W, 'liqClaims', rest); }
+  const rest = Math.max(0, net) - paid; if (rest > 0) { if (!cl.borrower.gone) { cl.borrower.cash += rest; flowIn(W, cl.borrower, rest); led(W, 'liqClaims', rest); } else if (!W.gov) tre(W, 'liqClaims', rest); } // a government run: a gone borrower's share leaves the economy, never to the treasury
   led(W, 'liqClaims', paid); if (W.credit) W.credit.recovered = (W.credit.recovered || 0) + paid;
   if (cl.left <= 0) W.claims = (W.claims || []).filter((c) => c !== cl);
 }
 // Bills a bot couldn't pay are owed, by cause (b.arrears); each payment goes where the bill was going. The forced-sale cause
 // each one raises:
-const BILLS = { living: 'living costs', lifestyle: 'living costs', holding: 'holding costs', wealthTax: 'wealth tax', shocks: 'cash shock' };
+const BILLS = { living: 'living costs', lifestyle: 'living costs', holding: 'holding costs', wealthTax: 'wealth tax', shocks: 'cash shock', pollTax: 'poll tax', levy: 'targeted levy', outsideTax: 'sales tax' }; // the last three: government runs
 const CREDIT_CAUSES = ['margin call', 'loan default'];
 function arrearsOf(b) { let s = 0; if (b.arrears) for (const k in b.arrears) s += b.arrears[k]; return s; }
 function routeBill(W, b, k, x) {
@@ -1731,6 +1744,7 @@ function routeBill(W, b, k, x) {
   led(W, k, x); // the money ledger books what was paid, when it was paid
   if (k === 'living' || k === 'lifestyle') { if (W.living) W.living.spent += x; } // leaves the economy
   else if (k === 'holding') tre(W, 'holding', x);
+  else if (k === 'pollTax' || k === 'levy' || k === 'outsideTax') tre(W, k, x); // government runs
   else if (k === 'wealthTax') { if (W.cfg.wealthTaxTo === 'house') tre(W, 'wealthTax', x); else W.taxPot = (W.taxPot || 0) + x; if (W.flow) W.flow.tax += x; flowOut(W, b, x); }
   // shocks: leave the economy
 }
@@ -1892,6 +1906,7 @@ export function step(W) {
   const cfg = W.cfg;
   W.t++; packCache = null; W_ = W; useShape(W); SNAP = null; W.shockWeek = 0; W.aucWeek = 0; W.aucStats = { sold: 0, coins: 0, free: 0, vs: [] };
   for (const p of W.players) p.Fpub = p.F; // last week's value: what the public (and the value collectors) know this week
+  if (W.gov) govWeekStart(W); // a government run: its rule-based dials, the board's fade and the placebo, before anything reads them
   W.guideUse = { s: 0, n: 0 }; W.offDiag = { bid: [], ask: [] }; W.limDiag = { bots: 0, keep: 0, lendRate: 0, maxRate: 0, lendOver: 0, maxOver: 0, lendShare: 0, lev: 0, packBid: 0, packBidEdge: 0, acts: 0, orders: 0, listings: 0, items: 0, shorts: 0, packs: 0, bid: 0, bidEdge: 0, bidFar: 0, ask: 0, askEdge: 0, askFar: 0, qty: 0, qtyEdge: 0 };
   if (guideOn(cfg)) priceGuide(W);
   if (W.timeline && W.t % cfg.seasonWeeks === 0) nextSeason(W);
@@ -1903,7 +1918,7 @@ export function step(W) {
     if (!W.L && W.timeline && W.seasonIx >= W.timeline.seasons.length - 1) leagueStart(W);
     if (W.L) { if (W.t % cfg.seasonWeeks === 0 && W.seasonIx >= W.timeline.seasons.length) leagueSeasonEnd(W); leagueWeek(W); leagueValues(W); }
   } else if (cfg.valueModel === 'ovrWalk') ovrWalk(W); else if (cfg.valueModel === 'factors') factorValues(W);
-  if (cfg.royalties && !cfg.priceOnly && cfg.royaltyEvery !== 'generation') payRoyalties(W, 1 / cfg.weeksPerGeneration);
+  if (cfg.royalties && !cfg.priceOnly && cfg.royaltyEvery !== 'generation' && !W.gov) payRoyalties(W, 1 / cfg.weeksPerGeneration); // a government run pays them with its other lines (govPay)
   W.flow = { net: GROUPS.map(() => 0), realized: GROUPS.map(() => 0), trips: GROUPS.map(() => 0), tax: 0, paidOut: 0 };
   assignGroups(W);
   W.week = { shares: 0, thefts: 0, caught: 0, researched: new Map() };
@@ -1918,10 +1933,11 @@ export function step(W) {
   // Allowance: printed each week, or (closed economy) paid out of the treasury, at most all of it a week
   const lastBub = W.hist.bub[W.hist.bub.length - 1] ?? 1;
   W.bankRate = cfg.centralBank ? clamp(1 + cfg.bankGain * (cfg.bankTarget - lastBub), 0, 4) : 1;
+  if (W.gov) govPay(W); else { // a government run: every spending line paid together, pro rata (or in its payOrder) when the treasury is short
   const want = cfg.allowance * (W.fillK ?? 1) / (W.botK ?? 1) * W.bots.length * W.bankRate, pay = cfg.closedEconomy ? Math.min(want, W.treasury) : want;
   if (cfg.closedEconomy) tre(W, 'allowance', -pay); else tre(W, 'wiped', -W.treasury); // without a closed economy, the house's takings leave circulation
   for (const b of W.bots) transfer(W, b, pay / W.bots.length, 'allowance');
-  W.flow.paidOut = pay;
+  W.flow.paidOut = pay; }
   { const every = Math.max(1, Math.round(cfg.wealthTaxEvery ?? 4)), thr = cfg.wealthTaxThreshold ?? 2; if (cfg.wealthTax > 0 && W.t % every === 0) {
     const ws = W.bots.map((b) => [b, worth(W, b)]), med = ws.map((x) => x[1]).sort((a, b) => a - b)[Math.floor(ws.length / 2)] || 0;
     for (const [b, w] of ws) { if (w <= med * thr) continue; bill(W, b, 'wealthTax', (w - med * thr) * cfg.wealthTax * every, false); } // what it can't pay is owed; wealthTaxForced sells for it (livingAndCredit raises the forced sale each week while it is owed)
@@ -1967,6 +1983,7 @@ export function step(W) {
   if (W.t % cfg.weeksPerGeneration === 0) generationEnd(W);
   for (const b of W.bots.slice()) if (b.kind === 'ai' && b.lifespanW && W.t - b.born >= b.lifespanW) aiSuccession(W, b);
   record(W);
+  if (W.gov) govWeekEnd(W);
 }
 // One copy changes hands at a price outside the weekly cross (outside collectors, forced sellers hitting bids)
 // A card traded at this price: remember it (for comparable-sales marks), and pair it with the card's previous trade (for
@@ -2013,12 +2030,14 @@ function xfer(W, c, buyer, seller, price, bd = null, ak = null) {
   const cfg = W.cfg;
   if (buyer !== 'out' && buyer && buyer.cash < price) return false;
   if (buyer && buyer !== 'out' && buyer.cash < price) return false;
+  if (W.gov && buyer && buyer !== 'out' && (seller === 'out' || seller === 'store') && buyer.cash < price + govOutsideTax(W, price)) return false; // a government's sales tax on buying from outside
   if (seller === 'out') { const q = W.outside.get(c.id) || 0; if (!q) return false; q > 1 ? W.outside.set(c.id, q - 1) : W.outside.delete(c.id); c.circ++; W.house.outside -= price; }
   else if (seller === 'liq') { const q = W.liq.get(c.id) || 0; if (!q) return false; q > 1 ? W.liq.set(c.id, q - 1) : (W.liq.delete(c.id), W.liqPrice?.delete(c.id)); (W.liqSold ||= new Set()).add(c.id); }
-  else if (seller === 'store') { if (c.pool < 1) return false; c.pool--; c.circ++; W.house.store = (W.house.store || 0) + price; tre(W, 'store', price); packCache = null; }
-  else { if ((seller.h.get(c.id) || 0) < 1) return false; give(seller, c, -1); seller.cash += price * (1 - cfg.fee); feeTo(W, price * cfg.fee); flowIn(W, seller, price * (1 - cfg.fee)); sellLot(W, seller, c, price * (1 - cfg.fee)); }
+  else if (seller === 'store') { if (c.pool < 1) return false; c.pool--; c.circ++; W.house.store = (W.house.store || 0) + price; if (!W.gov) tre(W, 'store', price); packCache = null; } // a government run: the store is outside, its takings leave
+  else { if ((seller.h.get(c.id) || 0) < 1) return false; give(seller, c, -1); const fe = feeOf(W, price); seller.cash += price * (1 - fe); feeTo(W, price * fe); flowIn(W, seller, price * (1 - fe)); sellLot(W, seller, c, price * (1 - fe)); }
   if (buyer === 'out') { W.outside.set(c.id, (W.outside.get(c.id) || 0) + 1); c.circ--; W.house.outside += price; if (typeof seller === 'object') led(W, 'outsideIn', price); }
   else { buyer.cash -= price; give(buyer, c, 1); flowOut(W, buyer, price); addLot(buyer, c, price, W.t); if (typeof seller !== 'object') led(W, seller === 'liq' ? 'liqOut' : seller === 'store' ? 'storeOut' : 'outsideOut', price); } // a bot pays someone outside the economy (booked after the checks, so a refused transfer books nothing)
+  if (W.gov) { if (buyer === 'out' && typeof seller === 'object') govOutside(W, seller, price, 'sell'); else if (buyer && buyer !== 'out' && (seller === 'out' || seller === 'store')) govOutside(W, buyer, price, 'buy'); }
   if (seller === 'liq') liqPay(W, liqTake(W, c.id), price); // the liquidator pays any claim on the copy out of what it got
   tkTrade(W, buyer, seller, c, price, c.P, 'x'); if (cfg.attention > 0) attTraded(W, c, buyer, seller);
   c.P = price; noteTrade(W, c, price); if (c.Ph.length) c.Ph[c.Ph.length - 1] = price; if (c.volH.length) c.volH[c.volH.length - 1]++; W.lastTrades = (W.lastTrades || 0) + 1; if (W.ord) W.ord.coins += price;
@@ -2155,11 +2174,13 @@ function clear(W) {
           if (bd.p < price || ak.p > price) continue; // the price limit (or the marginal pair's price) kept this pair from crossing
           const buyer = bd.b, seller = ak.b;
           if (buyer && buyer.cash < price) continue;
+          if (W.gov && buyer && seller === 'store' && buyer.cash < price + govOutsideTax(W, price)) continue;
           if (seller === 'liq') { const q = W.liq.get(c.id) || 0; if (!q) continue; q > 1 ? W.liq.set(c.id, q - 1) : (W.liq.delete(c.id), W.liqPrice?.delete(c.id)); (W.liqSold ||= new Set()).add(c.id); }
-          else if (seller === 'store') { if (c.pool < 1) continue; c.pool--; c.circ++; W.house.store = (W.house.store || 0) + price; tre(W, 'store', price); packCache = null; }
-          else { if ((seller.h.get(c.id) || 0) < 1) continue; give(seller, c, -1); seller.cash += price * (1 - cfg.fee); feeTo(W, price * cfg.fee); fill(seller, c, 'sell', price); flowIn(W, seller, price * (1 - cfg.fee)); sellLot(W, seller, c, price * (1 - cfg.fee)); }
+          else if (seller === 'store') { if (c.pool < 1) continue; c.pool--; c.circ++; W.house.store = (W.house.store || 0) + price; if (!W.gov) tre(W, 'store', price); packCache = null; }
+          else { if ((seller.h.get(c.id) || 0) < 1) continue; give(seller, c, -1); const fe = feeOf(W, price); seller.cash += price * (1 - fe); feeTo(W, price * fe); fill(seller, c, 'sell', price); flowIn(W, seller, price * (1 - fe)); sellLot(W, seller, c, price * (1 - fe)); }
           bd.used = ak.used = true; // only orders that traded are used
           if (buyer) { buyer.cash -= price; give(buyer, c, 1); fill(buyer, c, 'buy', price); flowOut(W, buyer, price); addLot(buyer, c, price, W.t); if (typeof seller !== 'object') led(W, seller === 'liq' ? 'liqOut' : 'storeOut', price); } else { c.circ--; W.house.outside += price; (W.outside ||= new Map()).set(c.id, (W.outside.get(c.id) || 0) + 1); if (typeof seller === 'object') led(W, 'outsideIn', price); } // an outside buyer keeps the copy (no card is destroyed)
+          if (W.gov) { if (!buyer && typeof seller === 'object') govOutside(W, seller, price, 'sell'); else if (buyer && seller === 'store') govOutside(W, buyer, price, 'buy'); }
           if (seller === 'liq') liqPay(W, liqTake(W, c.id), price); // the liquidator pays any claim on the copy out of what it got
           c.wk.h = Math.max(c.wk.h, price); c.wk.l = Math.min(c.wk.l, price); c.wk.v++;
           if (W.ord) W.ord.coins += price; tkTrade(W, buyer, seller, c, price, P0, 'x');
@@ -2224,13 +2245,13 @@ function leagueUpdate(W) {
 // Royalties: a card pays its holders royaltyRate of its hidden value per weeksPerGeneration weeks. 'week' (default) pays
 // each week a 1/weeksPerGeneration share, scaled under the league by that week's game: his production ÷ his career pace
 // (a big game pays more, an injured, idle or retired player pays nothing). 'generation': the old lump at each generation's end.
-function payRoyalties(W, share) {
+function payRoyalties(W, share, scaleOf = null) { // scaleOf (government runs): owed -> the share of it paid
   const cfg = W.cfg, league = cfg.valueModel === 'league' && W.L;
   const gameK = (p) => { if (!league || !p.lg) return 1; if (!p.lg.active || !p._game || p._gameT !== W.t) return 0; const g = p.lg.tot.g || 0, cpg = g ? lgProduction(p.pos, p.lg.tot) / g : 0; return cpg > 0 ? Math.max(0, lgProduction(p.pos, p._game) / cpg) : 1; };
   const k = new Map(W.players.map((p) => [p.id, gameK(p)]));
   const perCard = (c) => cfg.royaltyRate * share * c.F * (k.get(c.pid) ?? 1), perItem = (it) => cfg.royaltyRate * share * intrinsicItem(W, it) * (k.get(it.pid) ?? 1);
   let owed = 0; for (const b of W.bots) { for (const [id, q] of b.h) owed += perCard(W.cards[id]) * q; for (const it of heldItems(W, b)) owed += perItem(it); }
-  const house = cfg.royaltyFunding === 'house', scaleR = house ? Math.min(1, Math.max(0, W.treasury) / Math.max(1, owed)) : cfg.closedEconomy ? Math.min(1, (W.treasury * 0.5) / Math.max(1, owed)) : 1; let paid = 0;
+  const house = cfg.royaltyFunding === 'house', scaleR = scaleOf ? scaleOf(owed) : house ? Math.min(1, Math.max(0, W.treasury) / Math.max(1, owed)) : cfg.closedEconomy ? Math.min(1, (W.treasury * 0.5) / Math.max(1, owed)) : 1; let paid = 0;
   for (const b of W.bots) { let d = 0; for (const [id, q] of b.h) d += perCard(W.cards[id]) * q * scaleR; for (const it of heldItems(W, b)) d += perItem(it) * scaleR; b.cash += d; flowIn(W, b, d); paid += d; } // royalties count in a bot's return: what it holds is its choice
   for (const L of W.cardLoans || []) shortPay(W, L, perCard(W.cards[L.id]) * scaleR); // a short seller pays the lender what the card would have earned, from cash it has (an unpaid royalty calls the short next week)
   if (cfg.closedEconomy || house) tre(W, 'royalties', -paid); led(W, 'royalties', paid); W.house.royalties += paid; W.royGen = (W.royGen || 0) + paid;
@@ -2579,6 +2600,7 @@ export function removeBot(W, b, reason) {
   for (const cl of W.claims || []) for (const e of cl.lenders) if (e[0] === b) e[1] = 0; // claims it held as a lender lapse
   for (const L of W.loans || []) if (L.lender === b && L.amount > 0) { L.borrower.debt -= L.amount; L.amount = 0; }
   for (const L of (W.cardLoans || []).slice()) { if (L.lender === b) closeLoan(W, L, 'lender left', W.cards[L.id].P, true); else if (L.borrower === b) closeLoan(W, L, 'borrower left', W.cards[L.id].P, false); }
+  if (W.gov) govExit(W, b, reason); // a government run: the exit tax on its cash, and the term's record of who left
   led(W, 'leavers', b.cash + (b.shortColl || 0)); // booked after its loans close: what it still holds leaves with it (a bot below zero takes its debt to the world)
   W.bots = W.bots.filter((x) => x !== b);
   for (const x of W.bots) { x.flags.delete(b.id); x.friends.delete(b.id); }
@@ -2646,6 +2668,7 @@ function record(W) {
     const m = W.house.mint || {}, pv = W._mPrev || {}, d = (k) => (m[k] || 0) - (pv[k] || 0); W._mPrev = { ...m };
     const IN = { allowance: 'allowance', royalties: 'royalties', outsideIn: 'outside buyers', dealerIn: 'dealers buying', prizes: 'prizes', stakesBack: 'game pots paid', newcomers: 'newcomers', taxBack: 'wealth tax paid back', liqClaims: 'liquidator to lenders and borrowers' };
     const OUT = { living: 'living costs', lifestyle: 'lifestyle', fees: 'trade fees', packs: 'packs', liqOut: 'liquidator sales', storeOut: 'Vault store', outsideOut: 'outside sellers', dealerOut: 'dealers selling', holding: 'holding costs', wealthTax: 'wealth tax', shocks: 'cash shocks', stakes: 'game stakes', leavers: 'bots that left', loanLeavers: 'card loans settled with leavers' };
+    if (W.gov) { Object.assign(IN, GOV_IN); Object.assign(OUT, GOV_OUT); } // a government's lines
     const created = Object.fromEntries(Object.entries(IN).map(([k, l]) => [l, d(k)])), removed = Object.fromEntries(Object.entries(OUT).map(([k, l]) => [l, d(k)]));
     const c = Object.values(created).reduce((a, b) => a + b, 0), r = Object.values(removed).reduce((a, b) => a + b, 0), moneyNow = W.bots.reduce((s, b) => s + b.cash + (b.shortColl || 0), 0), moneyPrev = W._moneyPrev ?? moneyNow; W._moneyPrev = moneyNow;
     const T = W.house.tre || {}, tp = W._tPrev || {}, dt = Object.fromEntries(Object.keys(T).map((k) => [k, T[k] - (tp[k] || 0)])); W._tPrev = { ...T };
@@ -2737,6 +2760,7 @@ export function frame(W, { full = false } = {}) {
     money: W.moneyWeek ? (() => { const M = W.moneyWeek, R = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Math.round(v)])); return { created: R(M.created), removed: R(M.removed), other: Math.round(M.other), net: Math.round(M.net), totalIn: Math.round(M.totalIn), totalOut: Math.round(M.totalOut), exo: Math.round(M.exo), treasury: { lines: R(M.treasury.lines), other: Math.round(M.treasury.other), net: Math.round(M.treasury.net) } }; })() : null,
     inj: W.L ? W.players.filter((p) => W.era[p.id]?.injured).map((p) => p.id) : undefined,
     league: W.L ? { week: W.L.week, season: W.L.season, champion: W.L.champions[W.L.champions.length - 1] || null, active: W.players.filter((p) => p.lg?.active).length, injured: W.players.filter((p) => W.era[p.id]?.injured).length } : null,
+    ...(W.gov ? { gov: govFrame(W) } : {}), // government runs only: the treasury, its own account, the dials and the board's signals
   };
   if (full) {
     f.vol = W.players.map((c) => c.volH[c.volH.length - 1] || 0);
@@ -3494,7 +3518,294 @@ function liqCut(W) {
   if (W.cfg.liquidation === 'chase' || !W.liqPrice) return;
   for (const [id] of W.liq) if (!sold.has(id) && W.liqPrice.has(id)) W.liqPrice.set(id, Math.max(0.05 * W.cfg.coinScale, W.liqPrice.get(id) * (1 - W.cfg.liqStep)));
 }
+/* ---------- The government (regulated runs: docs/regulator-spec.md) ---------- */
+// Off unless cfg.government is set (an object; {} takes every default), so ordinary runs never reach this code. A
+// government sets the world's rules (the dials below) and spends its treasury; it never trades. Every coin of revenue is
+// a tax or fee on the bots' own holdings or activity; everything it gives out comes from the treasury; consumption moves
+// coins to its own account, which has no use in the world. The driver (regulate.mjs) applies its controls between weeks
+// (applyControls), posts its board text (noteBoard) and decides when it wakes (govIndicators, checkTriggers).
+// GOV_DIALS: every setting a government may change, with its unit and legal range (spec 9.3). A value outside its range
+// is rejected, never clipped. cfg: the dial is the engine setting of the same name; otherwise the government holds it.
+// s: the scale of the dial's policy input (the bots read tanh(asinh(v / s) − asinh(v0 / s)), v0 its opening value).
+export const GOV_DIALS = {
+  fee: { cfg: true, lo: -1, hi: 1, s: 0.01, unit: 'share of the sale price, per trade (negative: a subsidy per trade)' },
+  holdCost: { cfg: true, lo: -1, hi: 1, s: 0.0005, unit: 'share of the mark per copy held, per week (negative: a holding subsidy)' },
+  wealthTax: { cfg: true, lo: -0.25, hi: 0.25, s: 0.001, unit: 'share of worth above the threshold, per week, collected every 4 weeks at 4 × the rate (negative: a subsidy)' },
+  wealthTaxThreshold: { cfg: true, lo: 0, hi: Infinity, s: 2, unit: 'multiple of the median bot worth' },
+  packSalesTax: { lo: -1, hi: Infinity, s: 0.1, unit: 'share of the pack clearing price, added to it and paid by the buyer (negative: a pack subsidy)' },
+  outsideSalesTax: { lo: -1, hi: 1, s: 0.05, unit: 'share of the price of a trade with a dealer or the store, paid by the bot side (negative: a subsidy)' },
+  exitTax: { lo: -1, hi: 1, s: 0.1, unit: 'share of a leaving bot\'s cash (negative: a payment to leavers)' },
+  allowance: { lo: -Infinity, hi: Infinity, s: 'allowance', unit: 'coins per bot per week (negative: a poll tax; a bot that cannot pay is forced to sell)' },
+  royaltyRate: { cfg: true, lo: 0, hi: 1, s: 0.05, unit: 'share of a card\'s value paid to its holders per 20 weeks of games, paid weekly from that week\'s game' },
+  royaltyCap: { lo: 0, hi: 1, s: 0.5, unit: 'most of the treasury royalties may take in a week (share)' },
+  consumption: { lo: 0, hi: Infinity, s: 'spend', unit: 'coins per week moved from the treasury to the government\'s own account' },
+  maxLTV: { cfg: true, lo: 0, hi: Infinity, s: 0.6, unit: 'most a bot may borrow, as a share of its cards\' value' },
+  marginCall: { cfg: true, lo: 0, hi: Infinity, s: 0.75, unit: 'debt share of its cards\' value past which a borrower must sell' },
+  loanWeeks: { cfg: true, lo: 1, hi: Infinity, int: true, s: 8, unit: 'weeks until a loan falls due' },
+  shorting: { cfg: true, bool: true, unit: 'true or false: bots may borrow and short-sell cards' },
+  priceLimit: { cfg: true, lo: 0, hi: Infinity, s: 0.2, unit: 'most a card\'s price may move in a week, as a share (0 = off)' },
+  positionLimit: { cfg: true, lo: 0, hi: Infinity, s: 0.2, unit: 'most of a card\'s circulation one bot may hold, as a share (at least 3 copies; 0 = off)' },
+  guideEvery: { cfg: true, lo: 1, hi: Infinity, int: true, s: 4, unit: 'weeks between price guide issues' },
+  guideLag: { cfg: true, lo: 1, hi: Infinity, int: true, s: 1, unit: 'weeks the price guide\'s values lag' },
+};
+// The structured controls: transfers, payOrder, publish, rules (validated in govCheck)
+export const GOV_LINES = ['allowance', 'transfers', 'royalties', 'consumption', 'wealthSubsidy', 'holdSubsidy']; // the weekly spending lines (payOrder names them)
+export const GOV_TARGETS = ['all', 'worthDecile', 'cashDecile', 'newcomers', 'noCash', 'holders'];
+export const GOV_PUBLISH = ['vaultIndex', 'treasury', 'dials']; // statistics a government may withhold from the bots (a withheld one reads as a constant input)
+const GOV_REV = ['fees', 'holding', 'wealthTax', 'packTax', 'outsideTax', 'exitTax', 'pollTax', 'levy'];
+const GOV_SPEND = ['allowance', 'transfers', 'royalties', 'consumption', 'feeSubsidy', 'packSubsidy', 'outsideSubsidy', 'exitSubsidy', 'wealthSubsidy', 'holdSubsidy'];
+const GOV_IN = { transfer: 'transfers', subsidy: 'subsidies' }, GOV_OUT = { packTax: 'pack sales tax', outsideTax: 'outside sales tax', exitTax: 'exit tax', pollTax: 'poll tax', levy: 'targeted levies' };
+// Settings a regulated run pins (spec 9.5, 17.1): the engine refuses a government world without them
+export const GOV_PINS = { closedEconomy: true, centralBank: false, prizeShare: 0, populationFloor: 0, brain: 'nn', outsideMode: 'value', liquidation: 'auction', leagueUpdates: false, wealthTaxTo: 'house', royaltyEvery: 'week' };
+const GOV_STANCE = ['holdCost', 'wealthTax', 'wealthTaxThreshold', 'outsideSalesTax', 'exitTax', 'royaltyCap', 'consumption', 'maxLTV', 'marginCall', 'loanWeeks', 'shorting', 'priceLimit', 'positionLimit', 'guideEvery', 'guideLag'];
+export const BOARD_CARD_IN = ['board: mentions of this player', 'board: their direction'];
+function govBotIn(board) { return [...GOV_STANCE.map((k) => `policy: ${k}`), 'policy: transfers paid per bot', 'treasury 20w change', 'placebo', ...(board ? ['board tone', 'board activity', 'board promised dial moves'] : [])]; }
+const GOV_FADE = Math.pow(0.5, 1 / 4); // board signals and the placebo halve in 4 weeks
+const RNG_PLACEBO = 401; // the placebo's own stream: it never draws from the world's
+function govSetup(W) {
+  const cfg = W.cfg, g = cfg.government === true ? {} : cfg.government;
+  for (const [k, v] of Object.entries(GOV_PINS)) if (cfg[k] !== v && !(k === 'outsideMode' && !cfg.outsideCollectors)) throw new Error(`a government run needs ${k} = ${JSON.stringify(v)} (spec 9.5), not ${JSON.stringify(cfg[k])}`);
+  if (cfg.forcedSale === 'discount') throw new Error("a government run needs forcedSale other than 'discount'");
+  W.gov = { boardIn: g.board !== false, placeboOn: g.placebo !== false, d: {}, d0: {}, pub: { vaultIndex: true, treasury: true, dials: true }, transfers: [], payOrder: null, rules: {},
+    account: 0, bm: new Float64Array(0), bd: new Float64Array(0), bIn: new Float64Array(0), tone: 0, act: 0, promised: 0, placebo: 0, pending: [], prng: seeded(cfg.seed * 7919 + RNG_PLACEBO),
+    Th: [], revH: [], spendH: [], realAllow: 0, realTransfer: 0, frac: null, owed: null, ruleErr: [], posts: [], exits: null, term: null, check: { worst: 0, weeks: 0 } };
+}
+function govOpen(W) {
+  const G = W.gov, cfg = W.cfg, g = cfg.government === true ? {} : cfg.government, n = W.players.length;
+  G.bm = new Float64Array(n); G.bd = new Float64Array(n); G.bIn = new Float64Array(2 * n);
+  const d = G.d; d.packSalesTax = 0; d.outsideSalesTax = 0; d.exitTax = 0; d.allowance = cfg.allowance * (W.fillK ?? 1) / (W.botK ?? 1); d.royaltyCap = 0.5; d.consumption = 0; // the allowance dial is coins per bot (fillK applied once, here)
+  for (const [k, v] of Object.entries(g.dials || {})) { const e = GOV_DIALS[k] ? govCheck(W, k, v) : 'not a dial'; if (e) throw new Error(`government.dials.${k}: ${e}`); govSet(W, k, v); } // the pre-registered opening dial vector
+  for (const k of Object.keys(GOV_DIALS)) G.d0[k] = govGet(W, k);
+  const roy = cfg.royalties && !cfg.priceOnly ? govRoyaltyWeek(W) : 0, need = Math.max(0, G.d0.allowance) * W.bots.length + roy; // a typical week's spending at the opening dials
+  G.scale = { allowance: Math.max(1, Math.abs(G.d0.allowance)), spend: Math.max(1, need) };
+  const grant = (g.treasuryStart ?? 4) * need; G.grant = grant; G.need0 = need; if (grant > 0) tre(W, 'openingGrant', grant); // the opening grant: its own ledger line
+  G.Th.push(W.treasury);
+}
+// A typical week's royalties at the open (every active player plays: his game factor taken as 1)
+function govRoyaltyWeek(W) {
+  const cfg = W.cfg, share = 1 / cfg.weeksPerGeneration, L = cfg.valueModel === 'league' && W.L, k = (pid) => (L && W.players[pid].lg ? (W.players[pid].lg.active ? 1 : 0) : 1); let owed = 0;
+  for (const b of W.bots) { for (const [id, q] of b.h) { const c = W.cards[id]; owed += cfg.royaltyRate * share * c.F * k(c.pid) * q; } for (const it of heldItems(W, b)) owed += cfg.royaltyRate * share * intrinsicItem(W, it) * k(it.pid); }
+  return owed;
+}
+const govGet = (W, k) => (GOV_DIALS[k].cfg ? W.cfg[k] : W.gov.d[k]);
+function govSet(W, k, v) { if (GOV_DIALS[k].cfg) W.cfg[k] = v; else W.gov.d[k] = v; }
+// Is this a legal value for this control? null if it is, else the reason (type, finiteness and range only)
+function govCheck(W, k, v) {
+  const D = GOV_DIALS[k];
+  if (D) { if (D.bool) return typeof v === 'boolean' ? null : 'must be true or false';
+    if (typeof v !== 'number' || Number.isNaN(v)) return 'must be a number'; if (!Number.isFinite(v)) return 'must be finite';
+    if (D.int && !Number.isInteger(v)) return 'must be a whole number'; if (v < D.lo || v > D.hi) return `must be between ${D.lo} and ${D.hi === Infinity ? 'no upper limit' : D.hi}`; return null; }
+  if (k === 'transfers') { if (!Array.isArray(v)) return 'must be a list'; if (v.length > 20) return 'at most 20 transfers';
+    for (const [i, x] of v.entries()) { const e = govCheckTransfer(W, x); if (e) return `transfer ${i + 1}: ${e}`; } return null; }
+  if (k === 'payOrder') { if (v === null) return null; if (!Array.isArray(v) || v.some((x) => !GOV_LINES.includes(x)) || new Set(v).size !== v.length) return `must be null (pro rata) or a list of distinct lines from ${GOV_LINES.join(', ')}`; return null; }
+  if (k === 'publish') { if (!v || typeof v !== 'object' || Array.isArray(v)) return 'must be an object'; for (const [s, b] of Object.entries(v)) { if (!GOV_PUBLISH.includes(s)) return `${s} is not a published statistic (${GOV_PUBLISH.join(', ')})`; if (typeof b !== 'boolean') return `${s} must be true or false`; } return null; }
+  if (k === 'rules') { if (!v || typeof v !== 'object' || Array.isArray(v)) return 'must be an object of dial: rule'; for (const [dk, r] of Object.entries(v)) { const e = govCheckRule(dk, r); if (e) return `${dk}: ${e}`; } return null; }
+  return 'not a dial';
+}
+function govCheckTransfer(W, x) {
+  if (!x || typeof x !== 'object') return 'must be an object'; if (!GOV_TARGETS.includes(x.to)) return `to must be one of ${GOV_TARGETS.join(', ')}`;
+  if (typeof x.amount !== 'number' || !Number.isFinite(x.amount)) return 'amount must be a finite number (coins per bot per week)';
+  if (x.to === 'worthDecile' || x.to === 'cashDecile') { const lo = x.lo ?? 1, hi = x.hi ?? lo; if (![lo, hi].every((d) => Number.isInteger(d) && d >= 1 && d <= 10) || lo > hi) return 'lo and hi must be deciles 1 to 10, lo ≤ hi'; }
+  if (x.to === 'newcomers' && !(Number.isInteger(x.weeks) && x.weeks >= 1)) return 'weeks must be a whole number of at least 1';
+  if (x.to === 'holders' && !govPlayer(W, x.player)) return `no player named ${JSON.stringify(x.player)}`;
+  for (const k of Object.keys(x)) if (!['to', 'amount', 'lo', 'hi', 'weeks', 'player'].includes(k)) return `unknown field ${k}`;
+  return null;
+}
+function govCheckRule(dk, r) {
+  if (r === null) return null; const D = GOV_DIALS[dk]; if (!D || D.bool) return 'rules apply to numeric dials only';
+  if (!r || typeof r !== 'object' || typeof r.base !== 'number' || !Number.isFinite(r.base)) return 'needs a finite number base';
+  if (r.terms != null && (!Array.isArray(r.terms) || r.terms.length > 10 || r.terms.some((t) => !Array.isArray(t) || t.length !== 2 || !GOV_INDICATORS.includes(t[0]) || typeof t[1] !== 'number' || !Number.isFinite(t[1])))) return `terms must be up to 10 [indicator, coefficient] pairs; indicators: ${GOV_INDICATORS.join(', ')}`;
+  for (const b of ['min', 'max']) if (r[b] != null && (typeof r[b] !== 'number' || Number.isNaN(r[b]))) return `${b} must be a number`;
+  for (const k of Object.keys(r)) if (!['base', 'terms', 'min', 'max'].includes(k)) return `unknown field ${k}`;
+  return null;
+}
+function govPlayer(W, name) { if (typeof name !== 'string') return null; const s = name.trim().toLowerCase(); return W.players.find((p) => p.name.toLowerCase() === s || p.key.toLowerCase() === s) || null; }
+const govClone = (v) => (v && typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v);
+const govRead = (W, k) => (GOV_DIALS[k] ? govGet(W, k) : k === 'transfers' ? W.gov.transfers : k === 'payOrder' ? W.gov.payOrder : k === 'publish' ? W.gov.pub : W.gov.rules);
+// Apply a government's controls between weeks: each key is checked against the allow-list, its type and its range; an
+// illegal value is rejected (the old one stays) and returned as an error. Returns { changes: [{dial, old, new}], errors }.
+export function applyControls(W, controls) {
+  const changes = [], errors = [];
+  if (!W.gov) return { changes, errors: [{ dial: null, error: 'no government in this world' }] };
+  if (!controls || typeof controls !== 'object' || Array.isArray(controls)) return { changes, errors: [{ dial: null, error: 'controls must be an object' }] };
+  for (const [k, v] of Object.entries(controls)) {
+    const e = govCheck(W, k, v); if (e) { errors.push({ dial: k, value: govClone(v), error: e }); continue; }
+    const old = govClone(govRead(W, k));
+    if (GOV_DIALS[k]) { govSet(W, k, v); if (W.gov.rules[k]) { delete W.gov.rules[k]; changes.push({ dial: `rules.${k}`, old: 'removed by a direct setting', new: null }); } }
+    else if (k === 'transfers') W.gov.transfers = govClone(v);
+    else if (k === 'payOrder') W.gov.payOrder = v === null ? null : v.slice();
+    else if (k === 'publish') W.gov.pub = { ...W.gov.pub, ...v };
+    else if (k === 'rules') { for (const [dk, r] of Object.entries(v)) { if (r === null) delete W.gov.rules[dk]; else W.gov.rules[dk] = govClone(r); } }
+    changes.push({ dial: k, old, new: govClone(govRead(W, k)) });
+  }
+  return { changes, errors };
+}
+// The public indicators: built only from prices, trades, the population, the treasury's own books and the league's public
+// record (never hidden value or the bots' networks). Rules, wake triggers and the state files read these.
+export const GOV_INDICATORS = ['week', 'bots', 'joined', 'left', 'vaultIndex', 'vaultIndex1w', 'vaultIndex4w', 'vaultIndex20w', 'marksIndex', 'trades', 'auctionSales', 'treasury', 'treasury20w', 'revenue', 'revenue4w', 'spending', 'spending4w', 'consumption', 'ownAccount', 'medianWorth', 'meanCash', 'gini', 'packPrice', 'creditRate', 'approval'];
+export function govIndicators(W) {
+  const G = W.gov, h = W.hist, p = h.p, L = (a, k = 1) => (a.length >= k ? a[a.length - k] : null), ch = (k) => (p.length > k && p[p.length - 1 - k] > 0 ? p[p.length - 1] / p[p.length - 1 - k] - 1 : 0);
+  const sum = (a, k) => a.slice(-k).reduce((s, x) => s + x, 0), ws = W.bots.map((b) => worth(W, b)).sort((a, b) => a - b), T20 = G.Th.length > 20 ? G.Th[G.Th.length - 21] : G.Th[0];
+  return { week: W.t, bots: W.bots.length, joined: W.turnover?.joined ?? 0, left: W.turnover?.left ?? 0, vaultIndex: L(p) ?? 100, vaultIndex1w: ch(1), vaultIndex4w: ch(4), vaultIndex20w: ch(20), marksIndex: h.pMark?.length ? L(h.pMark) : null,
+    trades: L(h.trades) ?? 0, auctionSales: W.aucWeek || 0, treasury: W.treasury, treasury20w: W.treasury - (T20 ?? 0), revenue: L(G.revH) ?? 0, revenue4w: sum(G.revH, 4), spending: L(G.spendH) ?? 0, spending4w: sum(G.spendH, 4),
+    consumption: G.lastCons || 0, ownAccount: G.account, medianWorth: ws.length ? ws[ws.length >> 1] : 0, meanCash: W.bots.length ? W.bots.reduce((s, b) => s + b.cash, 0) / W.bots.length : 0, gini: L(h.gini) ?? 0,
+    packPrice: W.packPx?.standard ?? packInfo(W, 'standard').price ?? 0, creditRate: W.credit?.rate ?? 0, approval: G.term ? govApproval(W).share : null };
+}
+// Wake triggers: [{ field, op, value }] on the public indicators; returns the ones that fire now
+export function checkTriggers(W, triggers, ind = govIndicators(W)) {
+  const OPS = { '<': (a, b) => a < b, '<=': (a, b) => a <= b, '>': (a, b) => a > b, '>=': (a, b) => a >= b };
+  return (triggers || []).filter((t) => t && GOV_INDICATORS.includes(t.field) && OPS[t.op] && typeof t.value === 'number' && ind[t.field] != null && OPS[t.op](ind[t.field], t.value));
+}
+export const GOV_TRIGGER_OPS = ['<', '<=', '>', '>='];
+// The start of each week: rule-based dials (published functions of last week's public indicators; an illegal result keeps
+// the old value and is reported), then the board's fade, new posts and the placebo
+function govWeekStart(W) {
+  const G = W.gov; G.ruleErr = []; G.posts = [];
+  const rk = Object.keys(G.rules); if (rk.length) { const ind = govIndicators(W);
+    for (const k of rk) { const r = G.rules[k]; let v = r.base; for (const [f, c] of r.terms || []) v += c * (ind[f] ?? 0); if (r.min != null) v = Math.max(r.min, v); if (r.max != null) v = Math.min(r.max, v);
+      const e = govCheck(W, k, v); if (e) G.ruleErr.push({ dial: k, value: v, error: e }); else govSet(W, k, v); } }
+  const n = W.players.length; if (G.bm.length < n) { const g = (a, m) => { const b = new Float64Array(m); b.set(a); return b; }; G.bm = g(G.bm, n); G.bd = g(G.bd, n); G.bIn = g(G.bIn, 2 * n); }
+  for (let i = 0; i < n; i++) { G.bm[i] *= GOV_FADE; G.bd[i] *= GOV_FADE; } G.tone *= GOV_FADE; G.act *= GOV_FADE; G.promised *= GOV_FADE; G.placebo *= GOV_FADE;
+  for (const P of G.pending) { for (const m of P.mentions) { G.bm[m.pid] += 1; G.bd[m.pid] += m.dir; } G.tone += P.tone; G.act += 1; G.promised += Object.values(P.dials).reduce((s, x) => s + x, 0); G.posts.push(P); } G.pending = [];
+  if (G.placeboOn && G.prng() < 0.5) G.placebo += 2 * G.prng() - 1; // a random post-like pulse, unrelated to anything the government does
+  for (let i = 0; i < n; i++) { G.bIn[2 * i] = Math.tanh(G.bm[i]); G.bIn[2 * i + 1] = Math.tanh(G.bd[i]); }
+}
+// Rates below zero are subsidies paid from the treasury: one event's subsidy is paid only while the treasury holds it
+function govRate(W, rate, base) { if (!(rate < 0) || !(base > 0)) return rate; const sub = Math.min(-rate * base, Math.max(0, W.treasury)); return -sub / base; }
+function govSubsidy(W, line, x, b = null) { if (!(x > 0)) return; if (b) { b.cash += x; flowIn(W, b, x); } tre(W, line, -x); led(W, 'subsidy', x); }
+const govOutsideTax = (W, price) => Math.max(0, W.gov.d.outsideSalesTax * price);
+function govOutside(W, b, price, side) { const r = W.gov.d.outsideSalesTax; if (!r) return;
+  if (r > 0) { const x = r * price; if (side === 'buy') { b.cash -= x; flowOut(W, b, x); tre(W, 'outsideTax', x); led(W, 'outsideTax', x); } else bill(W, b, 'outsideTax', x, false); return; }
+  govSubsidy(W, 'outsideSubsidy', Math.min(-r * price, Math.max(0, W.treasury)), b); }
+const govPackTax = (W, cost) => govRate(W, W.gov.d.packSalesTax, cost) * cost;
+function govPackTaxPay(W, b, x, orig) { // x: what the bot pays (negative: it receives); orig: the sign of the pack's tax, so a refund goes back through the same line
+  b.cash -= x; if (x > 0) flowOut(W, b, x); else flowIn(W, b, -x);
+  if (orig > 0) { tre(W, 'packTax', x); led(W, 'packTax', x); } else { tre(W, 'packSubsidy', x); led(W, 'subsidy', -x); } }
+function govExit(W, b, reason) { const G = W.gov, r = G.d.exitTax, c = Math.max(0, b.cash);
+  if (r > 0 && c > 0) { const x = r * c; b.cash -= x; tre(W, 'exitTax', x); led(W, 'exitTax', x); }
+  else if (r < 0 && c > 0) govSubsidy(W, 'exitSubsidy', Math.min(-r * c, Math.max(0, W.treasury)), b);
+  if (G.term) G.term.left.add(b.id); }
+// Who a transfer reaches: a public attribute of each bot this week
+function govTargets(W, x) {
+  const bs = W.bots; if (x.to === 'all') return bs; if (x.to === 'noCash') return bs.filter((b) => b.cash <= 0);
+  if (x.to === 'newcomers') return bs.filter((b) => W.t - (b.joined ?? 0) <= x.weeks);
+  if (x.to === 'holders') { const p = govPlayer(W, x.player); if (!p) return []; return bs.filter((b) => { for (let k = 0; k < 16; k++) if (b.h.get(p.id * 16 + k) > 0) return true; for (const it of heldItems(W, b)) if (it.pid === p.id) return true; return false; }); }
+  const key = x.to === 'worthDecile' ? (b) => worth(W, b) : (b) => b.cash, lo = x.lo ?? 1, hi = x.hi ?? lo, n = bs.length;
+  const r = bs.map((b) => [b, key(b)]).sort((a, c) => a[1] - c[1] || a[0].id - c[0].id); return r.filter((_, i) => { const dd = Math.floor((i * 10) / n) + 1; return dd >= lo && dd <= hi; }).map((e) => e[0]);
+}
+// The fraction of each line paid: pro rata (every line the same share, balance ÷ total owed) unless a payOrder ranks
+// some lines first; lines it doesn't name share what is left pro rata
+function govFractions(owed, T, order) {
+  const f = {}; let left = Math.max(0, T);
+  for (const k of order || []) { if (!(k in owed)) continue; const o = owed[k], x = Math.min(o, left); f[k] = o > 0 ? x / o : 1; left -= x; }
+  const rest = Object.keys(owed).filter((k) => !(k in f)), tot = rest.reduce((s, k) => s + owed[k], 0), r = tot > 0 ? Math.min(1, left / tot) : 1;
+  for (const k of rest) f[k] = r; return f;
+}
+// The week's payments: levies first (a negative allowance or transfer is billed), then every spending line is added up
+// and paid together (spec 4.3)
+function govPay(W) {
+  const G = W.gov, d = G.d, cfg = W.cfg, bots = W.bots, n = bots.length, every = Math.max(1, Math.round(cfg.wealthTaxEvery ?? 4));
+  if (d.allowance < 0) for (const b of bots) bill(W, b, 'pollTax', -d.allowance);
+  const tg = G.transfers.map((x) => [x, govTargets(W, x)]); for (const [x, bs] of tg) if (x.amount < 0) for (const b of bs) bill(W, b, 'levy', -x.amount);
+  const owed = { allowance: Math.max(0, d.allowance) * n, transfers: tg.reduce((s, [x, bs]) => s + Math.max(0, x.amount) * bs.length, 0), royalties: 0, consumption: d.consumption, wealthSubsidy: 0, holdSubsidy: 0 };
+  let ws = null; if (cfg.wealthTax < 0 && W.t % every === 0) { ws = bots.map((b) => [b, worth(W, b)]); const med = ws.map((x) => x[1]).sort((a, b) => a - b)[Math.floor(ws.length / 2)] || 0, thr = cfg.wealthTaxThreshold ?? 2;
+    ws = ws.map(([b, w]) => [b, w > med * thr ? (w - med * thr) * -cfg.wealthTax * every : 0]); owed.wealthSubsidy = ws.reduce((s, e) => s + e[1], 0); }
+  let hs = null; if (cfg.holdCost < 0) { hs = bots.map((b) => { let v = 0; for (const [id, q] of b.h) v += q * W.cards[id].P * -cfg.holdCost; return [b, v]; }); owed.holdSubsidy = hs.reduce((s, e) => s + e[1], 0); }
+  const T0 = Math.max(0, W.treasury); let f = null;
+  const decide = (owedR) => { owed.royalties = Math.min(owedR, d.royaltyCap * T0); f = govFractions(owed, T0, G.payOrder); return owedR > 0 ? (owed.royalties / owedR) * f.royalties : 0; };
+  if (cfg.royalties && !cfg.priceOnly) payRoyalties(W, 1 / cfg.weeksPerGeneration, decide); else decide(0);
+  const each = Math.max(0, d.allowance) * f.allowance; let paidA = 0; if (each > 0) for (const b of bots) { transfer(W, b, each, 'allowance'); tre(W, 'allowance', -each); paidA += each; }
+  let paidT = 0; for (const [x, bs] of tg) { if (!(x.amount > 0)) continue; const y = x.amount * f.transfers; if (y > 0) for (const b of bs) { transfer(W, b, y, 'transfer'); tre(W, 'transfers', -y); paidT += y; } }
+  const cons = d.consumption * f.consumption; if (cons > 0) { tre(W, 'consumption', -cons); G.account += cons; } G.lastCons = cons;
+  if (ws) for (const [b, x] of ws) govSubsidy(W, 'wealthSubsidy', x * f.wealthSubsidy, b);
+  if (hs) for (const [b, x] of hs) govSubsidy(W, 'holdSubsidy', x * f.holdSubsidy, b);
+  G.owed = owed; G.frac = f; G.realAllow = d.allowance < 0 ? d.allowance : each; G.realTransfer = n ? paidT / n : 0; W.flow.paidOut = paidA;
+}
+// The end of each week: the treasury's history and the ledger's own check (the treasury moves only by its lines)
+function govWeekEnd(W) {
+  const G = W.gov, M = W.moneyWeek, lines = M?.treasury?.lines || {}; let rev = 0, sp = 0;
+  for (const [k, v] of Object.entries(lines)) { if (GOV_REV.includes(k)) rev += v; else if (GOV_SPEND.includes(k)) sp -= v; }
+  G.revH.push(rev); G.spendH.push(sp); G.Th.push(W.treasury); for (const a of [G.revH, G.spendH, G.Th]) if (a.length > 60) a.shift();
+  const off = Math.abs(M?.treasury?.other || 0); G.check.weeks++; if (off > G.check.worst) G.check.worst = off;
+}
+// The bots' policy inputs (spec 9.4): every dial through one bounded transform against its opening value, the realised
+// allowance and transfers, the treasury's 20-week change, the placebo and the board (a withheld statistic reads 0)
+const govStance = (v, v0, s) => Math.tanh(Math.asinh(v / s) - Math.asinh(v0 / s));
+function govBotInputs(W, b, x, nw) {
+  const G = W.gov, d0 = G.d0, on = G.pub.dials, sc = (k) => { const s = GOV_DIALS[k].s; return s === 'allowance' ? G.scale.allowance : s === 'spend' ? G.scale.spend : s; };
+  const st = (k) => { if (!on) return 0; const v = govGet(W, k), v0 = d0[k]; return GOV_DIALS[k].bool ? (v ? 1 : 0) - (v0 ? 1 : 0) : govStance(v, v0, sc(k)); };
+  x[22] = st('royaltyRate'); x[25] = on ? clamp((G.realAllow / nw) * 10, -3, 3) : 0; x[26] = st('fee'); x[27] = st('packSalesTax');
+  let i = BOT_IN_BASE.length; for (const k of GOV_STANCE) x[i++] = st(k);
+  x[i++] = on ? govStance(G.realTransfer, 0, G.scale.allowance) : 0;
+  { const T = G.Th, a = T.length > 20 ? T[T.length - 21] : T[0]; x[i++] = G.pub.treasury ? govStance(W.treasury, a ?? 0, G.scale.spend * 4) : 0; }
+  x[i++] = Math.tanh(G.placebo);
+  if (G.boardIn) { x[i++] = Math.tanh(G.tone); x[i++] = Math.tanh(G.act); x[i++] = Math.tanh(G.promised); }
+}
+// The board (spec 11.3): a post becomes numbers by a published, mechanical rule, so runs stay deterministic. Sentences
+// split at . ! ? ; and new lines. A direction word counts +1 (up) or −1 (down), flipped when a negation is among the three
+// words before it; a sentence's direction is the sign of its sum. A player is mentioned by his full name (any case), or
+// by his surname alone when it is capitalised, no other player has it and it is not one of the board's own words. Every
+// player mentioned in a sentence takes its direction. A dial is promised up or down by a raise or cut word in a sentence
+// naming it (with the same negation rule).
+export const BOARD_WORDS = {
+  up: ['up', 'rise', 'rises', 'rising', 'buy', 'buying', 'strong', 'gain', 'gains', 'rally'],
+  down: ['down', 'fall', 'falls', 'falling', 'sell', 'selling', 'weak', 'crash', 'drop', 'drops'],
+  negation: ['not', 'no', 'never', "don't", 'dont', "won't", 'wont', "isn't", 'isnt', "can't", 'cant', 'cannot', 'without'],
+  raise: ['raise', 'raising', 'increase', 'increasing', 'hike', 'higher', 'up'],
+  cut: ['cut', 'cutting', 'lower', 'lowering', 'reduce', 'reducing', 'decrease', 'down'],
+  dials: { fee: ['fee', 'fees'], holdCost: ['holding cost', 'holding costs'], wealthTax: ['wealth tax'], wealthTaxThreshold: ['threshold'], packSalesTax: ['pack tax', 'pack sales tax'], outsideSalesTax: ['sales tax'], exitTax: ['exit tax'],
+    allowance: ['allowance'], royaltyRate: ['royalty', 'royalties'], royaltyCap: ['royalty cap'], consumption: ['consumption'], transfers: ['transfer', 'transfers', 'grant', 'grants'], maxLTV: ['borrowing limit', 'ltv'], marginCall: ['margin call'], loanWeeks: ['loan term'],
+    shorting: ['shorting', 'short selling'], priceLimit: ['price limit'], positionLimit: ['position limit'], guideEvery: ['price guide', 'guide'] },
+};
+const BOARD_SET = new Set([...BOARD_WORDS.up, ...BOARD_WORDS.down, ...BOARD_WORDS.negation, ...BOARD_WORDS.raise, ...BOARD_WORDS.cut, ...Object.values(BOARD_WORDS.dials).flat().flatMap((p) => p.split(' '))]);
+let BOARD_IX = null; // name index, rebuilt when the player list grows
+function boardIndex(players) {
+  if (BOARD_IX && BOARD_IX.players === players && BOARD_IX.n === players.length) return BOARD_IX;
+  const full = new Map(), sur = new Map();
+  for (const p of players) { const nm = String(p.name || '').trim(); if (!nm) continue; const f = nm.toLowerCase(); (full.get(f) || full.set(f, []).get(f)).push(p.id); const parts = nm.split(/\s+/), s = parts[parts.length - 1]; if (parts.length > 1) (sur.get(s.toLowerCase()) || sur.set(s.toLowerCase(), []).get(s.toLowerCase())).push(p.id); }
+  return (BOARD_IX = { players, n: players.length, full, sur, fullList: [...full.keys()].sort((a, b) => b.length - a.length) });
+}
+export function parseBoard(text, players) {
+  const IX = boardIndex(players), sentences = String(text || '').split(/[.!?;\n]+/).map((s) => s.trim()).filter(Boolean), mentions = [], dials = {}; let toneSum = 0;
+  const W_ = BOARD_WORDS, has = (arr, w) => arr.includes(w);
+  for (const sRaw of sentences) {
+    const low = sRaw.toLowerCase(), words = low.match(/[a-z0-9']+/g) || [], orig = sRaw.match(/[A-Za-z0-9']+/g) || [];
+    const neg = (i) => { for (let j = Math.max(0, i - 3); j < i; j++) if (has(W_.negation, words[j])) return true; return false; };
+    let dir = 0; words.forEach((w, i) => { const v = has(W_.up, w) ? 1 : has(W_.down, w) ? -1 : 0; if (v) dir += neg(i) ? -v : v; }); dir = Math.sign(dir); toneSum += dir;
+    const seen = new Set(); let rest = ` ${words.join(' ')} `;
+    for (const f of IX.fullList) { const fw = ` ${(f.match(/[a-z0-9']+/g) || []).join(' ')} `; if (fw.trim() && rest.includes(fw)) { for (const pid of IX.full.get(f)) if (!seen.has(pid)) { seen.add(pid); mentions.push({ pid, name: players[pid]?.name, dir, by: 'full name' }); } rest = rest.split(fw).join(' '); } }
+    const left = rest.trim().split(' ').filter(Boolean), cap = new Set(orig.filter((w) => /^[A-Z]/.test(w)).map((w) => w.toLowerCase()));
+    for (const w of left) { const ids = IX.sur.get(w); if (!ids || ids.length !== 1 || !cap.has(w) || BOARD_SET.has(w)) continue; const pid = ids[0]; if (!seen.has(pid)) { seen.add(pid); mentions.push({ pid, name: players[pid]?.name, dir, by: 'surname' }); } }
+    const sp = ` ${words.join(' ')} `;
+    for (const [k, al] of Object.entries(W_.dials)) { if (!al.some((a) => sp.includes(` ${a} `))) continue;
+      let v = 0; words.forEach((w, i) => { const u = has(W_.raise, w) ? 1 : has(W_.cut, w) ? -1 : 0; if (u) v += neg(i) ? -u : u; }); if (v) dials[k] = (dials[k] || 0) + Math.sign(v); }
+  }
+  for (const k of Object.keys(dials)) { dials[k] = Math.sign(dials[k]); if (!dials[k]) delete dials[k]; }
+  return { sentences: sentences.length, tone: sentences.length ? toneSum / sentences.length : 0, mentions, dials };
+}
+// A board post: parsed now, read by the bots from the start of the next week. Returns the parsed signals (logged by the driver)
+export function noteBoard(W, text) { if (!W.gov) throw new Error('no government in this world'); const P = parseBoard(text, W.players); if (W.gov.boardIn) W.gov.pending.push(P); return P; }
+// Elections (run 2): a term starts with each present bot's worth; approval is the share of bots present the whole term
+// whose worth grew, with bots that left counted against; bots that died (their heirs took over) and newcomers don't count
+export function govTermStart(W) { W.gov.term = { start: W.t, w0: new Map(W.bots.map((b) => [b.id, worth(W, b)])), left: new Set() }; return W.gov.term; }
+export function govApproval(W) {
+  const T = W.gov.term; if (!T) return null; const now = new Map(W.bots.map((b) => [b.id, b])); let yes = 0, stayed = 0, left = 0;
+  for (const [id, w0] of T.w0) { const b = now.get(id); if (b) { stayed++; if (worth(W, b) > w0) yes++; } else if (T.left.has(id)) left++; }
+  const n = stayed + left; return { start: T.start, eligible: n, approve: yes, stayed, left, share: n ? yes / n : null };
+}
+// A new government takes office: the outgoing one keeps its own account (returned); the treasury and every setting pass on
+export function govHandover(W) { const G = W.gov, acct = G.account; G.account = 0; return acct; }
+// What a government frame carries (frames of government runs only)
+function govFrame(W) {
+  const G = W.gov, R = (x) => Math.round(x * 100) / 100, M = W.moneyWeek?.treasury;
+  const dials = {}; for (const k of Object.keys(GOV_DIALS)) { const v = govGet(W, k); dials[k] = typeof v === 'number' ? R(v * 1e6) / 1e6 : v; }
+  return { T: R(W.treasury), acct: R(G.account), lines: M ? Object.fromEntries(Object.entries(M.lines).filter(([, v]) => v).map(([k, v]) => [k, R(v)])) : {}, check: M ? R(M.other) : 0,
+    rev: R(G.revH[G.revH.length - 1] ?? 0), spend: R(G.spendH[G.spendH.length - 1] ?? 0), frac: G.frac ? Object.fromEntries(Object.entries(G.frac).map(([k, v]) => [k, R(v * 1e4) / 1e4])) : null,
+    dials, transfers: G.transfers.length ? govClone(G.transfers) : undefined, rules: Object.keys(G.rules).length ? govClone(G.rules) : undefined, payOrder: G.payOrder || undefined, pub: G.pub,
+    board: { tone: R(Math.tanh(G.tone) * 1e3) / 1e3, act: R(Math.tanh(G.act) * 1e3) / 1e3, promised: R(Math.tanh(G.promised) * 1e3) / 1e3, placebo: R(Math.tanh(G.placebo) * 1e3) / 1e3, posts: G.posts.length },
+    ruleErr: G.ruleErr.length ? G.ruleErr : undefined, approval: G.term ? govApproval(W) : undefined };
+}
 // For the mechanism tests (tests/mech.test.mjs): internals, not an API
 export const internals = { clear, borrowCard, lendPool, shortUpkeep, shortPay, creditMarket, livingAndCredit, settleForced, collectArrears, arrearsOf, bill, liqPay, xfer, mintCopy, ripPack, drawTier, packInfo, payout, settleEstate, estateSale, valueCollectors, compsMark, qtyOf, retireTail, writeNote, toLiq, setOrders: (W) => { W_ = W; bids = W.cards.map(() => []); asks = W.cards.map(() => []); }, bid: (b, c, p) => bid(b, c, p), ask: (b, c, p) => ask(b, c, p, new Map()), books: () => ({ bids, asks }) };
 // Internals for the targeted tests in tests/ (not part of the engine's interface)
-export const TEST = { socialPhase, tokenMarket, forcedSales, settleForced, nnAnswers, nnThink, nnAct, shortUpkeep, packAuction, aiOrders, aiSocial, nnPrice, cardNet: (W, b, c) => cardNet(W, b, c, Math.max(NW_FLOOR * W.cfg.coinScale, worth(W, b)), marketCtx(W)), hot: () => hot, books: () => ({ bids, asks }), setBooks: (W) => { W_ = W; bids = W.cards.map(() => []); asks = W.cards.map(() => []); }, BOT_SHAPE, netSize };
+export const TEST = { cardIn: (W, b, c) => Array.from(cardInputs(W, b, c, Math.max(NW_FLOOR * W.cfg.coinScale, worth(W, b)), marketCtx(W))), botIn: (W, b) => { const ws = W.bots.map((x) => worth(W, x)).sort((x, y) => x - y); nnThink(W, b, ws[ws.length >> 1]); return Array.from(XB); }, shapes: () => ({ card: CARD_SHAPE.slice(), bot: BOT_SHAPE.slice(), B0, cardIn: CARD_IN.slice(), botIn: BOT_IN.slice() }), socialPhase, tokenMarket, forcedSales, settleForced, nnAnswers, nnThink, nnAct, shortUpkeep, packAuction, aiOrders, aiSocial, nnPrice, cardNet: (W, b, c) => cardNet(W, b, c, Math.max(NW_FLOOR * W.cfg.coinScale, worth(W, b)), marketCtx(W)), hot: () => hot, books: () => ({ bids, asks }), setBooks: (W) => { W_ = W; bids = W.cards.map(() => []); asks = W.cards.map(() => []); }, BOT_SHAPE, netSize };

@@ -130,6 +130,7 @@ on every push.
 |---|---|
 | `engine.mjs` | The simulation: league, market, bots, evolution and measurement |
 | `sim.mjs` · `run.mjs` | Headless runs; runs with Claude-driven bots |
+| `regulate.mjs` · `gov/` | Runs with a government: the driver, its state files, the brief and the Claude session |
 | `configs/` · `data/` | Presets; the league data |
 | `page/` · `docs/trading-floor.html` | The browser page and its built, self-contained copy |
 | `tools/` · `scripts/` | Reports, the page build, figures, run summaries |
@@ -144,8 +145,9 @@ on every push.
   population learns value without dealers ([docs/round3-spec.md](docs/round3-spec.md)).
 - An AI government: a Claude session that sets taxes, fees and spending, keeps the treasury, and posts messages the
   bots can read. It runs in real time without limits on what it posts and does not know when the run ends. The study
-  is whether it grows the economy that funds it or extracts from it ([docs/regulator-spec.md](docs/regulator-spec.md),
-  not yet built).
+  is whether it grows the economy that funds it or extracts from it ([docs/regulator-spec.md](docs/regulator-spec.md)).
+  The harness is built and tested with a scripted government; run 1 waits for the plumbing test and the
+  pre-registration ([docs/GOVERNMENT.md](docs/GOVERNMENT.md)).
 
 ## Documentation
 
@@ -154,7 +156,8 @@ on every push.
 | [MODEL.md](docs/MODEL.md) | The full model, in the standard ODD format, with every assumption listed |
 | [PARALLELS.md](docs/PARALLELS.md) | Real-world parallels for each finding, with sources and where each one breaks |
 | [METRICS.md](docs/METRICS.md) · [TACTICS.md](docs/TACTICS.md) | What gets measured, and how tactics are detected |
-| [AUDIT.md](docs/AUDIT.md) | A full audit of the engine: 141 findings, 116 fixed in 2.0.0, 25 waiting for the government build |
+| [GOVERNMENT.md](docs/GOVERNMENT.md) | How to run the AI government, with and without a model |
+| [AUDIT.md](docs/AUDIT.md) | A full audit of the engine: 141 findings, 116 fixed in 2.0.0, 24 more by the government build, 1 open |
 | [DEVLOG.md](docs/DEVLOG.md) | Every experiment so far, in order |
 | [DATA.md](docs/DATA.md) | Where the league data came from |
 | [CHANGELOG.md](CHANGELOG.md) | Engine versions; cite the version with any result |

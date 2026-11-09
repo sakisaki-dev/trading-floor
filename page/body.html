@@ -267,6 +267,32 @@
     </section>
   </div>
 
+  <!-- The government (docs/regulator-spec.md §16): shown only for a run with a government (a replayed or followed
+       regulate.mjs run). The government never sees this page. -->
+  <section class="panel gov" id="govPanel" aria-labelledby="gov-h" hidden>
+    <div class="head"><h2 id="gov-h">Government</h2><span class="note" id="govNote">what it read, changed, posted and wrote · the government never sees this page</span></div>
+    <div class="gov__status" id="govStatus" role="status"></div>
+    <div class="stats" id="govStats"></div>
+    <div class="grid two">
+      <div>
+        <div class="head"><h2 class="h3">Treasury and its own account</h2><span class="legend"><span><i class="line" style="background:var(--c-blue)"></i>Treasury</span><span><i class="line" style="background:var(--c-orange)"></i>Own account</span><span><i class="line" style="background:var(--faint)"></i>Decision</span></span></div>
+        <canvas id="govT" class="ch" aria-label="Treasury balance and the government's own account, week by week, with its decisions marked"></canvas>
+      </div>
+      <div>
+        <div class="head"><h2 class="h3">Revenue and spending a week</h2><span class="legend"><span><i class="line" style="background:var(--c-green)"></i>Revenue</span><span><i class="line" style="background:var(--c-pink)"></i>Spending</span><span><i class="line" style="background:var(--c-orange)"></i>Consumption</span></span></div>
+        <canvas id="govRS" class="ch" aria-label="Treasury revenue, spending and consumption per week"></canvas>
+      </div>
+    </div>
+    <div class="tablewrap"><table id="govLines" class="gov__lines"><thead><tr><th>Ledger line</th><th class="num">This week</th><th class="num">Last 20 weeks</th><th class="num">Whole run</th></tr></thead><tbody></tbody></table></div>
+    <div class="grid three gov__cols">
+      <div><div class="head"><h2 class="h3">Commentary</h2><span class="note">week read → week it took effect</span></div><div id="govComm" class="gov__feed"></div></div>
+      <div><div class="head"><h2 class="h3">The board</h2><span class="note">every post, with the numbers the bots read from it</span></div><div id="govBoard" class="gov__feed"></div></div>
+      <div><div class="head"><h2 class="h3">Notebook</h2><span class="note" id="govNbNote">its own file · new lines marked</span></div><div id="govNb" class="gov__nb"></div></div>
+    </div>
+    <div class="head"><h2 class="h3">Dials timeline</h2><span class="note">every setting it touched, old → new, at the week it took effect</span></div>
+    <div id="govDials" class="gov__dials"></div>
+  </section>
+
   <section class="panel health" id="healthPanel" aria-labelledby="hb2-h">
     <div class="head"><h2 id="hb2-h">Health board</h2><span class="note">display only: nothing in the world reads these lights · ▲ improving · ▼ worsening · ! alarm · click a light to chart it</span></div>
     <div class="hb__top" id="hbTop"></div>
