@@ -32,6 +32,24 @@ npm run test:gov
 Open <http://localhost:4322> to watch: the page shows the Government panel (status, treasury, ledger, commentary, board,
 notebook, dials). A finished run replays on the page with Load run → `runs/<id>/run.json`.
 
+## The short way: `tools/gov.sh`
+
+One launcher does every step below. It keeps the subscription token in the macOS Keychain (never in a file or the
+shell history), finds the newest installed CLI, and prints where to watch.
+
+```bash
+tools/gov.sh check        # what's ready; starts nothing
+tools/gov.sh token        # once: claude setup-token, then paste the token into the Keychain
+tools/gov.sh plumbing     # the one-turn plumbing test (subscription)
+tools/gov.sh plumbing200  # 200 weeks at 2 s a week, live at http://localhost:4322 (subscription)
+tools/gov.sh replay200    # the replay check of that run (no session)
+tools/gov.sh run1         # run 1, live (subscription); 1,500 weeks at 4 s by default, WEEKS=7000 PACE=4 to override
+tools/gov.sh resume       # after a crash
+tools/gov.sh view         # opens the live view; prints the phone address on the same Wi-Fi
+```
+
+Run 1 defaults to 1,500 weeks because the full league can't hold 4 s a week past about week 900 (spec 24).
+
 ## Before run 1, once
 
 1. **Commit.** The driver refuses a `claude` run with uncommitted changes to the engine, driver, data, configs or page
