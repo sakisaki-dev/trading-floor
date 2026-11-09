@@ -17,6 +17,22 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 
 ### Added
 
+- Page: a **Government** switch in the control bar, with a select of the scripted governments (A0–A4 and the stub). On,
+  the world restarts as the regulated preset (250 bots) with that government running in the page's worker
+  (`gov/page_gov.mjs`: regulate.mjs's loop for scripted governments, with budget day, wake rules, predictions,
+  elections and the notebook handover; elections are under Rules → Government). Another scripted government applies
+  from the next week; off restarts the world as before. The real government stays a Claude session run by
+  `regulate.mjs`, and the page says so with the command.
+- Page: **How the government works**, at the end of the Government panel: one card per part of the spec with its live
+  numbers (the treasury's equation, revenue and spending by line, pro rata owed against paid, every dial with its legal
+  range, opening value and the week it took effect, the clock's read → applied lag, wake and the next wake, budget day
+  and the opening grant, every policy input the bots read, the board and its parsed numbers, the placebo, elections and
+  approval, what the government sees and never sees, the fitness booking, and what is not built yet). It works in the
+  browser world, `regulate.mjs --serve` and replays.
+- Engine, display only: `govView`, `govInputNames`, `govScale` (never called by the step). `regulate.mjs` adds the view
+  to each frame as `govX` after the frame is hashed and written to `frames.jsonl.gz`, so hashes and replays are
+  unchanged, and adds the wake, elections and scales to the record it serves. The stub's choices moved to
+  `gov/stub_core.mjs` (unchanged), so the page and the stub process run the same code.
 - The AI government's build (`docs/regulator-spec.md` section 24; how to run it: `docs/GOVERNMENT.md`). It is off unless
   `cfg.government` is set. With no government, every week's full frame hashes the same as before on the ten worlds of
   `tests/same_results.mjs`, so the engine version does not change.

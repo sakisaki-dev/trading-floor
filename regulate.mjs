@@ -43,7 +43,7 @@ if (dirty && !flag('allow-dirty') && !prior?.fingerprint?.allowDirty && A.govern
 const hashFile = (f) => { try { return sha(fs.readFileSync(path.join(here, f))); } catch { return null; } };
 const DATA = ['library.json', 'timeline.json', 'history.json', 'kits.json', 'names.json', 'league_rates.json', 'rookie_names.json', 'nfl_age.json'];
 const fingerprint = prior?.fingerprint || { commit: git('rev-parse HEAD'), dirty: !!dirty, diffSha256: dirty ? sha(git('diff') || '') : null, allowDirty: flag('allow-dirty'),
-  files: Object.fromEntries(['engine.mjs', 'regulate.mjs', 'gov/state.mjs', 'gov/rules.mjs', 'gov/brief.mjs', 'gov/session.mjs', 'gov/arms.mjs', 'gov/stub_government.mjs', 'page/ui.js', 'page/body.html', 'page/style.css', 'page/worker.js', 'package-lock.json'].map((f) => [f, hashFile(f)])),
+  files: Object.fromEntries(['engine.mjs', 'regulate.mjs', 'gov/state.mjs', 'gov/rules.mjs', 'gov/brief.mjs', 'gov/session.mjs', 'gov/arms.mjs', 'gov/stub_government.mjs', 'gov/stub_core.mjs', 'page/ui.js', 'page/body.html', 'page/style.css', 'page/worker.js', 'package-lock.json'].map((f) => [f, hashFile(f)])),
   data: Object.fromEntries(DATA.map((f) => [f, hashFile('data/' + f)])), node: process.version, hardware: { cpu: os.cpus()[0]?.model, cores: os.cpus().length, memGB: Math.round(os.totalmem() / 2 ** 30), platform: `${os.platform()} ${os.release()}` },
   brief: A.government === 'claude' ? { id: A.brief, sha256: sha(BRIEFS[A.brief]) } : null, model: A.government === 'claude' ? A.model : null };
 
@@ -104,7 +104,9 @@ if (A.serve) {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(shell(fs.readFileSync(pagePath, 'utf8')));
   }).listen(port, '0.0.0.0', () => console.log(`Live view: http://localhost:${port}`));
 }
-const govRecord = () => ({ decisions: record.decisions, posts: record.posts, nbVersions: record.nbVersions, governments: record.governments, elections: record.elections, predictions: record.predictions, status: STATUS, pace: A.pace, lockstep: A.lockstep, clock: { behindMs: Math.round(behindMs), slowWeeks } });
+const govRecord = () => ({ decisions: record.decisions, posts: record.posts, nbVersions: record.nbVersions, governments: record.governments, elections: record.elections, predictions: record.predictions, status: STATUS, pace: A.pace, lockstep: A.lockstep, clock: { behindMs: Math.round(behindMs), slowWeeks },
+  // for the page's "How the government works" view (display only)
+  source: 'regulate.mjs', kind: A.government, wake: { at: wake.at, when: wake.when, inWeeks: wake.inWeeks ?? null }, wakeDefault: A.wake, lastErrors, electionsCfg: A.elections, nextElection: A.elections ? (Math.floor(W.t / A.elections.term) + 1) * A.elections.term : null, scale: E.govScale(W), inputNames: E.govInputNames(W) });
 
 // ---------- One turn: what the government wrote, applied at the start of the next week ----------
 let running = null, wake = { at: 0, when: [] }, pending = []; // pending: finished turns waiting for the next week boundary
@@ -174,7 +176,7 @@ function bookWeek(f) { const r = govRow(), L = f.gov.lines; for (const [k, v] of
 const startWeek = 0, target = A.weeks;
 const f0 = E.frame(W, { full: true }); const h0 = frameHash(f0);
 if (priorHashes.length && priorHashes[0] !== h0) throw new Error(`week 0 differs from the run being ${resumeDir ? 'resumed' : 'replayed'}: this engine or data is not the one that made it`);
-if (!resumeDir) fs.appendFileSync(hashF, h0 + '\n'); gz.write(JSON.stringify(f0) + '\n'); frames.push(f0);
+if (!resumeDir) fs.appendFileSync(hashF, h0 + '\n'); gz.write(JSON.stringify(f0) + '\n'); f0.govX = E.govView(W); frames.push(f0);
 const writeState = () => SW.week(W, { lastErrors, wake: { atWeek: wake.at, when: wake.when } });
 writeState();
 const logged = new Map(); for (const e of priorLog) if ((e.type === 'turn' || e.type === 'arm') && (replayDir || resumeDir)) { const k = e.weekEffective; (logged.get(k) || logged.set(k, []).get(k)).push(e); }
@@ -206,7 +208,7 @@ for (let week = 1; week <= target; week++) {
   if (replaying) for (const e of logged.get(week) || []) applyLogged(e);
   else { while (pending.length && (A.lockstep == null || pending[0].applyAt <= week)) applyTurn(pending.shift()); }
   E.step(W);
-  const f = E.frame(W, { full: true }), h = frameHash(f); gz.write(JSON.stringify(f) + '\n');
+  const f = E.frame(W, { full: true }), h = frameHash(f); gz.write(JSON.stringify(f) + '\n'); f.govX = E.govView(W); // govX: the page's view of the layer, added after the hash and frames.jsonl.gz (display only)
   if (replaying && priorHashes[week] && priorHashes[week] !== h) throw new Error(`week ${week} differs from the logged run (hash ${h.slice(0, 12)} against ${priorHashes[week].slice(0, 12)})`);
   if (!(resumeDir && week <= lastLoggedWeek)) fs.appendFileSync(hashF, h + '\n');
   frames.push(f); if (frames.length > FULL_WEEKS) thin(frames.length - 1 - FULL_WEEKS);
