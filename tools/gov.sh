@@ -26,8 +26,9 @@ case "${1:-help}" in
   token)
     echo "Opening the subscription sign-in. When it prints a token (sk-ant-oat...), copy it."
     "$CLI" setup-token
-    echo; read -rs "t?Paste the token here (it is not shown): "; echo
-    [[ "$t" == sk-ant-* ]] || { echo "That doesn't look like a token; nothing saved."; exit 1; }
+    echo; read -rs "t?Paste the token here, once (it is not shown): "; echo
+    t=$(print -r -- "$t" | tr -d ' \n\r\t' | perl -pe 's/(?=sk-ant-oat)/\n/g' | grep -E '^sk-ant-oat' | awk 'length($0)>=90' | head -1 || true) # the first whole token, if the paste repeated or wrapped it
+    [[ ${#t} -ge 90 ]] || { echo "That doesn't look like a whole token (sk-ant-oat01-..., about 108 characters); nothing saved."; exit 1; }
     security add-generic-password -U -a "$USER" -s "$SVC" -w "$t" && echo "Saved in the Keychain as '$SVC'. Remove it with: security delete-generic-password -s $SVC" ;;
   check)
     echo "CLI:     ${CLI:-none} $([[ -x "$CLI" ]] && "$CLI" --version 2>/dev/null | head -1)"

@@ -31,10 +31,14 @@ export function prepareSession(root, { cli = findCli() } = {}) {
   let version = null; try { version = execFileSync(bin, ['--version'], { env: { HOME: path.join(abs, 'home'), PATH: '/usr/bin:/bin', DISABLE_AUTOUPDATER: '1' }, encoding: 'utf8', timeout: 20000 }).trim(); } catch (e) { version = `unknown (${e.message.slice(0, 80)})`; }
   return { root: abs, cwd: path.join(abs, 'session'), home: path.join(abs, 'home'), bin, binSha256: sha(bin), version, source: cli };
 }
+// The CLI's own built-in plugins load even under --safe-mode (2.1.319: agents-md, telemetry, privacy, plugin-authoring,
+// the last with skill and tool hooks). They are switched off by name; the plumbing test fails if a new one appears.
+const BUILTIN_PLUGINS = ['cc-plugin-agents-md', 'cc-plugin-telemetry', 'cc-plugin-privacy', 'cc-plugin-plugin-authoring'];
+const NO_PLUGINS = JSON.stringify({ enabledPlugins: Object.fromEntries(BUILTIN_PLUGINS.map((n) => [`${n}@builtin`, false])) });
 export function sessionArgs({ prompt, brief, model = MODEL, sessionId, first, format = 'json' }) {
   return ['-p', prompt, '--model', model, '--system-prompt', brief,
     '--tools', 'Read,Write', '--allowedTools', 'Read(./**)', ...WRITABLE.map((f) => `Write(./${f})`),
-    '--permission-mode', 'dontAsk', '--permission-prompts', 'none', '--setting-sources', '', '--strict-mcp-config', '--disable-slash-commands', '--safe-mode', '--restricted',
+    '--permission-mode', 'dontAsk', '--permission-prompts', 'none', '--setting-sources', '', '--settings', NO_PLUGINS, '--strict-mcp-config', '--disable-slash-commands', '--safe-mode', '--restricted',
     '--output-format', format, ...(format === 'stream-json' ? ['--verbose'] : []), first ? '--session-id' : '--resume', sessionId];
 }
 export function sessionEnv(S) {
