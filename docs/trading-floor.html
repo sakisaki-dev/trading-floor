@@ -774,7 +774,6 @@
   /* Save run and Load run are icon-only, so the bar stays one row; their names are in the tooltip and for screen readers */
   div.bar :is(#step, #reset, #saveRun, .file) { min-width: 32px; justify-content: center; padding-inline: 8px; }
   div.bar :is(#step, #reset, #saveRun, .file)::before { margin: 0; }
-  div.bar select#preset { max-width: 190px; text-overflow: ellipsis; }
   div.bar .bar__gov:not(:has(#govOn:checked)) select#govKind { display: none; } /* the picker shows only while a government is on */
   div.bar #step { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2.5 3.3v9.4c0 .5.5.8.9.5l6.6-4.7a.6.6 0 0 0 0-1L3.4 2.8c-.4-.3-.9 0-.9.5z'/%3E%3Crect x='11' y='2.5' width='2.6' height='11' rx='1'/%3E%3C/svg%3E"); } div.bar #reset { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 2.5a5.5 5.5 0 1 1-5.2 3.7' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3Cpath d='M1.6 2.2l1.2 4.3 4.2-1.3z'/%3E%3C/svg%3E"); } div.bar #saveRun { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 2v8m0 0L4.8 6.8M8 10l3.2-3.2M3 12.5v.5c0 .6.4 1 1 1h8c.6 0 1-.4 1-1v-.5' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); } div.bar .file { --i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 10.5v-8m0 0L4.8 5.7M8 2.5l3.2 3.2M3 12.5v.5c0 .6.4 1 1 1h8c.6 0 1-.4 1-1v-.5' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
   /* Speed: the segmented control as a quiet capsule track */
@@ -784,11 +783,11 @@
   div.bar .seg button:hover { background: transparent; color: var(--chalk); }
   div.bar .seg__pill { border-radius: 999px; top: 3px; bottom: 3px; }
   /* Preset and seed: soft filled capsules, no outline */
-  div.bar select#preset { background-color: var(--fill); padding-right: 30px; max-width: 240px; text-overflow: ellipsis;
+  div.bar select#preset { background-color: var(--fill); padding-right: 30px; max-width: 176px; text-overflow: ellipsis;
     background-image: var(--chev); background-repeat: no-repeat; background-position: right 11px center; background-size: 12px; }
   div.bar select#preset:hover { background-color: var(--fill-2); }
   div.bar .mini { gap: 6px; padding-left: 8px; font: 500 12px/1 var(--body); color: var(--muted); }
-  div.bar input[type=number] { width: 78px; padding: 6px 12px; background: var(--fill); font: 500 13px/20px var(--mono); cursor: text; }
+  div.bar input[type=number] { width: 64px; padding: 6px 10px; background: var(--fill); font: 500 13px/20px var(--mono); cursor: text; }
   div.bar input[type=number]:hover { background: var(--fill-2); }
   div.bar input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   /* Rules and Layout: a chevron that turns over when the sheet is open */
@@ -828,12 +827,17 @@
   /* The Government switch in the bar, and its select */
   div.bar .govsw { gap: 8px; padding: 0 4px 0 8px; font: 500 13px/20px var(--body); white-space: nowrap; }
   div.bar .govsw input[type=checkbox] { order: 2; margin: 0; }
-  div.bar select#govKind { background-color: var(--fill); padding-right: 30px; max-width: 200px; text-overflow: ellipsis;
+  div.bar select#govKind { background-color: var(--fill); padding-right: 30px; max-width: 156px; text-overflow: ellipsis;
     background-image: var(--chev); background-repeat: no-repeat; background-position: right 11px center; background-size: 12px; }
   div.bar select#govKind:hover { background-color: var(--fill-2); }
   div.bar select#govKind:disabled { opacity: 0.5; }
   div.bar .bar__gov::before { display: none; }
   div.bar .bar__gov:not(:has(#govOn:checked)) select#govKind { color: var(--muted); }
+  /* Narrower windows: tighter menus, the Seed label dropped (it stays as the tooltip) and "Gov", so the bar stays one row down to about 1,100 px */
+  @media (max-width: 1320px) and (min-width: 761px) {
+    div.bar select#preset { max-width: 140px; } div.bar select#govKind { max-width: 124px; }
+    div.bar .mini__l, div.bar .govsw__long { display: none; } div.bar .govsw { gap: 6px; padding-left: 4px; }
+    .bar__g + .bar__g { padding-left: 6px; } }
   .rgrp__c > .gov__real { margin: 0; padding: 10px 14px 12px 0; box-shadow: 0 -1px 0 var(--line); font-size: 12.5px; line-height: 1.5; overflow-wrap: anywhere; }
   .gov__real code, .gx__real code { font: 400 11.5px/1.5 var(--mono); overflow-wrap: anywhere; }
   /* How the government works: one glass card per part of the spec */
@@ -932,14 +936,14 @@
     </div>
     <div class="bar__g">
       <select id="preset" aria-label="Market preset"></select>
-      <label class="mini" for="seed">Seed <input id="seed" type="number" value="88" min="1" max="99999"></label>
+      <label class="mini" for="seed" title="Seed"><span class="mini__l">Seed</span> <input id="seed" type="number" value="88" min="1" max="99999"></label>
       <button id="rulesBtn" type="button" aria-expanded="false" aria-controls="rules">Rules</button>
       <button id="layoutBtn" type="button" aria-expanded="false" aria-controls="layoutP">Layout</button>
     </div>
     <!-- The government switch: restarts the world as the regulated preset with a scripted government run in this
          browser's worker (gov/page_gov.mjs). The real government is a Claude session run by regulate.mjs. -->
     <div class="bar__g bar__gov">
-      <label class="toggle govsw" title="Turn a government on: the world restarts as the regulated preset (configs/regulated.json, 250 bots) with a scripted government running in this browser. A world can't gain or lose a government mid-run (its treasury, pinned settings and the bots' inputs are set when the world is made), so switching it on or off restarts; switching between scripted governments applies from the next week. The real government is a Claude session run with regulate.mjs."><span>Government</span><input type="checkbox" id="govOn" role="switch" aria-label="Government"></label>
+      <label class="toggle govsw" title="Turn a government on: the world restarts as the regulated preset (configs/regulated.json, 250 bots) with a scripted government running in this browser. A world can't gain or lose a government mid-run (its treasury, pinned settings and the bots' inputs are set when the world is made), so switching it on or off restarts; switching between scripted governments applies from the next week. The real government is a Claude session run with regulate.mjs."><span>Gov<span class="govsw__long">ernment</span></span><input type="checkbox" id="govOn" role="switch" aria-label="Government"></label>
       <select id="govKind" aria-label="Which scripted government runs in this browser">
         <option value="A0">A0 · do nothing</option>
         <option value="A1" selected>A1 · balanced budget</option>
@@ -5357,7 +5361,7 @@ const PRESETS = {
   Object.assign(PRESETS, { realismLight: light }, rest); }
 // The regulated preset (configs/regulated.json, inlined at build time as REGULATED) with 250 bots, as the page's Realism
 // opens: the world a government runs. The Government switch in the bar picks it (and leaving it turns the switch off).
-PRESETS.regulated = { label: 'Regulated · 250 bots (government)', set: { ...REGULATED, botScale: 1 }, hyp: '<b>Regulated, with a scripted government.</b> Realism with the settings a government run pins (spec 9.5: a closed economy, royalties and the wealth tax paid from and into the treasury, no central bank), 250 bots. The government sets the dials and spends the treasury from week 1; its budget-day turn ran before the first week. It runs in this browser and is scripted: the real one is a Claude session that regulate.mjs runs. How every part works is at the end of the Government panel.' };
+PRESETS.regulated = { label: 'Regulated · 250 bots', set: { ...REGULATED, botScale: 1 }, hyp: '<b>Regulated, with a scripted government.</b> Realism with the settings a government run pins (spec 9.5: a closed economy, royalties and the wealth tax paid from and into the treasury, no central bank), 250 bots. The government sets the dials and spends the treasury from week 1; its budget-day turn ran before the first week. It runs in this browser and is scripted: the real one is a Claude session that regulate.mjs runs. How every part works is at the end of the Government panel.' };
 const SOC = ['Sharer', 'Reciprocator', 'Thief'];
 const TAGS = { return: 'Back', champion: 'Champion', award: 'Award', hof: 'Hall of Fame', retire: 'Retired', rookie: 'Rookie', injury: 'Injury', season: 'Season', people: 'People', credit: 'Credit', fashion: 'Fashion', margin: 'Margin', start: 'Open', gen: 'Gen', evolve: 'Evolution', crash: 'Crash', bubble: 'Bubble', corner: 'Corner', flag: 'Flagged', pool: 'Pool', update: 'Update', auction: 'Auction', games: 'Games' };
 
