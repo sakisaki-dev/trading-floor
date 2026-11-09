@@ -411,9 +411,9 @@ The leak scan (17.2) checks each field's source, not only whether its numbers ma
 
 ### 9.1 The menu
 
-Run 1 uses the broader menu below (recommended, awaiting the owner's yes; 22.2). If the owner keeps the narrow menu
-(today's dials, three grant groups), run 1's report says in its title that the menu was ours, and the broader menu
-ships as run 1b. Everything on it sets quantities on public observables; nothing names a bot's action.
+Run 1 uses the broader menu below (accepted by the owner on 2026-11-08; 22.2). Had the owner kept the narrow menu
+(today's dials, three grant groups), run 1's report would have said in its title that the menu was ours, and the broader menu
+would have shipped as run 1b. Everything on it sets quantities on public observables; nothing names a bot's action.
 
 | Group | Settings |
 |---|---|
@@ -1017,9 +1017,12 @@ Each step keeps default runs byte-identical and is checked the way the earlier r
 | Watching | Live on the page: commentary, notebook, board |
 | Exogenous booking for fitness (`fitnessExo`) | Decided 2026-11-07: only lump sums the bot did not choose (allowance, transfers and grants, poll tax, opening grants, rescues) are taken out of fitness; taxes and fees tied to a bot's holdings or activity count in its return, so bots can learn to avoid taxes and over-taxing can shrink the base |
 
-### 22.2 Recommended, awaiting the owner's yes
+### 22.2 Recommended, accepted by the owner
 
-| Decision | Recommendation | Alternatives |
+Decided 2026-11-08: the owner accepted every recommendation below as it stands. The alternatives stay listed for
+later runs.
+
+| Decision | Choice | Alternatives |
 |---|---|---|
 | Pace | 4 s a week | 2 s (more lag) or 6 s (less) |
 | Opening treasury | 4 weeks of spending, as its own ledger line | 0 (week-1 shock) or a full season |
