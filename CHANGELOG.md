@@ -17,6 +17,27 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 
 ### Changed
 
+- Speed on long runs: about 1.15 to 1.2 times faster late in a run, with identical results. Cards are never removed, so
+  by week 1,500 most of the 49,000 card markets have no copies out and no orders. The weekly upkeep no longer touches
+  them: a card nobody holds or trades gets its week of zero volume added when its history is next read, order lists are
+  made only for cards that get an order, the order and research snapshot copies a card's row (and works out its market
+  inputs) the first time a bot reads it, and a card's last royalty is read from its player when needed. The other part
+  of the slowdown was one-of-a-kind cards (65,000 by week 1,800): each bot's are now kept as item objects that change only
+  when its set does, so worth() and the auctions' re-mark check no longer look every one up again; a one-of-a-kind
+  card's last royalty is also read when needed (its mint count kept in a plain Map: a WeakMap this large slows every
+  full garbage collection). Smaller items: dealers' fixed price tilts are worked out once, contests count players by
+  position once, the most-traded list scores each card once before sorting, the frame's top cards are picked without
+  sorting every card, and the full frame counts owned one-of-a-kind cards per player in one pass. Measured on Realism with `botScale: 1`, seed 31761, practiceGens 0, both engines in one
+  process stepping alternately, CPU time of step plus compact frame per week (mean, then median): weeks 26 to 50, 1.06 s
+  before and 1.05 s after (medians 1.01 and 0.97); weeks 551 to 650, 3.44 and 2.77 (2.99 and 2.59); weeks 1,401 to
+  1,500, 5.03 and 4.08 (3.87 and 3.33; the step alone 3.59 and 3.05). Those runs used the engine just before the plain-Map change; a second paired run with it, on a quieter machine, gave 2.40 s and 2.00 s for weeks 551 to 650 (medians 2.09 and 1.92). That is about a sixth less time late in a run,
+  not the third the card count suggested: most of the remaining growth is the bots' work over live cards and items, and
+  pack pricing over every player. Heap is about the same (552 MB against 598 MB around week 600, 818 MB against 831 MB around week 1,500). Not changed: the per-card sums in
+  the Vault index, bubble and market stats still run over every card, since a dead card can carry a non-zero term.
+  Same engine version: every week's full and compact frame hashes the same as before on the ten worlds of
+  `tests/same_results.mjs`, on the 250-bot Realism world above for 1,700 weeks (rookies, retirements and dormant players
+  included), and on a world with forced dormancy (players set aside and woken again).
+
 - The page opens on a new preset, Realism · 250 bots (faster): the Realism laws with `botScale: 1`, about half the bots and about twice the speed to watch. Realism itself is unchanged and still matches `configs/realism.json`.
 
 - Page: more colour in Apple's system palette (one tint per section, tinted key numbers, vivid series), the main chart in the Vault's gold on navy, liquid-glass chrome, custom sliders and sliding segmented controls, a collapsible sidebar, and smooth motion (redraws spread over frames, numbers and charts ease to each new week). Presentation only; no engine change.
