@@ -54,6 +54,7 @@ lib.leagueRates = rd('league_rates.json'); lib.rookieNames = rd('rookie_names.js
 const preset = JSON.parse(fs.readFileSync(path.join(here, 'configs', A.preset + '.json'), 'utf8'));
 const cfg0 = { ...preset, ...A.set, ...(A.practice != null ? { practiceGens: A.practice } : {}), seed: A.seed };
 if (!cfg0.government) cfg0.government = {};
+if (!BRIEFS[A.brief]) { console.error(`--brief must be one of ${Object.keys(BRIEFS).join(', ')}`); process.exit(2); }
 const tSetup = Date.now(); const W = E.createWorld(lib, cfg0);
 const setupSecs = (Date.now() - tSetup) / 1000;
 fingerprint.config = prior?.fingerprint?.config || JSON.parse(JSON.stringify(W.cfg)); fingerprint.rng = W.rngLayout; fingerprint.pins = E.GOV_PINS;

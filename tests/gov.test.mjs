@@ -146,7 +146,8 @@ await test('the state whitelist: no hidden-value or network field, no hidden val
   for (const f of files) { const t = fs.readFileSync(f, 'utf8'); if (f.endsWith('.json')) walk(JSON.parse(t)); if (f.endsWith('.jsonl')) t.split('\n').filter(Boolean).forEach((l) => walk(JSON.parse(l))); if (f.endsWith('.csv')) t.split('\n')[0].split(',').forEach((k) => keys.add(k)); }
   for (const k of EXCLUDED_KEYS) assert.ok(!keys.has(k), `excluded field ${k} in state/`);
   assert.ok(!all.includes(String(seed)), 'the seed appears in state/');
-  const hidden = [...W.players.map((p) => p.F), W.hist.f.at(-1), W.hist.bub.at(-1), E.bubble(W)].filter((x) => x > 0 && !Number.isInteger(x)).map((x) => String(x)).filter((s) => s.length > 8);
+  // F, the F index, price ÷ value and vcap, at full precision
+  const hidden = [...W.players.map((p) => p.F), W.hist.f.at(-1), W.hist.bub.at(-1), E.bubble(W), W.cards.reduce((a, c) => a + c.F * c.circ, 0)].filter((x) => x > 0 && !Number.isInteger(x)).map((x) => String(x)).filter((s) => s.length > 8);
   for (const h of hidden) assert.ok(!all.includes(h), `hidden value ${h} appears in state/`);
   const md = fs.readFileSync(path.join(dir, 'rules.md'), 'utf8'); for (const k of [...Object.keys(E.GOV_DIALS), ...E.GOV_INDICATORS, ...E.BOARD_WORDS.up, ...E.BOARD_WORDS.negation]) assert.ok(md.includes(k), `rules.md lacks ${k}`);
 });
