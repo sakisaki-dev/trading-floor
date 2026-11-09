@@ -624,7 +624,7 @@ function mintCopy(W, b, x, cost, t = W.t, fromPool = true) {
   if (fromPool) { p.pool--; if (p.pool === 0) log(W, 'pool', `The pool has run out of ${p.pos} ${p.name} cards.`); }
   if (x.d < 4 && x.kit === 'home' && !x.par) { const m = W.cards[mktId(x.pid, x.d, x.f)]; m.circ++; if (!fromPool) m.S0++; if (b) { give(b, m, 1); addLot(b, m, cost, t); } return m; }
   const it = { uid: `I${(W.itemSeq = (W.itemSeq || 0) + 1)}`, pid: x.pid, d: x.d, f: x.f, kit: x.kit || 'home', par: x.par || null, auto: x.auto || null, mult: copyMult(x), owner: b, cost, last: null };
-  it.label = itemLabel(W, it); W.items.set(it.uid, it); ITEM_ROY.set(it, W._royN || 0); if (b) (b.items ||= new ItemSet()).add(it.uid);
+  it.label = itemLabel(W, it); W.items.set(it.uid, it); (W._itRoyN ||= new Map()).set(it.uid, W._royN || 0); if (b) (b.items ||= new ItemSet()).add(it.uid);
   return it;
 }
 // An item's mark-to-market: its plain card's price × (its premium ÷ the plain card's), not its own trades (an assumption:
@@ -1530,9 +1530,9 @@ function snapCards(W) {
 // A card's inputs 32, 34, 35 and 41 in a snapshot phase, from the snapshot's own values (so the same whenever they are worked out); returns their offset in S.cx
 // What one copy of a card paid over the last generation: his player's roySum (set by payRoyalties) × the card's multiplier,
 // as payRoyalties used to store on every card each week (undefined before the first payment, which every reader takes as none)
-// The same for a one-of-a-kind card: none until a payment has been made since it was minted (ITEM_ROY: the payments made before it)
-const ITEM_ROY = new WeakMap();
-function itemRoy(W, it) { const n0 = ITEM_ROY.get(it) ?? 0; return (W._royN || 0) > n0 ? (W.players[it.pid]?.roySum || 0) * (it.mult / Math.max(1e-9, W.cards[mktId(it.pid, it.d === 4 ? 0 : it.d, it.f)]?.mult || 1)) : undefined; }
+// The same for a one-of-a-kind card: none until a payment has been made since it was minted (W._itRoyN: uid -> the payments
+// made before it; a plain Map, as a WeakMap this large slows every full garbage collection)
+function itemRoy(W, it) { const n0 = W._itRoyN?.get(it.uid) ?? 0; return (W._royN || 0) > n0 ? (W.players[it.pid]?.roySum || 0) * (it.mult / Math.max(1e-9, W.cards[mktId(it.pid, it.d === 4 ? 0 : it.d, it.f)]?.mult || 1)) : undefined; }
 function cardRoy(W, c) { return W._royPaid ? (W.players[c.pid].roySum || 0) * c.mult : undefined; }
 // The snapshot with card id's row filled in (undefined is stored as NaN: both read as "none")
 function snapRow(S, id) { if (!S.ok[id]) { const c = S.W.cards[id]; S.P[id] = c.P; S.bb[id] = c.bb; S.ba[id] = c.ba; S.roy[id] = cardRoy(S.W, c); S.off[id] = c.on === false ? 1 : 0; S.ok[id] = 1; } return S; }
