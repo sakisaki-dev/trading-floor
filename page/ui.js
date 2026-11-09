@@ -195,6 +195,7 @@ const nNow = () => (mode === 'replay' ? cursor + 1 : FRAMES.length);
 function setPlay(v) { playing = v; $('play').textContent = v ? 'Pause' : 'Play'; $('play').dataset.state = v ? 'playing' : 'paused'; if (mode === 'live') tell({ cmd: 'play', v }); }
 
 function startLive() {
+  if (window.LIVE_RUN) { followNewest(); return; } // a served run (regulate.mjs --serve): the page only follows it, it never starts a world of its own
   mode = 'live'; RUN = null; $('liveBtn').hidden = true; $('runFile').value = ''; LIVEGOV = null; GOVSET.on = presetKey === 'regulated'; govSync(); govShow(GOVSET.on);
   startWorker(); LIVE = { p: null, b: null }; CHANGES = [];
   tell({ cmd: 'start', opts: { ...opts, ...PRESETS[presetKey].set }, playing, speed, gov: GOVSET.on ? { kind: GOVSET.kind, elections: GOVSET.elections } : null });
@@ -1558,9 +1559,11 @@ function drawGovHow(f, G, R, D, t, n) {
 /* ---------- Start ---------- */
 // Live AI run: the runner (node run.mjs --serve PORT) serves this page with window.LIVE_RUN set. New weeks stream in
 // every few seconds; the view follows the newest week unless it has been scrubbed back.
+function followNewest() { if (FRAMES.length) { cursor = FRAMES.length - 1; redrawAll(); } }
 async function followLive(url) {
   let run = null;
   const pull = async () => {
+    if (run && RUN !== run) return; // the page left this run: stop, so its weeks never go into another world
     try {
       const r = await fetch(`${url}?since=${run ? FRAMES.length : 0}`, { cache: 'no-store' }); const d = await r.json();
       if (!run) { if (!d.frames.length) throw new Error('no weeks yet'); run = { meta: d.meta, config: d.config, frames: d.frames, memos: d.memos, gov: d.gov }; startReplay(run); cursor = FRAMES.length - 1; setPlay(false); redrawAll(); }
@@ -1572,7 +1575,7 @@ async function followLive(url) {
   pull();
 }
 setPlay(playing);
-if (window.LIVE_RUN) followLive(window.LIVE_RUN); else startLive();
+if (window.LIVE_RUN) { document.body.classList.add('liverun'); followLive(window.LIVE_RUN); } else startLive();
 requestAnimationFrame(loop);
 document.addEventListener('visibilitychange', () => { if (mode === 'live') tell({ cmd: 'hidden', v: document.hidden }); });
 window.addEventListener('resize', () => { drawCharts(); drawPanels(); });

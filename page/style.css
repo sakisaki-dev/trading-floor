@@ -901,4 +901,6 @@
   @media (max-width: 420px) { .gx__in li { grid-template-columns: minmax(0, 1fr) 64px 54px; } .gx__dials td:nth-child(2), .gx__dials th:nth-child(2) { display: none; } div.bar select#govKind { max-width: 200px; } }
   @media (max-width: 900px) { .gov__cols { grid-template-columns: minmax(0, 1fr); } }
   @media (max-width: 640px) { .gov__dial { grid-template-columns: 52px minmax(0, 1fr); } .gov__dial span { grid-column: 1 / -1; } }
+  /* A served run (regulate.mjs --serve): the page follows that run, so the controls that would start a world of its own are hidden */
+  body.liverun div.bar :is(#reset, #preset, label.mini, .bar__gov, #runFile, label.file), body.liverun .rgrp[aria-label="Government"] { display: none !important; }
 </style>
