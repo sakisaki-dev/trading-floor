@@ -793,4 +793,29 @@
     *, *::before, *::after { animation-duration: 0.001ms !important; animation-delay: 0s !important; transition-duration: 0.001ms !important; }
     .lamp--pulse { animation: none !important; }
   }
+  /* The government panel (regulated runs only) */
+  .gov__status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+  .gov__status b { color: var(--chalk); font: 500 12.5px/1.3 var(--mono); font-variant-numeric: tabular-nums; }
+  .gov__chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--fill); color: var(--chalk); font-weight: 600; }
+  .gov__chip::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+  .gov__chip[data-s="thinking"]::before { background: var(--c-orange); } .gov__chip[data-s="asleep"]::before, .gov__chip[data-s="watching"]::before { background: var(--c-green); }
+  .gov__chip[data-s="unavailable"]::before, .gov__chip[data-s="error"]::before { background: var(--c-red); }
+  .gov .ch { height: 180px; }
+  .gov__lines td.num, .gov__lines th.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .gov__lines tr.rev td:first-child::before, .gov__lines tr.sp td:first-child::before, .gov__lines tr.co td:first-child::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; background: var(--c-green); }
+  .gov__lines tr.sp td:first-child::before { background: var(--c-pink); } .gov__lines tr.co td:first-child::before { background: var(--c-orange); }
+  .gov__feed { display: grid; gap: 8px; align-content: start; max-height: 360px; overflow: auto; font-size: 13px; line-height: 1.45; }
+  .gov__item { padding: 8px 10px; border-radius: var(--r-md); background: var(--panel-2); display: grid; gap: 4px; }
+  .gov__item time { font: 500 11.5px/1.2 var(--mono); color: var(--faint); }
+  .gov__item p { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+  .gov__item .note { overflow-wrap: anywhere; }
+  .gov__item .err { color: var(--down); }
+  .gov__nb { max-height: 360px; overflow: auto; padding: 8px 10px; border-radius: var(--r-md); background: var(--panel-2); font: 400 12.5px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .gov__nb .new { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent-fill); display: block; }
+  .gov__dials { display: grid; gap: 4px; max-height: 260px; overflow: auto; font-size: 13px; }
+  .gov__dial { display: grid; grid-template-columns: 64px 150px minmax(0, 1fr); gap: 8px; align-items: baseline; padding: 4px 0; border-top: 1px solid var(--line); }
+  .gov__dial:first-child { border-top: 0; } .gov__dial time { font: 400 11.5px/1 var(--mono); color: var(--faint); } .gov__dial code { font: 500 12px/1.3 var(--mono); color: var(--chalk); }
+  .gov__dial span { font-family: var(--mono); font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+  @media (max-width: 900px) { .gov__cols { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 640px) { .gov__dial { grid-template-columns: 52px minmax(0, 1fr); } .gov__dial span { grid-column: 1 / -1; } }
 </style>

@@ -72,7 +72,7 @@ const gz = zlib.createGzip(); gz.pipe(fs.createWriteStream(path.join(out, 'frame
 if (resumeDir) fs.appendFileSync(clockF, JSON.stringify({ type: 'resume', at: new Date().toISOString(), weeksLogged: priorHashes.length - 1 }) + '\n');
 const FULL_WEEKS = 104, THIN = ['bots', 'jn', 'aiLog', 'arcs', 'hot', 'events', 'researched', 'topics', 'top', 'movers', 'aiDetail', 'genome', 'lineages', 'pool', 'ovr', 'risk', 'lender', 'fashion'];
 const frames = [], thin = (i) => { const f = frames[i]; if (!f || f._thin) return; for (const k of THIN) delete f[k]; f._thin = true; };
-const record = { decisions: [], posts: [], notebooks: {}, governments: [], elections: [], predictions: [] };
+const record = { decisions: [], posts: [], nbVersions: [], governments: [], elections: [], predictions: [] }; // nbVersions: the notebook each time it changed
 
 // ---------- The government's folder ----------
 // stub, claude: a session folder with state/ inside (the session reads it); arms and replays: state/ in the run folder
@@ -93,7 +93,7 @@ newGovernment(0); if (A.elections) E.govTermStart(W);
 
 // ---------- The live page (--serve) ----------
 const meta = (extra = {}) => ({ id: path.basename(out), source: 'regulate.mjs', government: A.government, seed: '(hidden)', weeksRun: W.t, pace: A.pace, setupSecs, rng: W.rngLayout, status: STATUS, ...extra });
-let STATUS = { state: 'starting', week: 0, since: Date.now() };
+let STATUS = { state: 'starting', week: 0, since: Date.now() }, behindMs = 0, slowWeeks = 0;
 if (A.serve) {
   const http = await import('node:http'), port = Number(A.serve) || 4322, pagePath = path.join(here, 'docs', 'trading-floor.html');
   const shell = (body) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body><script>window.LIVE_RUN = '/frames';</script>${body}</body></html>`;
@@ -103,7 +103,7 @@ if (A.serve) {
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(shell(fs.readFileSync(pagePath, 'utf8')));
   }).listen(port, '0.0.0.0', () => console.log(`Live view: http://localhost:${port}`));
 }
-const govRecord = () => ({ decisions: record.decisions, posts: record.posts, notebooks: record.notebooks, governments: record.governments, elections: record.elections, predictions: record.predictions, status: STATUS, pace: A.pace, lockstep: A.lockstep });
+const govRecord = () => ({ decisions: record.decisions, posts: record.posts, nbVersions: record.nbVersions, governments: record.governments, elections: record.elections, predictions: record.predictions, status: STATUS, pace: A.pace, lockstep: A.lockstep, clock: { behindMs: Math.round(behindMs), slowWeeks } });
 
 // ---------- One turn: what the government wrote, applied at the start of the next week ----------
 let running = null, wake = { at: 0, when: [] }, pending = []; // pending: finished turns waiting for the next week boundary
@@ -141,7 +141,7 @@ function applyTurn(d) {
   const text = d.readFiles.board.trim(); let parsed = null; if (text) { parsed = E.noteBoard(W, text); SW.post(eff, text, parsed); record.posts.push({ week: eff, text, parsed }); }
   if (P.wakeIn) { wake.inWeeks = P.wakeIn.inWeeks ?? wake.inWeeks ?? A.wake; wake.when = P.wakeIn.when; } // without a wake entry the last setting stands (at first, the default)
   wake.at = W.t + (wake.inWeeks ?? A.wake);
-  const nb = d.readFiles.notebook, nd = diffLines(nbLast, nb); nbLast = nb; record.notebooks[`G${govNo}`] = nb;
+  const nb = d.readFiles.notebook, nd = diffLines(nbLast, nb); if (nb !== nbLast) record.nbVersions.push({ week: W.t + 1, gov: `G${govNo}`, text: nb }); nbLast = nb;
   const ind = E.govIndicators(W), preds = (P.preds || []).map((p) => ({ turn: d.n, ...p, base: ind[p.metric], from: W.t, due: W.t + p.horizon, gov: `G${govNo}` })); record.predictions.push(...preds);
   const entry = { type: 'turn', gov: `G${govNo}`, turn: d.n, weekRead: d.weekRead, weekEffective: eff, lagWeeks: eff - d.weekRead, budgetDay: !!d.budgetDay, ms: d.r.ms, controls: P.eng, changes: res.changes, errors, wake: P.wakeIn, commentary: P.commentary ?? null, predictions: preds,
     board: text ? { text, parsed: parsed && { tone: parsed.tone, sentences: parsed.sentences, mentions: parsed.mentions, dials: parsed.dials } } : null, notebook: { ...nd, sha256: sha(nb) }, facts: d.r.facts, stray: d.readFiles.stray, compactions: d.readFiles.compactions };
@@ -197,7 +197,7 @@ if (!resumeDir && !replayDir) {
   wake.at = Math.max(wake.at, 0);
 }
 console.log(`Run ${path.basename(out)}: government ${A.government}, ${W.bots.length} bots, pace ${A.pace} s/week${A.lockstep != null ? `, lockstep ${A.lockstep}` : ''}; world ready in ${setupSecs.toFixed(0)} s.`);
-const clock0 = Date.now(); let behindMs = 0, slowWeeks = 0;
+const clock0 = Date.now();
 for (let week = 1; week <= target; week++) {
   const replaying = !!replayDir || (resumeDir && week <= lastLoggedWeek);
   const tw = Date.now();

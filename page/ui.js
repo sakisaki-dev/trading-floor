@@ -182,7 +182,7 @@ const nNow = () => (mode === 'replay' ? cursor + 1 : FRAMES.length);
 function setPlay(v) { playing = v; $('play').textContent = v ? 'Pause' : 'Play'; $('play').dataset.state = v ? 'playing' : 'paused'; if (mode === 'live') tell({ cmd: 'play', v }); }
 
 function startLive() {
-  mode = 'live'; RUN = null; $('liveBtn').hidden = true; $('runFile').value = '';
+  mode = 'live'; RUN = null; $('liveBtn').hidden = true; $('runFile').value = ''; govShow(false);
   startWorker(); LIVE = { p: null, b: null }; CHANGES = [];
   tell({ cmd: 'start', opts: { ...opts, ...PRESETS[presetKey].set }, playing, speed });
   $('hyp').innerHTML = PRESETS[presetKey].hyp; $('preset').value = presetKey;
@@ -192,7 +192,7 @@ function startReplay(run) {
   { // weeks a long run trimmed (older than two years) lack the bots and lists: borrow them from the nearest full week
     const fr = run.frames || [], next = {}; for (let i = fr.length - 1; i >= 0; i--) for (const k of THIN) { if (fr[i][k] !== undefined) next[k] = fr[i][k]; else if (next[k] !== undefined) fr[i][k] = k === 'events' || k === 'jn' || k === 'arcs' || k === 'aiLog' ? [] : next[k]; } }
   for (const f of run.frames) pushFrame(f);
-  cursor = 0; $('liveBtn').hidden = false; setPlay(true);
+  cursor = 0; $('liveBtn').hidden = false; setPlay(true); govShow(!!run.gov || run.frames.some((f) => f.gov));
   const ai = run.meta?.aiBots || [];
   $('hyp').innerHTML = run.meta?.source === 'Trading Floor page' ? `<b>Replay ${esc(run.meta.id)}.</b> ${run.frames.length - 1} weeks saved from the page · seed ${run.meta.seed} · ${run.meta.changes?.length || 0} rule changes while it ran.` : `<b>Replay ${esc(run.meta?.id || '')}.</b> ${run.frames.length - 1} weeks · ${ai.length} AI bots (${[...new Set(ai.map((b) => b.model))].map(esc).join(', ') || 'none'}) · $${(run.meta?.costUsd ?? 0).toFixed(2)} API cost. Hover a gold-ringed dot (an AI bot) for its memo.`;
   arcs = []; pos.clear(); redrawAll();
@@ -521,7 +521,7 @@ function drawFast(split) {
   if (!split) { drawWatch(); drawStatus(); drawIndicators(); drawGroups(); drawMvc(f); }
   $('lbMore').textContent = lbAll ? 'Show top 20' : `Show all ${f.bots.length} bots`;
 }
-function drawPanels() { if (!cur()) return; drawFast(); drawPanelsCore(); drawTape(); drawAcct(); drawCons(); drawDetail(); drawLeagueNews(); drawHealth(); drawTactics(); drawSectors(); drawMap(); drawCalendar(); drawHeatmaps(); }
+function drawPanels() { if (!cur()) return; drawFast(); drawGov(); drawPanelsCore(); drawTape(); drawAcct(); drawCons(); drawDetail(); drawLeagueNews(); drawHealth(); drawTactics(); drawSectors(); drawMap(); drawCalendar(); drawHeatmaps(); }
 // The tables of the games, notes and wealth row
 function drawPanelsCore() {
   const f = cur(), n = nNow(); if (!f) return;
@@ -1389,6 +1389,42 @@ function drawCons() {
   $('consNote').textContent = `Groups are by worth each week. The richest 10% hold ${pct(c1)} of all cash (${pct(c0)} at the start). Quick flips: sold within 12 weeks of buying.`;
 }
 
+
+/* ---------- The government (regulated runs: docs/regulator-spec.md §16) ---------- */
+// Shown only for a run that has one (a replayed or followed regulate.mjs run): status, the treasury and its own account,
+// the ledger by line, the commentary, the board with its parsed signals, the notebook (new lines marked) and every dial
+// it touched. Everything follows the cursor in a replay. With no government the panel stays hidden and nothing else changes.
+const UI_GOV_REV = new Set(['fees', 'holding', 'wealthTax', 'packTax', 'outsideTax', 'exitTax', 'pollTax', 'levy']);
+const UI_GOV_NAME = { fees: 'Trade and auction fees', holding: 'Holding costs', wealthTax: 'Wealth tax', packTax: 'Pack sales tax', outsideTax: 'Outside sales tax', exitTax: 'Exit tax', pollTax: 'Poll tax', levy: 'Levies', allowance: 'Allowance', transfers: 'Transfers', royalties: 'Royalties', consumption: 'Government consumption', feeSubsidy: 'Fee subsidy', packSubsidy: 'Pack subsidy', outsideSubsidy: 'Outside subsidy', exitSubsidy: 'Exit subsidy', wealthSubsidy: 'Wealth subsidy', holdSubsidy: 'Holding subsidy', openingGrant: 'Opening grant' };
+let GOV_ON = false; // a run with a government is shown (applyLayout keeps the panel hidden otherwise)
+function govShow(on) { const p = $('govPanel'); GOV_ON = !!on; if (!p || p.hidden === !on) return; p.hidden = !on; if (typeof drawNav === 'function' && typeof ROWS !== 'undefined') drawNav(); }
+const uiGovVal = (v) => (typeof v === 'number' ? (Math.abs(v) >= 1000 ? fmt(v) : String(+v.toPrecision(4))) : typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v));
+function drawGov() {
+  const P = $('govPanel'); if (!P || P.hidden || !seen('govPanel')) return; const n = nNow(), f = cur(), G = f?.gov, R = RUN?.gov || {}; if (!G) return;
+  const t = f.t, D = (R.decisions || []).filter((d) => d.weekEffective <= t + 1), turns = D.filter((d) => d.type === 'turn');
+  { const S = R.status || {}, lags = turns.slice(1).map((d) => d.lagWeeks).sort((a, b) => a - b), med = lags.length ? lags[lags.length >> 1] : null, live = mode === 'replay' && RUN?.meta?.source === 'regulate.mjs' && cursor >= FRAMES.length - 1 && window.LIVE_RUN;
+    const st = live ? S.state || 'watching' : 'replay', since = S.since ? Math.round((Date.now() - S.since) / 1000) : null;
+    const what = !live ? `replay of week ${t}` : st === 'thinking' ? `thinking for ${since} s (read week ${S.week})` : st === 'asleep' ? `asleep until week ${S.until}${S.when?.length ? ` or ${S.when.map((w) => `${w.field} ${w.op} ${w.value}`).join(', ')}` : ''}` : st === 'unavailable' ? `unavailable (${esc(S.error || 'usage window')}); the world runs on its last settings` : st === 'error' ? `last turn failed (${esc(S.error || '')}); retried on the next wake` : st;
+    const c = R.clock || {}; $('govStatus').html = `<span class="gov__chip" data-s="${live ? esc(st) : 'replay'}">${esc(live ? st : 'Replay')}</span><span>${what}</span><span>pace <b>${R.lockstep != null ? `lockstep ${R.lockstep}` : R.pace ? `${R.pace} s a week` : 'no clock'}</b></span>${c.behindMs != null ? `<span>behind the clock <b>${fmt(c.behindMs / 1000)} s</b> over ${fmt(c.slowWeeks)} slow weeks</span>` : ''}<span>turns <b>${turns.length}</b></span><span>median lag <b>${med == null ? '–' : `${med} wk`}</b></span>${(R.governments || []).length > 1 ? `<span>government <b>${esc(R.governments.filter((g) => g.from <= t).at(-1)?.id || '')}</b> of ${R.governments.length}</span>` : ''}`; }
+  { const cash = f.h?.money ?? 0, cards = f.mkt?.mcap ?? 0, share = G.T / Math.max(1, cash + G.T + cards), ap = G.approval;
+    const tiles = [['Treasury', fmt(G.T)], ['Own account', fmt(G.acct)], ['Revenue this week', fmt(G.rev)], ['Spending this week', fmt(G.spend)], ['Paid of what was owed', G.frac ? pct(Math.min(...Object.values(G.frac))) : '–'], ['Treasury share (cards at marks)', pct(share)], ['Board tone', G.board ? (G.board.tone >= 0 ? '+' : '') + G.board.tone.toFixed(2) : '–'], ...(ap ? [['Approval so far', ap.share == null ? '–' : pct(ap.share)]] : [])];
+    $('govStats').html = tiles.map(([k, v]) => `<div class="stat"><span>${k}</span><b>${v}</b></div>`).join(''); }
+  const T = FRAMES.map((x) => x.gov?.T ?? null), A = FRAMES.map((x) => x.gov?.acct ?? null);
+  line('govT', [{ data: T, color: SYS.blue, fill: true }, { data: A, color: SYS.orange }], { fy: fmt, min: 0 });
+  line('govRS', [{ data: FRAMES.map((x) => x.gov?.rev ?? null), color: SYS.green }, { data: FRAMES.map((x) => x.gov?.spend ?? null), color: SYS.pink }, { data: FRAMES.map((x) => (x.gov ? -(x.gov.lines?.consumption || 0) : null)), color: SYS.orange, dash: true }], { fy: fmt, min: 0 });
+  { const c = charts.govT, cv = $('govT'); if (c && c.X && turns.length) { const x = cv.getContext('2d'), d = window.devicePixelRatio || 1; x.save(); x.setTransform(d, 0, 0, d, 0, 0); const Ht = cv.getBoundingClientRect().height; x.fillStyle = ink(0.35);
+    for (const e of turns) { const i = FRAMES.findIndex((q) => q.t === e.weekEffective); if (i >= 0 && i < n) x.fillRect(Math.round(c.X(i)), Ht - c.pad.b - 6, 1, 6); } x.restore(); } }
+  { const sum = (from) => { const o = {}; for (let i = Math.max(0, from); i < n; i++) for (const [k, v] of Object.entries(FRAMES[i].gov?.lines || {})) o[k] = (o[k] || 0) + v; return o; }, a = G.lines || {}, b = sum(n - 20), c = sum(0);
+    const keys = [...new Set([...Object.keys(c)])].sort((p, q) => (UI_GOV_REV.has(q) - UI_GOV_REV.has(p)) || Math.abs(c[q]) - Math.abs(c[p]));
+    $('govLines').tBodies[0].html = keys.map((k) => `<tr class="${UI_GOV_REV.has(k) ? 'rev' : k === 'consumption' ? 'co' : k === 'openingGrant' ? '' : 'sp'}"><td>${esc(UI_GOV_NAME[k] || k)}</td><td class="num">${fmt(a[k] || 0)}</td><td class="num">${fmt(b[k] || 0)}</td><td class="num">${fmt(c[k] || 0)}</td></tr>`).join('') || '<tr><td colspan="4" class="note">No ledger lines yet.</td></tr>'; }
+  $('govComm').html = turns.slice(-40).reverse().map((d) => `<div class="gov__item"><time>W${d.weekRead} → W${d.weekEffective}${d.gov && (R.governments || []).length > 1 ? ` · ${esc(d.gov)}` : ''}${d.budgetDay ? ' · budget day' : ''}</time>${d.commentary ? `<p>${esc(d.commentary)}</p>` : ''}<span class="note">${d.changes?.length ? d.changes.map((c) => esc(c.dial)).join(', ') : 'no changes'}${d.errors?.length ? ` · <span class="err">${d.errors.length} rejected: ${d.errors.map((e) => esc(e.dial ?? 'controls')).join(', ')}</span>` : ''}${d.facts && !d.facts.ok ? ` · <span class="err">turn failed</span>` : ''}</span></div>`).join('') || '<p class="note">No turns yet.</p>';
+  $('govBoard').html = turns.filter((d) => d.board?.text).slice(-30).reverse().map((d) => { const p = d.board.parsed || {}; const ment = (p.mentions || []).map((m) => `${esc(m.name)} ${m.dir > 0 ? '▲' : m.dir < 0 ? '▼' : '·'}`).join(', '); const dl = Object.entries(p.dials || {}).map(([k, v]) => `${esc(k)} ${v > 0 ? '▲' : '▼'}`).join(', ');
+    return `<div class="gov__item"><time>W${d.weekEffective}</time><p>${esc(d.board.text)}</p><span class="note">tone ${(p.tone ?? 0).toFixed(2)}${ment ? ` · players: ${ment}` : ''}${dl ? ` · dials: ${dl}` : ''}</span></div>`; }).join('') || '<p class="note">Nothing posted yet.</p>';
+  { const V = (R.nbVersions || []).filter((v) => v.week <= t + 1), cur1 = V.at(-1), prev = cur1 ? V.slice(0, -1).reverse().find((v) => v.gov === cur1.gov) : null, old = new Set((prev?.text || '').split('\n'));
+    $('govNbNote').textContent = cur1 ? `${cur1.gov} · as of week ${cur1.week} · ${cur1.text.length.toLocaleString()} characters · new lines marked` : 'its own file · new lines marked';
+    $('govNb').html = cur1 ? cur1.text.split('\n').map((l) => (l && !old.has(l) ? `<span class="new">${esc(l)}</span>` : esc(l))).join('\n') : '<span class="note">Empty.</span>'; }
+  $('govDials').html = D.flatMap((d) => (d.changes || []).map((c) => [d.weekEffective, c, d.type === 'arm' ? d.arm : d.gov])).slice(-200).reverse().map(([w, c, who]) => `<div class="gov__dial"><time>W${w}</time><code>${esc(c.dial)}</code><span>${esc(uiGovVal(c.old))} → ${esc(uiGovVal(c.new))}</span></div>`).join('') || '<p class="note">No dial changed yet.</p>';
+}
 /* ---------- Start ---------- */
 // Live AI run: the runner (node run.mjs --serve PORT) serves this page with window.LIVE_RUN set. New weeks stream in
 // every few seconds; the view follows the newest week unless it has been scrubbed back.
@@ -1397,9 +1433,9 @@ async function followLive(url) {
   const pull = async () => {
     try {
       const r = await fetch(`${url}?since=${run ? FRAMES.length : 0}`, { cache: 'no-store' }); const d = await r.json();
-      if (!run) { if (!d.frames.length) throw new Error('no weeks yet'); run = { meta: d.meta, config: d.config, frames: d.frames, memos: d.memos }; startReplay(run); cursor = FRAMES.length - 1; setPlay(false); redrawAll(); }
-      else if (d.frames.length) { const following = cursor >= FRAMES.length - 1; for (const f of d.frames) { run.frames.push(f); pushFrame(f); for (const [s2, b2] of f.arcs || []) arcs.push({ s: s2, b: b2, age: 0 }); } run.meta = d.meta; run.memos = d.memos; if (following) cursor = FRAMES.length - 1; drawCharts(); drawPanels(); }
-      const m = d.meta || {}; $('hyp').innerHTML = `<b>Live AI run ${esc(m.id || '')}.</b> Week ${FRAMES.length - 1} of ${m.weeksPlanned} · ${m.calls} decisions · ${m.errors} errors · $${(m.costUsd || 0).toFixed(2)} list-price usage${m.stopped ? ` · stopped: ${esc(m.stopped)}` : ''}. The view follows the newest week.`;
+      if (!run) { if (!d.frames.length) throw new Error('no weeks yet'); run = { meta: d.meta, config: d.config, frames: d.frames, memos: d.memos, gov: d.gov }; startReplay(run); cursor = FRAMES.length - 1; setPlay(false); redrawAll(); }
+      else if (d.frames.length) { const following = cursor >= FRAMES.length - 1; for (const f of d.frames) { run.frames.push(f); pushFrame(f); for (const [s2, b2] of f.arcs || []) arcs.push({ s: s2, b: b2, age: 0 }); } run.meta = d.meta; run.memos = d.memos; if (d.gov) run.gov = d.gov; if (following) cursor = FRAMES.length - 1; drawCharts(); drawPanels(); }
+      const m = d.meta || {}; if (m.source === 'regulate.mjs') $('hyp').innerHTML = `<b>Live government run ${esc(m.id || '')}.</b> Week ${FRAMES.length - 1} · government ${esc(m.government || '')} · ${(d.gov?.decisions || []).filter((x) => x.type === 'turn').length} turns · pace ${m.pace ? `${m.pace} s a week` : 'no clock'}. The view follows the newest week; its panel is under Government.`; else $('hyp').innerHTML = `<b>Live AI run ${esc(m.id || '')}.</b> Week ${FRAMES.length - 1} of ${m.weeksPlanned} · ${m.calls} decisions · ${m.errors} errors · $${(m.costUsd || 0).toFixed(2)} list-price usage${m.stopped ? ` · stopped: ${esc(m.stopped)}` : ''}. The view follows the newest week.`;
     } catch (err) { $('hyp').innerHTML = `<b>Waiting for the run…</b> (${esc(err.message)})`; }
     setTimeout(pull, 3000);
   };
@@ -1434,6 +1470,7 @@ function applyLayout() {
     r.hidden = LAY.hideRow.includes(r.dataset.row) || (ps.length > 0 && vis === 0);
     if (r.classList.contains('grid') || r.classList.contains('desk') || r.classList.contains('movers')) { r.classList.remove('n1', 'n2', 'n3', 'n4', 'n5'); const top = [...r.children].filter((c) => !c.hidden && !(c.classList.contains('stack') && panelsOf(c).every((p) => p.hidden))); for (const c of r.children) if (c.classList.contains('stack')) c.hidden = panelsOf(c).every((p) => p.hidden); if (top.length < r.children.length) r.classList.add('n' + Math.max(1, top.length)); }
   }
+  { const gp = $('govPanel'); if (gp && !GOV_ON) gp.hidden = true; } // only a run with a government shows its panel
   ACCT_UI.weeks = 8; wake = true; drawLayoutPanel(); drawNav();
 }
 function moveRow(key, d) { const keys = [...WRAP.children].filter((el) => el.dataset.row).map((el) => el.dataset.row), i = keys.indexOf(key), j = i + d; if (i < 0 || j < 0 || j >= keys.length) return; [keys[i], keys[j]] = [keys[j], keys[i]]; LAY.order = keys; saveLay(); applyLayout(); }
