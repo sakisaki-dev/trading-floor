@@ -15,6 +15,12 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 
 ## [Unreleased]
 
+### Added
+
+- `docs/PARALLELS.md`: real-world parallels for each finding, with sources, how close each mechanism is and where it
+  breaks; a summary table in the README. `scripts/summarize_run.mjs` and `results/runs/`: per-generation summaries of
+  the four engine 2.0 runs it cites (seeds 83148, 9556, 24306, 38148). Documentation and tooling only.
+
 ### Changed
 
 - The page opens on a new preset, Realism · 250 bots (faster): the Realism laws with `botScale: 1`, about half the bots and about twice the speed to watch. Realism itself is unchanged and still matches `configs/realism.json`.

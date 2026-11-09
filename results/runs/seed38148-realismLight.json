@@ -1,0 +1,3465 @@
+{
+ "source": "page-seed38148-realismLight-w996.json",
+ "seed": 38148,
+ "preset": "realismLight",
+ "weeks": 996,
+ "savedAt": "2026-11-08T19:08:32.669Z",
+ "presetRules": {
+  "allowance": 200,
+  "livingCost": 200,
+  "lifestyle": 0.0005,
+  "royaltyFunding": "minted",
+  "royaltyRate": 0.05,
+  "holdCost": 0.0005,
+  "wealthTax": 0.001,
+  "wealthTaxTo": "equal",
+  "wealthTaxForced": true,
+  "outsideCollectors": true,
+  "outsideMode": "value",
+  "outsideBudget": 100000,
+  "outsideNews": true,
+  "guideOn": true,
+  "guideEvery": 4,
+  "guideLag": 1,
+  "fee": 0.01,
+  "centralBank": false,
+  "closedEconomy": false,
+  "markRule": "book",
+  "markHalfLife": 4,
+  "priceRule": "comps",
+  "compsWeeks": 4,
+  "singleBidder": "own",
+  "forcedSale": "book",
+  "forcedOrder": "network",
+  "liquidation": "auction",
+  "vaultIndex": "repeatSales",
+  "priceAnchor": true,
+  "priceRange": 0.6,
+  "keepMax": 1,
+  "rateMax": 0.05,
+  "priceMap": "log",
+  "priceLogK": 0.6,
+  "priceClamp": 50,
+  "rateMap": "log",
+  "rateLogMid": 0.025,
+  "rateClamp": 10,
+  "deployOrders": 40,
+  "maxListings": 10,
+  "maxShorts": 30,
+  "maxPacks": 8,
+  "fitnessValue": "bid",
+  "evolve": true,
+  "evolveShare": 0.1,
+  "nnFitnessGens": 6,
+  "practiceGens": 3,
+  "adaptOn": true,
+  "adaptEvery": 10,
+  "adaptSize": 0.05,
+  "quitRule": "network",
+  "mortality": true,
+  "lifespan": [
+   6,
+   14
+  ],
+  "heirs": 1,
+  "estateSale": 0.4,
+  "cashShockChance": 0.005,
+  "cashShockSize": 0.1,
+  "lossRate": 0.01,
+  "turnover": true,
+  "entryRate": 0.25,
+  "entryHype": 1,
+  "entryReturns": 1,
+  "entryNews": 1,
+  "botScale": 1,
+  "valueModel": "league",
+  "valueBasis": "form",
+  "formSeasons": 2,
+  "rookieRule": "measured",
+  "injuries": true,
+  "injuryByAge": true,
+  "retirement": true,
+  "retirementByAge": true,
+  "awards": true,
+  "rookies": true,
+  "pressure": true,
+  "pressureStrength": 1,
+  "hypeInjury": 0,
+  "startSeason": "latest",
+  "leagueFill": "full",
+  "games": true,
+  "prizeShare": 0,
+  "gameFloor": null,
+  "credit": true,
+  "maxLTV": 0.6,
+  "marginCall": 0.75,
+  "loanWeeks": 8,
+  "shorting": true,
+  "fashion": false,
+  "store": false,
+  "priceLimit": 0,
+  "positionLimit": 0,
+  "capPoorest": false,
+  "leagueUpdates": false,
+  "printRunK": 40,
+  "printRunExp": 0.5,
+  "printRunMin": 2,
+  "printRunValueFloor": 0.5,
+  "printRunUnit": 100,
+  "poolMultiplier": 10,
+  "packsPerWeek": 33,
+  "packMix": {
+   "standard": 0.75,
+   "premium": 0.21,
+   "elite": 0.025,
+   "holo": 0.015
+  },
+  "startCash": 20000,
+  "newcomerCashSd": 0.5,
+  "concentrationFree": 3,
+  "concentrationSlope": 0.06,
+  "itemHaircut": 0.9,
+  "nnResearchError": 0.2,
+  "gameNoise": 0.4,
+  "formBlendSeasons": 2,
+  "championWeight": "production",
+  "rngStreams": "split",
+  "awardWinner": "top"
+ },
+ "startingRules": {
+  "seed": 38148
+ },
+ "end": {
+  "week": 996,
+  "bots": 167,
+  "lineages": {
+   "count": 57,
+   "depth": 18,
+   "topShare": 0.447,
+   "topSize": 49
+  },
+  "indexes": {
+   "vault": 299.27,
+   "marks": 406.999,
+   "value": 636.07,
+   "priceOverValue": 0.622
+  },
+  "gini": 0.693,
+  "cashShare": [
+   0.734,
+   0.24,
+   0.026
+  ],
+  "auctionOverMark": 2.168,
+  "topCards": [
+   {
+    "label": "RB Logan Ayomanor · Gold Prizm, Prizm Black 1/1",
+    "mark": 700069,
+    "value": 946700
+   },
+   {
+    "label": "WR Rob Diehl II · Base Autograph, Patch 5/10, Ballpoint blue, throwback",
+    "mark": 665283,
+    "value": 572909
+   },
+   {
+    "label": "WR Vyncint Heath · Holo Locker",
+    "mark": 626458,
+    "value": 530085
+   }
+  ]
+ },
+ "generations": [
+  {
+   "gen": 1,
+   "week": 20,
+   "population": 259,
+   "indexes": {
+    "vault": 77.864,
+    "marks": 122.318,
+    "value": 300.505,
+    "priceOverValue": 0.39
+   },
+   "gini": 0.307,
+   "worthShare": [
+    0.23,
+    0.484,
+    0.286
+   ],
+   "cashShare": [
+    0.408,
+    0.469,
+    0.123
+   ],
+   "auctionOverMark": 1.824,
+   "book": {
+    "noOrders": 0.383,
+    "bids": 1247,
+    "asks": 2023,
+    "bidDistLog": -0.255
+   },
+   "credit": {
+    "offered": 472070,
+    "asked": 1762120,
+    "lent": 195172,
+    "debt": 1201136
+   },
+   "returnCarryOver": null,
+   "largestFamily": 0.004,
+   "exits": {},
+   "entries": 9,
+   "heirs": 0,
+   "quitNewMedian": 0.395,
+   "tactics": [
+    {
+     "id": 1,
+     "share": 0.504,
+     "ret": 0.346,
+     "name": "trades with dealers and outsiders (62% of its trades), sells a lot (~72 a gen), rarely trades at auction (16% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 2,
+     "share": 0.496,
+     "ret": 0.2,
+     "name": "trades with other bots (82% of its trades), sells less than most (~15 a gen), trades at auction (63% of its trades)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 2,
+   "week": 40,
+   "population": 243,
+   "indexes": {
+    "vault": 77.611,
+    "marks": 209.803,
+    "value": 345.322,
+    "priceOverValue": 0.585
+   },
+   "gini": 0.406,
+   "worthShare": [
+    0.269,
+    0.514,
+    0.217
+   ],
+   "cashShare": [
+    0.471,
+    0.459,
+    0.07
+   ],
+   "auctionOverMark": 1.769,
+   "book": {
+    "noOrders": 0.478,
+    "bids": 1287,
+    "asks": 1588,
+    "bidDistLog": -0.249
+   },
+   "credit": {
+    "offered": 642437,
+    "asked": 1850007,
+    "lent": 374860,
+    "debt": 1906995
+   },
+   "returnCarryOver": -0.174,
+   "largestFamily": 0.012,
+   "exits": {
+    "chose to leave": 28
+   },
+   "entries": 12,
+   "heirs": 0,
+   "quitNewMedian": 0.517,
+   "tactics": [
+    {
+     "id": 1,
+     "share": 0.575,
+     "ret": 0.631,
+     "name": "rarely trades at auction (11% of its trades), trades with dealers and outsiders (60% of its trades), buys 9% below the mark",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 2,
+     "share": 0.425,
+     "ret": 0.651,
+     "name": "trades at auction (69% of its trades), trades with other bots (76% of its trades), buys 57% above the mark",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 3,
+   "week": 60,
+   "population": 229,
+   "indexes": {
+    "vault": 71.64,
+    "marks": 233.047,
+    "value": 375.486,
+    "priceOverValue": 0.601
+   },
+   "gini": 0.447,
+   "worthShare": [
+    0.293,
+    0.521,
+    0.186
+   ],
+   "cashShare": [
+    0.514,
+    0.428,
+    0.058
+   ],
+   "auctionOverMark": 1.635,
+   "book": {
+    "noOrders": 0.519,
+    "bids": 1004,
+    "asks": 1358,
+    "bidDistLog": -0.335
+   },
+   "credit": {
+    "offered": 579561,
+    "asked": 1810128,
+    "lent": 66722,
+    "debt": 2232315
+   },
+   "returnCarryOver": -0.12,
+   "largestFamily": 0.022,
+   "exits": {
+    "chose to leave": 27
+   },
+   "entries": 13,
+   "heirs": 0,
+   "quitNewMedian": 0.399,
+   "tactics": [
+    {
+     "id": 1,
+     "share": 0.511,
+     "ret": 0.46,
+     "name": "rarely trades at auction (12% of its trades), sells 10% below the price guide, trades with dealers and outsiders (65% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 2,
+     "share": 0.489,
+     "ret": 0.258,
+     "name": "trades at auction (66% of its trades), sells 38% above the price guide, trades with other bots (70% of its trades)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 4,
+   "week": 80,
+   "population": 213,
+   "indexes": {
+    "vault": 82.915,
+    "marks": 240.791,
+    "value": 396.131,
+    "priceOverValue": 0.594
+   },
+   "gini": 0.531,
+   "worthShare": [
+    0.352,
+    0.519,
+    0.13
+   ],
+   "cashShare": [
+    0.595,
+    0.369,
+    0.036
+   ],
+   "auctionOverMark": 1.505,
+   "book": {
+    "noOrders": 0.519,
+    "bids": 1234,
+    "asks": 1468,
+    "bidDistLog": -0.248
+   },
+   "credit": {
+    "offered": 1379039,
+    "asked": 1175573,
+    "lent": 471708,
+    "debt": 1971574
+   },
+   "returnCarryOver": -0.047,
+   "largestFamily": 0.038,
+   "exits": {
+    "chose to leave": 27
+   },
+   "entries": 11,
+   "heirs": 0,
+   "quitNewMedian": 0.476,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.524,
+     "ret": 0.078,
+     "name": "trades at auction (67% of its trades), trades with other bots (70% of its trades), keeps 15% in cash",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.476,
+     "ret": -0.087,
+     "name": "rarely trades at auction (12% of its trades), trades with dealers and outsiders (67% of its trades), keeps 61% in cash",
+     "cannibalizedBy": 2
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 5,
+   "week": 100,
+   "population": 194,
+   "indexes": {
+    "vault": 87.703,
+    "marks": 261.883,
+    "value": 432.424,
+    "priceOverValue": 0.595
+   },
+   "gini": 0.525,
+   "worthShare": [
+    0.348,
+    0.516,
+    0.136
+   ],
+   "cashShare": [
+    0.607,
+    0.349,
+    0.044
+   ],
+   "auctionOverMark": 1.69,
+   "book": {
+    "noOrders": 0.518,
+    "bids": 1175,
+    "asks": 1288,
+    "bidDistLog": -0.225
+   },
+   "credit": {
+    "offered": 851959,
+    "asked": 1070606,
+    "lent": 222464,
+    "debt": 1739917
+   },
+   "returnCarryOver": -0.245,
+   "largestFamily": 0.036,
+   "exits": {
+    "chose to leave": 23
+   },
+   "entries": 4,
+   "heirs": 0,
+   "quitNewMedian": 0.399,
+   "tactics": [
+    {
+     "id": 1,
+     "share": 0.536,
+     "ret": 0.296,
+     "name": "rarely trades at auction (14% of its trades), trades with dealers and outsiders (63% of its trades), keeps 56% in cash",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 2,
+     "share": 0.464,
+     "ret": 0.858,
+     "name": "trades at auction (68% of its trades), trades with other bots (73% of its trades), keeps 12% in cash",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 6,
+   "week": 120,
+   "population": 185,
+   "indexes": {
+    "vault": 76.151,
+    "marks": 281.456,
+    "value": 474.854,
+    "priceOverValue": 0.613
+   },
+   "gini": 0.545,
+   "worthShare": [
+    0.376,
+    0.497,
+    0.126
+   ],
+   "cashShare": [
+    0.588,
+    0.37,
+    0.042
+   ],
+   "auctionOverMark": 1.394,
+   "book": {
+    "noOrders": 0.571,
+    "bids": 1512,
+    "asks": 1290,
+    "bidDistLog": -0.14
+   },
+   "credit": {
+    "offered": 843011,
+    "asked": 596739,
+    "lent": 111986,
+    "debt": 1955516
+   },
+   "returnCarryOver": -0.026,
+   "largestFamily": 0.049,
+   "exits": {
+    "chose to leave": 17,
+    "died (heirs took over)": 21
+   },
+   "entries": 8,
+   "heirs": 21,
+   "quitNewMedian": 0.539,
+   "tactics": [
+    {
+     "id": 1,
+     "share": 0.599,
+     "ret": 0.19,
+     "name": "rarely trades at auction (13% of its trades), trades with dealers and outsiders (63% of its trades), buys 7% below the mark",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 2,
+     "share": 0.401,
+     "ret": 0.649,
+     "name": "trades at auction (77% of its trades), trades with other bots (77% of its trades), buys 50% above the mark",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 7,
+   "week": 140,
+   "population": 179,
+   "indexes": {
+    "vault": 83.037,
+    "marks": 333.911,
+    "value": 501.421,
+    "priceOverValue": 0.687
+   },
+   "gini": 0.571,
+   "worthShare": [
+    0.386,
+    0.505,
+    0.109
+   ],
+   "cashShare": [
+    0.674,
+    0.306,
+    0.02
+   ],
+   "auctionOverMark": 1.482,
+   "book": {
+    "noOrders": 0.569,
+    "bids": 985,
+    "asks": 1319,
+    "bidDistLog": -0.226
+   },
+   "credit": {
+    "offered": 1699312,
+    "asked": 1771625,
+    "lent": 58106,
+    "debt": 1259693
+   },
+   "returnCarryOver": -0.068,
+   "largestFamily": 0.056,
+   "exits": {
+    "chose to leave": 9,
+    "died (heirs took over)": 10
+   },
+   "entries": 3,
+   "heirs": 10,
+   "quitNewMedian": 0.33,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.542,
+     "ret": 0.175,
+     "name": "trades at auction (62% of its trades), buys 32% above the mark, sells 33% above the price guide",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.458,
+     "ret": 0.73,
+     "name": "rarely trades at auction (14% of its trades), buys 18% below the mark, sells 10% below the price guide",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 8,
+   "week": 160,
+   "population": 173,
+   "indexes": {
+    "vault": 88.733,
+    "marks": 356.403,
+    "value": 510.582,
+    "priceOverValue": 0.705
+   },
+   "gini": 0.588,
+   "worthShare": [
+    0.386,
+    0.515,
+    0.099
+   ],
+   "cashShare": [
+    0.579,
+    0.392,
+    0.03
+   ],
+   "auctionOverMark": 1.316,
+   "book": {
+    "noOrders": 0.562,
+    "bids": 1681,
+    "asks": 1297,
+    "bidDistLog": -0.149
+   },
+   "credit": {
+    "offered": 1503579,
+    "asked": 1814975,
+    "lent": 298005,
+    "debt": 1968293
+   },
+   "returnCarryOver": -0.164,
+   "largestFamily": 0.064,
+   "exits": {
+    "chose to leave": 14,
+    "died (heirs took over)": 22
+   },
+   "entries": 8,
+   "heirs": 22,
+   "quitNewMedian": 0.402,
+   "tactics": [
+    {
+     "id": 1,
+     "share": 0.512,
+     "ret": 4.586,
+     "name": "rarely trades at auction (13% of its trades), trades with dealers and outsiders (68% of its trades), buys 12% below the mark",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 2,
+     "share": 0.488,
+     "ret": 0.609,
+     "name": "trades at auction (70% of its trades), trades with other bots (68% of its trades), buys 37% above the mark",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 9,
+   "week": 180,
+   "population": 186,
+   "indexes": {
+    "vault": 97.382,
+    "marks": 383.88,
+    "value": 523.518,
+    "priceOverValue": 0.745
+   },
+   "gini": 0.613,
+   "worthShare": [
+    0.421,
+    0.491,
+    0.088
+   ],
+   "cashShare": [
+    0.643,
+    0.323,
+    0.034
+   ],
+   "auctionOverMark": 1.624,
+   "book": {
+    "noOrders": 0.555,
+    "bids": 1576,
+    "asks": 1400,
+    "bidDistLog": -0.231
+   },
+   "credit": {
+    "offered": 1104554,
+    "asked": 1524291,
+    "lent": 313242,
+    "debt": 2267727
+   },
+   "returnCarryOver": -0.089,
+   "largestFamily": 0.059,
+   "exits": {
+    "chose to leave": 7,
+    "died (heirs took over)": 23
+   },
+   "entries": 20,
+   "heirs": 23,
+   "quitNewMedian": 0.386,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.508,
+     "ret": 4.049,
+     "name": "trades at auction (67% of its trades), buys 39% above the mark, trades with other bots (71% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.492,
+     "ret": 1.346,
+     "name": "rarely trades at auction (14% of its trades), buys 13% below the mark, trades with dealers and outsiders (65% of its trades)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 10,
+   "week": 200,
+   "population": 176,
+   "indexes": {
+    "vault": 116.53,
+    "marks": 421.548,
+    "value": 550.921,
+    "priceOverValue": 0.807
+   },
+   "gini": 0.626,
+   "worthShare": [
+    0.436,
+    0.484,
+    0.081
+   ],
+   "cashShare": [
+    0.647,
+    0.313,
+    0.04
+   ],
+   "auctionOverMark": 1.733,
+   "book": {
+    "noOrders": 0.492,
+    "bids": 2063,
+    "asks": 1996,
+    "bidDistLog": -0.238
+   },
+   "credit": {
+    "offered": 1602650,
+    "asked": 2370600,
+    "lent": 508085,
+    "debt": 2357003
+   },
+   "returnCarryOver": -0.017,
+   "largestFamily": 0.068,
+   "exits": {
+    "chose to leave": 22,
+    "died (heirs took over)": 14
+   },
+   "entries": 12,
+   "heirs": 14,
+   "quitNewMedian": 0.38,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.506,
+     "ret": 1.189,
+     "name": "trades at auction (65% of its trades), buys 39% above the mark, trades with other bots (71% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.494,
+     "ret": 0.553,
+     "name": "rarely trades at auction (12% of its trades), buys 17% below the mark, trades with dealers and outsiders (61% of its trades)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 11,
+   "week": 220,
+   "population": 175,
+   "indexes": {
+    "vault": 100.352,
+    "marks": 441.733,
+    "value": 566.316,
+    "priceOverValue": 0.832
+   },
+   "gini": 0.655,
+   "worthShare": [
+    0.475,
+    0.458,
+    0.067
+   ],
+   "cashShare": [
+    0.743,
+    0.24,
+    0.017
+   ],
+   "auctionOverMark": 1.131,
+   "book": {
+    "noOrders": 0.569,
+    "bids": 1183,
+    "asks": 1761,
+    "bidDistLog": -0.283
+   },
+   "credit": {
+    "offered": 1880772,
+    "asked": 1557978,
+    "lent": 524101,
+    "debt": 3150113
+   },
+   "returnCarryOver": -0.161,
+   "largestFamily": 0.074,
+   "exits": {
+    "chose to leave": 15,
+    "died (heirs took over)": 18
+   },
+   "entries": 14,
+   "heirs": 18,
+   "quitNewMedian": 0.403,
+   "tactics": [
+    {
+     "id": 1,
+     "share": 0.533,
+     "ret": 1.408,
+     "name": "rarely trades at auction (14% of its trades), trades with dealers and outsiders (63% of its trades), buys at the price guide",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 2,
+     "share": 0.467,
+     "ret": 0.121,
+     "name": "trades at auction (67% of its trades), trades with other bots (72% of its trades), buys 65% above the price guide",
+     "cannibalizedBy": 1
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 12,
+   "week": 240,
+   "population": 172,
+   "indexes": {
+    "vault": 109.232,
+    "marks": 461.117,
+    "value": 571.799,
+    "priceOverValue": 0.871
+   },
+   "gini": 0.656,
+   "worthShare": [
+    0.468,
+    0.468,
+    0.064
+   ],
+   "cashShare": [
+    0.675,
+    0.3,
+    0.025
+   ],
+   "auctionOverMark": 1.497,
+   "book": {
+    "noOrders": 0.583,
+    "bids": 1234,
+    "asks": 1708,
+    "bidDistLog": -0.191
+   },
+   "credit": {
+    "offered": 1234962,
+    "asked": 2029453,
+    "lent": 266747,
+    "debt": 1643160
+   },
+   "returnCarryOver": -0.126,
+   "largestFamily": 0.081,
+   "exits": {
+    "chose to leave": 14,
+    "died (heirs took over)": 19
+   },
+   "entries": 11,
+   "heirs": 19,
+   "quitNewMedian": 0.385,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.568,
+     "ret": 0.142,
+     "name": "trades at auction (71% of its trades), trades with other bots (72% of its trades), buys 28% above the mark",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.432,
+     "ret": 3.652,
+     "name": "rarely trades at auction (15% of its trades), trades with dealers and outsiders (67% of its trades), buys 18% below the mark",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 13,
+   "week": 260,
+   "population": 165,
+   "indexes": {
+    "vault": 95.557,
+    "marks": 458.558,
+    "value": 589.529,
+    "priceOverValue": 0.791
+   },
+   "gini": 0.669,
+   "worthShare": [
+    0.493,
+    0.444,
+    0.064
+   ],
+   "cashShare": [
+    0.724,
+    0.25,
+    0.026
+   ],
+   "auctionOverMark": 1.185,
+   "book": {
+    "noOrders": 0.593,
+    "bids": 1132,
+    "asks": 1918,
+    "bidDistLog": -0.199
+   },
+   "credit": {
+    "offered": 1221486,
+    "asked": 1918066,
+    "lent": 63140,
+    "debt": 2240767
+   },
+   "returnCarryOver": -0.011,
+   "largestFamily": 0.085,
+   "exits": {
+    "chose to leave": 18,
+    "died (heirs took over)": 17
+   },
+   "entries": 11,
+   "heirs": 17,
+   "quitNewMedian": 0.39,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.583,
+     "ret": 0.434,
+     "name": "holds ~25 weeks, trades at auction (64% of its trades), trades with other bots (68% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.417,
+     "ret": 4.505,
+     "name": "holds ~5.3 weeks, rarely trades at auction (17% of its trades), trades with dealers and outsiders (65% of its trades)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 14,
+   "week": 280,
+   "population": 157,
+   "indexes": {
+    "vault": 104.506,
+    "marks": 485.176,
+    "value": 599.514,
+    "priceOverValue": 0.828
+   },
+   "gini": 0.68,
+   "worthShare": [
+    0.502,
+    0.437,
+    0.061
+   ],
+   "cashShare": [
+    0.757,
+    0.229,
+    0.013
+   ],
+   "auctionOverMark": 1.295,
+   "book": {
+    "noOrders": 0.619,
+    "bids": 952,
+    "asks": 1844,
+    "bidDistLog": -0.193
+   },
+   "credit": {
+    "offered": 1379147,
+    "asked": 2920200,
+    "lent": 553445,
+    "debt": 2709596
+   },
+   "returnCarryOver": -0.105,
+   "largestFamily": 0.083,
+   "exits": {
+    "chose to leave": 13,
+    "died (heirs took over)": 18
+   },
+   "entries": 5,
+   "heirs": 18,
+   "quitNewMedian": 0.286,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.571,
+     "ret": 0.086,
+     "name": "trades at auction (74% of its trades), trades with other bots (74% of its trades), buys 32% above the mark",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.429,
+     "ret": 2.2,
+     "name": "rarely trades at auction (24% of its trades), trades with dealers and outsiders (63% of its trades), buys 12% below the mark",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 15,
+   "week": 300,
+   "population": 150,
+   "indexes": {
+    "vault": 110.637,
+    "marks": 483.736,
+    "value": 605.913,
+    "priceOverValue": 0.803
+   },
+   "gini": 0.665,
+   "worthShare": [
+    0.474,
+    0.463,
+    0.063
+   ],
+   "cashShare": [
+    0.707,
+    0.269,
+    0.023
+   ],
+   "auctionOverMark": 1.347,
+   "book": {
+    "noOrders": 0.678,
+    "bids": 896,
+    "asks": 1328,
+    "bidDistLog": -0.249
+   },
+   "credit": {
+    "offered": 1722920,
+    "asked": 4120086,
+    "lent": 190241,
+    "debt": 2101780
+   },
+   "returnCarryOver": -0.011,
+   "largestFamily": 0.073,
+   "exits": {
+    "chose to leave": 11,
+    "died (heirs took over)": 8
+   },
+   "entries": 4,
+   "heirs": 8,
+   "quitNewMedian": 0.314,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.55,
+     "ret": 1.175,
+     "name": "trades at auction (77% of its trades), trades with other bots (78% of its trades), keeps 13% in cash",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.45,
+     "ret": 1.246,
+     "name": "rarely trades at auction (20% of its trades), trades with dealers and outsiders (68% of its trades), keeps 59% in cash",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 16,
+   "week": 320,
+   "population": 157,
+   "indexes": {
+    "vault": 100.864,
+    "marks": 457.196,
+    "value": 611.392,
+    "priceOverValue": 0.764
+   },
+   "gini": 0.656,
+   "worthShare": [
+    0.459,
+    0.481,
+    0.06
+   ],
+   "cashShare": [
+    0.659,
+    0.313,
+    0.028
+   ],
+   "auctionOverMark": 1.572,
+   "book": {
+    "noOrders": 0.634,
+    "bids": 1234,
+    "asks": 1916,
+    "bidDistLog": -0.218
+   },
+   "credit": {
+    "offered": 1100492,
+    "asked": 4270459,
+    "lent": 558636,
+    "debt": 1761628
+   },
+   "returnCarryOver": 0.109,
+   "largestFamily": 0.083,
+   "exits": {
+    "chose to leave": 8,
+    "died (heirs took over)": 13
+   },
+   "entries": 15,
+   "heirs": 13,
+   "quitNewMedian": 0.428,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.53,
+     "ret": 0.698,
+     "name": "trades at auction (74% of its trades), keeps 11% in cash, trades with other bots (73% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.47,
+     "ret": 1.638,
+     "name": "rarely trades at auction (17% of its trades), keeps 65% in cash, trades with dealers and outsiders (69% of its trades)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 17,
+   "week": 340,
+   "population": 151,
+   "indexes": {
+    "vault": 105.574,
+    "marks": 475.427,
+    "value": 616.388,
+    "priceOverValue": 0.792
+   },
+   "gini": 0.641,
+   "worthShare": [
+    0.441,
+    0.487,
+    0.072
+   ],
+   "cashShare": [
+    0.621,
+    0.352,
+    0.027
+   ],
+   "auctionOverMark": 1.429,
+   "book": {
+    "noOrders": 0.612,
+    "bids": 1149,
+    "asks": 1927,
+    "bidDistLog": -0.195
+   },
+   "credit": {
+    "offered": 816519,
+    "asked": 4893785,
+    "lent": 358645,
+    "debt": 2850563
+   },
+   "returnCarryOver": -0.102,
+   "largestFamily": 0.08,
+   "exits": {
+    "chose to leave": 11,
+    "died (heirs took over)": 14
+   },
+   "entries": 5,
+   "heirs": 14,
+   "quitNewMedian": 0.442,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.536,
+     "ret": 0.182,
+     "name": "trades at auction (76% of its trades), trades with other bots (77% of its trades), holds ~30 weeks",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.464,
+     "ret": 1.5,
+     "name": "rarely trades at auction (19% of its trades), trades with dealers and outsiders (65% of its trades), holds ~5.7 weeks",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 18,
+   "week": 360,
+   "population": 150,
+   "indexes": {
+    "vault": 87.723,
+    "marks": 427.658,
+    "value": 615.943,
+    "priceOverValue": 0.698
+   },
+   "gini": 0.651,
+   "worthShare": [
+    0.468,
+    0.461,
+    0.071
+   ],
+   "cashShare": [
+    0.704,
+    0.269,
+    0.028
+   ],
+   "auctionOverMark": 1.438,
+   "book": {
+    "noOrders": 0.651,
+    "bids": 953,
+    "asks": 1549,
+    "bidDistLog": -0.217
+   },
+   "credit": {
+    "offered": 1368714,
+    "asked": 3476841,
+    "lent": 848919,
+    "debt": 2892130
+   },
+   "returnCarryOver": -0.155,
+   "largestFamily": 0.127,
+   "exits": {
+    "chose to leave": 8,
+    "died (heirs took over)": 15
+   },
+   "entries": 7,
+   "heirs": 15,
+   "quitNewMedian": 0.294,
+   "tactics": [
+    {
+     "id": 1,
+     "share": 0.533,
+     "ret": 1.063,
+     "name": "rarely trades at auction (18% of its trades), trades with dealers and outsiders (70% of its trades), keeps 59% in cash",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 2,
+     "share": 0.467,
+     "ret": 0.141,
+     "name": "trades at auction (79% of its trades), trades with other bots (75% of its trades), keeps 13% in cash",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 19,
+   "week": 380,
+   "population": 151,
+   "indexes": {
+    "vault": 95.631,
+    "marks": 404.648,
+    "value": 623.104,
+    "priceOverValue": 0.683
+   },
+   "gini": 0.685,
+   "worthShare": [
+    0.52,
+    0.414,
+    0.066
+   ],
+   "cashShare": [
+    0.693,
+    0.289,
+    0.018
+   ],
+   "auctionOverMark": 1.418,
+   "book": {
+    "noOrders": 0.678,
+    "bids": 915,
+    "asks": 1629,
+    "bidDistLog": -0.492
+   },
+   "credit": {
+    "offered": 866343,
+    "asked": 2906032,
+    "lent": 713903,
+    "debt": 2525199
+   },
+   "returnCarryOver": -0.059,
+   "largestFamily": 0.146,
+   "exits": {
+    "chose to leave": 6,
+    "died (heirs took over)": 8
+   },
+   "entries": 7,
+   "heirs": 8,
+   "quitNewMedian": 0.38,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.527,
+     "ret": 1.062,
+     "name": "trades at auction (76% of its trades), trades with other bots (73% of its trades), sells 34% above the price guide",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.473,
+     "ret": 0.308,
+     "name": "rarely trades at auction (20% of its trades), trades with dealers and outsiders (70% of its trades), sells 14% below the price guide",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 20,
+   "week": 400,
+   "population": 154,
+   "indexes": {
+    "vault": 95.137,
+    "marks": 434.964,
+    "value": 626.57,
+    "priceOverValue": 0.707
+   },
+   "gini": 0.702,
+   "worthShare": [
+    0.533,
+    0.41,
+    0.057
+   ],
+   "cashShare": [
+    0.69,
+    0.288,
+    0.022
+   ],
+   "auctionOverMark": 1.394,
+   "book": {
+    "noOrders": 0.681,
+    "bids": 944,
+    "asks": 1518,
+    "bidDistLog": -0.492
+   },
+   "credit": {
+    "offered": 641784,
+    "asked": 3429497,
+    "lent": 362030,
+    "debt": 2508924
+   },
+   "returnCarryOver": -0.02,
+   "largestFamily": 0.169,
+   "exits": {
+    "chose to leave": 8,
+    "died (heirs took over)": 12
+   },
+   "entries": 11,
+   "heirs": 12,
+   "quitNewMedian": 0.357,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.52,
+     "ret": 0.699,
+     "name": "trades at auction (72% of its trades), trades with other bots (71% of its trades), keeps 14% in cash",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.48,
+     "ret": 1.036,
+     "name": "rarely trades at auction (22% of its trades), trades with dealers and outsiders (67% of its trades), keeps 63% in cash",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 21,
+   "week": 420,
+   "population": 154,
+   "indexes": {
+    "vault": 112.245,
+    "marks": 434.126,
+    "value": 637.166,
+    "priceOverValue": 0.691
+   },
+   "gini": 0.712,
+   "worthShare": [
+    0.534,
+    0.416,
+    0.05
+   ],
+   "cashShare": [
+    0.773,
+    0.211,
+    0.016
+   ],
+   "auctionOverMark": 1.648,
+   "book": {
+    "noOrders": 0.715,
+    "bids": 1113,
+    "asks": 1083,
+    "bidDistLog": -0.439
+   },
+   "credit": {
+    "offered": 2040657,
+    "asked": 4277920,
+    "lent": 1449865,
+    "debt": 3169779
+   },
+   "returnCarryOver": -0.017,
+   "largestFamily": 0.182,
+   "exits": {
+    "chose to leave": 12,
+    "died (heirs took over)": 14
+   },
+   "entries": 12,
+   "heirs": 14,
+   "quitNewMedian": 0.437,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.644,
+     "ret": 0.042,
+     "name": "opens no packs, keeps 17% in cash, trades at auction (64% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.356,
+     "ret": 0.728,
+     "name": "opens packs (~22 a gen), keeps 66% in cash, rarely trades at auction (20% of its trades)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 22,
+   "week": 440,
+   "population": 153,
+   "indexes": {
+    "vault": 88.043,
+    "marks": 409.153,
+    "value": 641.357,
+    "priceOverValue": 0.654
+   },
+   "gini": 0.732,
+   "worthShare": [
+    0.569,
+    0.386,
+    0.045
+   ],
+   "cashShare": [
+    0.81,
+    0.179,
+    0.011
+   ],
+   "auctionOverMark": 1.701,
+   "book": {
+    "noOrders": 0.739,
+    "bids": 1044,
+    "asks": 1096,
+    "bidDistLog": -0.428
+   },
+   "credit": {
+    "offered": 1181323,
+    "asked": 4033411,
+    "lent": 496726,
+    "debt": 3618235
+   },
+   "returnCarryOver": -0.071,
+   "largestFamily": 0.17,
+   "exits": {
+    "chose to leave": 13,
+    "died (heirs took over)": 14
+   },
+   "entries": 12,
+   "heirs": 14,
+   "quitNewMedian": 0.391,
+   "tactics": [
+    {
+     "id": 1,
+     "share": 0.52,
+     "ret": 0.082,
+     "name": "rarely trades at auction (23% of its trades), keeps 66% in cash, trades with dealers and outsiders (62% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 2,
+     "share": 0.48,
+     "ret": 1.391,
+     "name": "trades at auction (75% of its trades), keeps 14% in cash, trades with other bots (70% of its trades)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 23,
+   "week": 460,
+   "population": 156,
+   "indexes": {
+    "vault": 106.674,
+    "marks": 417.532,
+    "value": 644.134,
+    "priceOverValue": 0.692
+   },
+   "gini": 0.739,
+   "worthShare": [
+    0.6,
+    0.35,
+    0.049
+   ],
+   "cashShare": [
+    0.824,
+    0.162,
+    0.014
+   ],
+   "auctionOverMark": 1.586,
+   "book": {
+    "noOrders": 0.768,
+    "bids": 727,
+    "asks": 976,
+    "bidDistLog": -0.712
+   },
+   "credit": {
+    "offered": 1368996,
+    "asked": 3305020,
+    "lent": 143930,
+    "debt": 2135792
+   },
+   "returnCarryOver": -0.111,
+   "largestFamily": 0.18,
+   "exits": {
+    "chose to leave": 9,
+    "died (heirs took over)": 13
+   },
+   "entries": 12,
+   "heirs": 13,
+   "quitNewMedian": 0.397,
+   "tactics": [
+    {
+     "id": 1,
+     "share": 0.517,
+     "ret": 0.697,
+     "name": "rarely trades at auction (22% of its trades), trades with dealers and outsiders (66% of its trades), keeps 62% in cash",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 2,
+     "share": 0.483,
+     "ret": 0.174,
+     "name": "trades at auction (77% of its trades), trades with other bots (74% of its trades), keeps 11% in cash",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 24,
+   "week": 480,
+   "population": 155,
+   "indexes": {
+    "vault": 105.661,
+    "marks": 443.643,
+    "value": 644.667,
+    "priceOverValue": 0.686
+   },
+   "gini": 0.747,
+   "worthShare": [
+    0.618,
+    0.333,
+    0.049
+   ],
+   "cashShare": [
+    0.827,
+    0.164,
+    0.009
+   ],
+   "auctionOverMark": 1.826,
+   "book": {
+    "noOrders": 0.749,
+    "bids": 886,
+    "asks": 1177,
+    "bidDistLog": -0.54
+   },
+   "credit": {
+    "offered": 3251179,
+    "asked": 3608634,
+    "lent": 94844,
+    "debt": 1265513
+   },
+   "returnCarryOver": -0.087,
+   "largestFamily": 0.213,
+   "exits": {
+    "chose to leave": 11,
+    "died (heirs took over)": 14
+   },
+   "entries": 10,
+   "heirs": 14,
+   "quitNewMedian": 0.388,
+   "tactics": [
+    {
+     "id": 1,
+     "share": 0.53,
+     "ret": 3.352,
+     "name": "rarely trades at auction (28% of its trades), trades with dealers and outsiders (62% of its trades), keeps 57% in cash",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 2,
+     "share": 0.47,
+     "ret": 0.034,
+     "name": "trades at auction (83% of its trades), trades with other bots (80% of its trades), keeps 7% in cash",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 25,
+   "week": 500,
+   "population": 159,
+   "indexes": {
+    "vault": 109.184,
+    "marks": 440.285,
+    "value": 644.151,
+    "priceOverValue": 0.733
+   },
+   "gini": 0.753,
+   "worthShare": [
+    0.636,
+    0.315,
+    0.049
+   ],
+   "cashShare": [
+    0.799,
+    0.186,
+    0.014
+   ],
+   "auctionOverMark": 1.663,
+   "book": {
+    "noOrders": 0.715,
+    "bids": 1341,
+    "asks": 1364,
+    "bidDistLog": -0.32
+   },
+   "credit": {
+    "offered": 1631119,
+    "asked": 3691085,
+    "lent": 613265,
+    "debt": 1852982
+   },
+   "returnCarryOver": 0.065,
+   "largestFamily": 0.226,
+   "exits": {
+    "chose to leave": 14,
+    "died (heirs took over)": 16
+   },
+   "entries": 18,
+   "heirs": 16,
+   "quitNewMedian": 0.351,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.507,
+     "ret": 0.318,
+     "name": "trades at auction (79% of its trades), trades with other bots (78% of its trades), keeps 13% in cash",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.493,
+     "ret": 2.78,
+     "name": "rarely trades at auction (24% of its trades), trades with dealers and outsiders (60% of its trades), keeps 60% in cash",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 26,
+   "week": 520,
+   "population": 163,
+   "indexes": {
+    "vault": 109.003,
+    "marks": 427.697,
+    "value": 639.7,
+    "priceOverValue": 0.689
+   },
+   "gini": 0.735,
+   "worthShare": [
+    0.589,
+    0.363,
+    0.048
+   ],
+   "cashShare": [
+    0.763,
+    0.22,
+    0.016
+   ],
+   "auctionOverMark": 1.824,
+   "book": {
+    "noOrders": 0.722,
+    "bids": 1607,
+    "asks": 1168,
+    "bidDistLog": -0.276
+   },
+   "credit": {
+    "offered": 900290,
+    "asked": 2919094,
+    "lent": 299281,
+    "debt": 1891252
+   },
+   "returnCarryOver": 0.097,
+   "largestFamily": 0.27,
+   "exits": {
+    "chose to leave": 8,
+    "died (heirs took over)": 12
+   },
+   "entries": 12,
+   "heirs": 12,
+   "quitNewMedian": 0.368,
+   "tactics": [
+    {
+     "id": 1,
+     "share": 0.551,
+     "ret": 0.995,
+     "name": "rarely trades at auction (18% of its trades), keeps 63% in cash, buys 12% below the mark",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 2,
+     "share": 0.449,
+     "ret": 0.218,
+     "name": "trades at auction (79% of its trades), keeps 14% in cash, buys 53% above the mark",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 27,
+   "week": 540,
+   "population": 155,
+   "indexes": {
+    "vault": 103.108,
+    "marks": 428.568,
+    "value": 639.7,
+    "priceOverValue": 0.679
+   },
+   "gini": 0.707,
+   "worthShare": [
+    0.562,
+    0.38,
+    0.057
+   ],
+   "cashShare": [
+    0.759,
+    0.227,
+    0.014
+   ],
+   "auctionOverMark": 1.523,
+   "book": {
+    "noOrders": 0.759,
+    "bids": 1608,
+    "asks": 1016,
+    "bidDistLog": -0.33
+   },
+   "credit": {
+    "offered": 2135111,
+    "asked": 2725314,
+    "lent": 151202,
+    "debt": 1168676
+   },
+   "returnCarryOver": 0.058,
+   "largestFamily": 0.336,
+   "exits": {
+    "chose to leave": 13,
+    "died (heirs took over)": 16
+   },
+   "entries": 5,
+   "heirs": 16,
+   "quitNewMedian": 0.361,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.5,
+     "ret": 0.122,
+     "name": "trades at auction (74% of its trades), keeps 17% in cash, trades with other bots (75% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.5,
+     "ret": 1.268,
+     "name": "rarely trades at auction (20% of its trades), keeps 65% in cash, trades with dealers and outsiders (60% of its trades)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 28,
+   "week": 560,
+   "population": 157,
+   "indexes": {
+    "vault": 137.382,
+    "marks": 450.493,
+    "value": 638.355,
+    "priceOverValue": 0.699
+   },
+   "gini": 0.714,
+   "worthShare": [
+    0.566,
+    0.377,
+    0.057
+   ],
+   "cashShare": [
+    0.771,
+    0.22,
+    0.009
+   ],
+   "auctionOverMark": 1.406,
+   "book": {
+    "noOrders": 0.759,
+    "bids": 1296,
+    "asks": 941,
+    "bidDistLog": -0.438
+   },
+   "credit": {
+    "offered": 2426546,
+    "asked": 3359315,
+    "lent": 416579,
+    "debt": 1475650
+   },
+   "returnCarryOver": -0.015,
+   "largestFamily": 0.35,
+   "exits": {
+    "chose to leave": 7,
+    "died (heirs took over)": 11
+   },
+   "entries": 9,
+   "heirs": 11,
+   "quitNewMedian": 0.338,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.566,
+     "ret": 0.231,
+     "name": "keeps 14% in cash, trades at auction (63% of its trades), opens fewer packs than most (~0.8 a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.434,
+     "ret": 0.43,
+     "name": "keeps 68% in cash, rarely trades at auction (21% of its trades), opens packs (~19 a gen)",
+     "cannibalizedBy": 2
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 29,
+   "week": 580,
+   "population": 156,
+   "indexes": {
+    "vault": 153.287,
+    "marks": 454.841,
+    "value": 636.07,
+    "priceOverValue": 0.714
+   },
+   "gini": 0.651,
+   "worthShare": [
+    0.482,
+    0.439,
+    0.079
+   ],
+   "cashShare": [
+    0.776,
+    0.209,
+    0.015
+   ],
+   "auctionOverMark": 1.537,
+   "book": {
+    "noOrders": 0.801,
+    "bids": 947,
+    "asks": 924,
+    "bidDistLog": -0.435
+   },
+   "credit": {
+    "offered": 1133595,
+    "asked": 3839449,
+    "lent": 197796,
+    "debt": 1825997
+   },
+   "returnCarryOver": -0.005,
+   "largestFamily": 0.365,
+   "exits": {
+    "chose to leave": 11,
+    "died (heirs took over)": 8
+   },
+   "entries": 10,
+   "heirs": 8,
+   "quitNewMedian": 0.325,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.367,
+     "ret": 0.574,
+     "name": "trades at auction (79% of its trades), keeps 8% in cash, trades with other bots (79% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 3,
+     "share": 0.207,
+     "ret": 0.398,
+     "name": "sells 47% below the price guide, buys 46% below the price guide, holds ~5 weeks",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.173,
+     "ret": 2.44,
+     "name": "opens packs (~33 a gen), trades with dealers and outsiders (73% of its trades), bids at auction less than most (~28 a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 4,
+     "share": 0.147,
+     "ret": -0.412,
+     "name": "borrows (140% of its worth a gen), forced to sell (114% of its worth a gen), trades 13× its worth a gen",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 5,
+     "share": 0.107,
+     "ret": -0.08,
+     "name": "buys less than most (~3.2 a gen), lists at auction less than most (~14 a gen), bids at auction less than most (~290 a gen)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 30,
+   "week": 600,
+   "population": 154,
+   "indexes": {
+    "vault": 157.806,
+    "marks": 443.269,
+    "value": 636.07,
+    "priceOverValue": 0.71
+   },
+   "gini": 0.684,
+   "worthShare": [
+    0.497,
+    0.443,
+    0.06
+   ],
+   "cashShare": [
+    0.767,
+    0.222,
+    0.011
+   ],
+   "auctionOverMark": 1.263,
+   "book": {
+    "noOrders": 0.759,
+    "bids": 1593,
+    "asks": 1104,
+    "bidDistLog": -0.599
+   },
+   "credit": {
+    "offered": 1957006,
+    "asked": 3305396,
+    "lent": 408485,
+    "debt": 1792053
+   },
+   "returnCarryOver": -0.014,
+   "largestFamily": 0.39,
+   "exits": {
+    "chose to leave": 7,
+    "died (heirs took over)": 12
+   },
+   "entries": 5,
+   "heirs": 12,
+   "quitNewMedian": 0.311,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.575,
+     "ret": 0.269,
+     "name": "keeps 13% in cash, trades at auction (71% of its trades), buys 41% above the mark",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.425,
+     "ret": 0.808,
+     "name": "keeps 67% in cash, rarely trades at auction (28% of its trades), buys 19% below the mark",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": [
+    {
+     "id": 3,
+     "name": "sells 47% below the price guide, buys 46% below the price guide, holds ~5 weeks",
+     "lastShare": 0.207,
+     "into": 1
+    },
+    {
+     "id": 4,
+     "name": "borrows (140% of its worth a gen), forced to sell (114% of its worth a gen), trades 13× its worth a gen",
+     "lastShare": 0.147,
+     "into": 1
+    },
+    {
+     "id": 5,
+     "name": "buys less than most (~3.2 a gen), lists at auction less than most (~14 a gen), bids at auction less than most (~290 a gen)",
+     "lastShare": 0.107,
+     "into": 1
+    }
+   ]
+  },
+  {
+   "gen": 31,
+   "week": 620,
+   "population": 157,
+   "indexes": {
+    "vault": 152.504,
+    "marks": 422.264,
+    "value": 636.07,
+    "priceOverValue": 0.667
+   },
+   "gini": 0.651,
+   "worthShare": [
+    0.48,
+    0.447,
+    0.073
+   ],
+   "cashShare": [
+    0.778,
+    0.21,
+    0.011
+   ],
+   "auctionOverMark": 1.645,
+   "book": {
+    "noOrders": 0.783,
+    "bids": 1210,
+    "asks": 991,
+    "bidDistLog": -0.624
+   },
+   "credit": {
+    "offered": 2992356,
+    "asked": 4215702,
+    "lent": 387053,
+    "debt": 2168540
+   },
+   "returnCarryOver": -0.166,
+   "largestFamily": 0.414,
+   "exits": {
+    "chose to leave": 4,
+    "died (heirs took over)": 12
+   },
+   "entries": 7,
+   "heirs": 12,
+   "quitNewMedian": 0.359,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.29,
+     "ret": 0.608,
+     "name": "sells 58% above the mark, trades at auction (81% of its trades), trades with other bots (79% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 6,
+     "share": 0.232,
+     "ret": 4.711,
+     "name": "sells 30% below the mark, rarely trades at auction (31% of its trades), net buyer (buys 2.3× the coins it sells)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.206,
+     "ret": 0.993,
+     "name": "bids at auction less than most (~48 a gen), net seller (sells 3.2× the coins it buys), keeps 69% in cash",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 7,
+     "share": 0.084,
+     "ret": 0.118,
+     "name": "sells less than most (~2.5 a gen), shorts less than most (~3.5 a gen), lists at auction less than most (~3 a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 8,
+     "share": 0.065,
+     "ret": -0.271,
+     "name": "forced to sell (149% of its worth a gen), borrows (120% of its worth a gen), concentrated (top player 82% of its cards)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 9,
+     "share": 0.065,
+     "ret": 2.746,
+     "name": "borrows (142% of its worth a gen), forced to sell (79% of its worth a gen), buys 33% below the price guide",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 10,
+     "share": 0.058,
+     "ret": 1.258,
+     "name": "buys 65% below the price guide, trades 11× its worth a gen, keeps 73% in cash",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 32,
+   "week": 640,
+   "population": 160,
+   "indexes": {
+    "vault": 177.249,
+    "marks": 396.965,
+    "value": 636.07,
+    "priceOverValue": 0.663
+   },
+   "gini": 0.666,
+   "worthShare": [
+    0.521,
+    0.404,
+    0.074
+   ],
+   "cashShare": [
+    0.686,
+    0.3,
+    0.014
+   ],
+   "auctionOverMark": 1.81,
+   "book": {
+    "noOrders": 0.761,
+    "bids": 1341,
+    "asks": 1087,
+    "bidDistLog": -0.547
+   },
+   "credit": {
+    "offered": 1109924,
+    "asked": 3052091,
+    "lent": 507681,
+    "debt": 1138312
+   },
+   "returnCarryOver": -0.082,
+   "largestFamily": 0.413,
+   "exits": {
+    "chose to leave": 8,
+    "died (heirs took over)": 13
+   },
+   "entries": 11,
+   "heirs": 13,
+   "quitNewMedian": 0.379,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.404,
+     "ret": 0.612,
+     "name": "sells 49% above the mark, trades at auction (73% of its trades), buys 48% above the mark",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 6,
+     "share": 0.314,
+     "ret": 2.517,
+     "name": "sells 26% below the mark, lists at auction less than most (~14 a gen), opens no packs",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.135,
+     "ret": 3.804,
+     "name": "lends coins (68% of its worth a gen), opens packs (~42 a gen), bids at auction less than most (~23 a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 9,
+     "share": 0.096,
+     "ret": 2.463,
+     "name": "forced to sell (146% of its worth a gen), trades 12× its worth a gen, borrows (130% of its worth a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 11,
+     "share": 0.038,
+     "ret": 0.851,
+     "name": "buys less than most (~2.7 a gen), net seller (sells 99× the coins it buys), keeps 98% in cash",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 12,
+     "share": 0.013,
+     "ret": -0.134,
+     "name": "holds ~270 weeks, sells less than most (~0.5 a gen), bids at auction less than most (~16 a gen)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": [
+    {
+     "id": 7,
+     "name": "sells less than most (~2.5 a gen), shorts less than most (~3.5 a gen), lists at auction less than most (~3 a gen)",
+     "lastShare": 0.084,
+     "into": 6
+    },
+    {
+     "id": 8,
+     "name": "forced to sell (149% of its worth a gen), borrows (120% of its worth a gen), concentrated (top player 82% of its cards)",
+     "lastShare": 0.065,
+     "into": 9
+    },
+    {
+     "id": 10,
+     "name": "buys 65% below the price guide, trades 11× its worth a gen, keeps 73% in cash",
+     "lastShare": 0.058,
+     "into": 9
+    }
+   ]
+  },
+  {
+   "gen": 33,
+   "week": 660,
+   "population": 159,
+   "indexes": {
+    "vault": 164.335,
+    "marks": 413.476,
+    "value": 636.07,
+    "priceOverValue": 0.701
+   },
+   "gini": 0.661,
+   "worthShare": [
+    0.505,
+    0.425,
+    0.07
+   ],
+   "cashShare": [
+    0.734,
+    0.25,
+    0.016
+   ],
+   "auctionOverMark": 1.886,
+   "book": {
+    "noOrders": 0.798,
+    "bids": 1090,
+    "asks": 1123,
+    "bidDistLog": -0.539
+   },
+   "credit": {
+    "offered": 707898,
+    "asked": 2664590,
+    "lent": 245893,
+    "debt": 774506
+   },
+   "returnCarryOver": 0.022,
+   "largestFamily": 0.415,
+   "exits": {
+    "chose to leave": 12,
+    "died (heirs took over)": 19
+   },
+   "entries": 11,
+   "heirs": 19,
+   "quitNewMedian": 0.412,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.377,
+     "ret": 0.415,
+     "name": "trades at auction (75% of its trades), buys 60% above the mark, sells 23% above the price guide",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 6,
+     "share": 0.26,
+     "ret": 0.332,
+     "name": "sells 46% below the price guide, lists at auction less than most (~7.4 a gen), buys less than most (~27 a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.227,
+     "ret": 0.008,
+     "name": "bids at auction less than most (~97 a gen), opens packs (~30 a gen), lends coins (40% of its worth a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 9,
+     "share": 0.136,
+     "ret": 0.857,
+     "name": "borrows (132% of its worth a gen), forced to sell (86% of its worth a gen), trades 12× its worth a gen",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": [
+    {
+     "id": 11,
+     "name": "buys less than most (~2.7 a gen), net seller (sells 99× the coins it buys), keeps 98% in cash",
+     "lastShare": 0.039,
+     "into": 1
+    },
+    {
+     "id": 12,
+     "name": "holds ~270 weeks, sells less than most (~0.5 a gen), bids at auction less than most (~16 a gen)",
+     "lastShare": 0.013,
+     "into": 6
+    }
+   ]
+  },
+  {
+   "gen": 34,
+   "week": 680,
+   "population": 161,
+   "indexes": {
+    "vault": 209.717,
+    "marks": 394.598,
+    "value": 636.07,
+    "priceOverValue": 0.691
+   },
+   "gini": 0.661,
+   "worthShare": [
+    0.493,
+    0.438,
+    0.069
+   ],
+   "cashShare": [
+    0.734,
+    0.255,
+    0.011
+   ],
+   "auctionOverMark": 1.906,
+   "book": {
+    "noOrders": 0.793,
+    "bids": 1091,
+    "asks": 1141,
+    "bidDistLog": -0.533
+   },
+   "credit": {
+    "offered": 935041,
+    "asked": 3671946,
+    "lent": 86796,
+    "debt": 917796
+   },
+   "returnCarryOver": -0.199,
+   "largestFamily": 0.416,
+   "exits": {
+    "chose to leave": 9,
+    "died (heirs took over)": 19
+   },
+   "entries": 11,
+   "heirs": 19,
+   "quitNewMedian": 0.366,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.503,
+     "ret": 0.428,
+     "name": "trades at auction (70% of its trades), trades with other bots (74% of its trades), sells 28% above the mark",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.497,
+     "ret": 0.749,
+     "name": "rarely trades at auction (24% of its trades), trades with dealers and outsiders (59% of its trades), sells 20% below the mark",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": [
+    {
+     "id": 6,
+     "name": "sells 46% below the price guide, lists at auction less than most (~7.4 a gen), buys less than most (~27 a gen)",
+     "lastShare": 0.26,
+     "into": 1
+    },
+    {
+     "id": 9,
+     "name": "borrows (132% of its worth a gen), forced to sell (86% of its worth a gen), trades 12× its worth a gen",
+     "lastShare": 0.136,
+     "into": 1
+    }
+   ]
+  },
+  {
+   "gen": 35,
+   "week": 700,
+   "population": 171,
+   "indexes": {
+    "vault": 214.063,
+    "marks": 390.841,
+    "value": 636.07,
+    "priceOverValue": 0.684
+   },
+   "gini": 0.676,
+   "worthShare": [
+    0.503,
+    0.437,
+    0.06
+   ],
+   "cashShare": [
+    0.772,
+    0.22,
+    0.008
+   ],
+   "auctionOverMark": 1.987,
+   "book": {
+    "noOrders": 0.813,
+    "bids": 995,
+    "asks": 940,
+    "bidDistLog": -0.181
+   },
+   "credit": {
+    "offered": 776214,
+    "asked": 3407298,
+    "lent": 76860,
+    "debt": 1183984
+   },
+   "returnCarryOver": -0.056,
+   "largestFamily": 0.392,
+   "exits": {
+    "chose to leave": 8,
+    "died (heirs took over)": 9
+   },
+   "entries": 18,
+   "heirs": 9,
+   "quitNewMedian": 0.335,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.497,
+     "ret": -0.089,
+     "name": "trades at auction (76% of its trades), trades with other bots (76% of its trades), sells 37% above the mark",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.269,
+     "ret": 0.867,
+     "name": "opens packs (~27 a gen), bids at auction less than most (~547 a gen), lends coins (36% of its worth a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 13,
+     "share": 0.234,
+     "ret": 1.474,
+     "name": "sells 41% below the mark, buys 41% below the price guide, buys less than most (~18 a gen)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 36,
+   "week": 720,
+   "population": 176,
+   "indexes": {
+    "vault": 160.939,
+    "marks": 364.052,
+    "value": 636.07,
+    "priceOverValue": 0.652
+   },
+   "gini": 0.681,
+   "worthShare": [
+    0.526,
+    0.41,
+    0.064
+   ],
+   "cashShare": [
+    0.791,
+    0.195,
+    0.014
+   ],
+   "auctionOverMark": 1.708,
+   "book": {
+    "noOrders": 0.836,
+    "bids": 954,
+    "asks": 938,
+    "bidDistLog": -0.852
+   },
+   "credit": {
+    "offered": 725329,
+    "asked": 4003036,
+    "lent": 192041,
+    "debt": 1124832
+   },
+   "returnCarryOver": -0.062,
+   "largestFamily": 0.403,
+   "exits": {
+    "chose to leave": 9,
+    "died (heirs took over)": 11
+   },
+   "entries": 14,
+   "heirs": 11,
+   "quitNewMedian": 0.336,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.506,
+     "ret": 0.178,
+     "name": "trades at auction (76% of its trades), keeps 10% in cash, buys 57% above the mark",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.297,
+     "ret": 0.398,
+     "name": "rarely trades at auction (15% of its trades), trades with dealers and outsiders (67% of its trades), opens packs (~24 a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 13,
+     "share": 0.198,
+     "ret": 0.53,
+     "name": "forced to sell (90% of its worth a gen), borrows (69% of its worth a gen), trades 8.4× its worth a gen",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 37,
+   "week": 740,
+   "population": 173,
+   "indexes": {
+    "vault": 191.438,
+    "marks": 369.563,
+    "value": 636.07,
+    "priceOverValue": 0.65
+   },
+   "gini": 0.637,
+   "worthShare": [
+    0.467,
+    0.449,
+    0.084
+   ],
+   "cashShare": [
+    0.724,
+    0.264,
+    0.012
+   ],
+   "auctionOverMark": 1.933,
+   "book": {
+    "noOrders": 0.825,
+    "bids": 1468,
+    "asks": 749,
+    "bidDistLog": -0.548
+   },
+   "credit": {
+    "offered": 279965,
+    "asked": 2141019,
+    "lent": 66961,
+    "debt": 1236809
+   },
+   "returnCarryOver": -0.068,
+   "largestFamily": 0.41,
+   "exits": {
+    "chose to leave": 9,
+    "died (heirs took over)": 12
+   },
+   "entries": 6,
+   "heirs": 12,
+   "quitNewMedian": 0.304,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.556,
+     "ret": 0.348,
+     "name": "trades at auction (73% of its trades), holds ~17 weeks, keeps 10% in cash",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.444,
+     "ret": 0.478,
+     "name": "rarely trades at auction (29% of its trades), holds ~4.1 weeks, keeps 48% in cash",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": [
+    {
+     "id": 13,
+     "name": "forced to sell (90% of its worth a gen), borrows (69% of its worth a gen), trades 8.4× its worth a gen",
+     "lastShare": 0.198,
+     "into": 2
+    }
+   ]
+  },
+  {
+   "gen": 38,
+   "week": 760,
+   "population": 177,
+   "indexes": {
+    "vault": 184.748,
+    "marks": 372.679,
+    "value": 636.07,
+    "priceOverValue": 0.642
+   },
+   "gini": 0.644,
+   "worthShare": [
+    0.484,
+    0.436,
+    0.08
+   ],
+   "cashShare": [
+    0.735,
+    0.248,
+    0.017
+   ],
+   "auctionOverMark": 2.217,
+   "book": {
+    "noOrders": 0.84,
+    "bids": 1181,
+    "asks": 858,
+    "bidDistLog": -0.782
+   },
+   "credit": {
+    "offered": 909097,
+    "asked": 2241873,
+    "lent": 136478,
+    "debt": 1196670
+   },
+   "returnCarryOver": -0.035,
+   "largestFamily": 0.407,
+   "exits": {
+    "chose to leave": 11,
+    "died (heirs took over)": 15
+   },
+   "entries": 15,
+   "heirs": 15,
+   "quitNewMedian": 0.334,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.497,
+     "ret": 0.028,
+     "name": "trades at auction (72% of its trades), buys 66% above the mark, sells 48% above the mark",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.329,
+     "ret": 0.196,
+     "name": "buys 44% below the price guide, sells 43% below the price guide, rarely trades at auction (33% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 14,
+     "share": 0.173,
+     "ret": 0.838,
+     "name": "bids at auction less than most (~28 a gen), opens packs (~37 a gen), net seller (sells 5.6× the coins it buys)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 39,
+   "week": 780,
+   "population": 177,
+   "indexes": {
+    "vault": 218.433,
+    "marks": 412.713,
+    "value": 636.07,
+    "priceOverValue": 0.661
+   },
+   "gini": 0.667,
+   "worthShare": [
+    0.493,
+    0.441,
+    0.066
+   ],
+   "cashShare": [
+    0.755,
+    0.237,
+    0.008
+   ],
+   "auctionOverMark": 2.269,
+   "book": {
+    "noOrders": 0.83,
+    "bids": 1349,
+    "asks": 715,
+    "bidDistLog": -1.231
+   },
+   "credit": {
+    "offered": 719631,
+    "asked": 4014875,
+    "lent": 107130,
+    "debt": 1483737
+   },
+   "returnCarryOver": 0.006,
+   "largestFamily": 0.401,
+   "exits": {
+    "chose to leave": 8,
+    "died (heirs took over)": 15
+   },
+   "entries": 8,
+   "heirs": 15,
+   "quitNewMedian": 0.284,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.566,
+     "ret": 0.049,
+     "name": "trades at auction (72% of its trades), buys 46% above the mark, net buyer (buys 2× the coins it sells)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.434,
+     "ret": 0.549,
+     "name": "rarely trades at auction (30% of its trades), buys 20% below the mark, net seller (sells 1.7× the coins it buys)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": [
+    {
+     "id": 14,
+     "name": "bids at auction less than most (~28 a gen), opens packs (~37 a gen), net seller (sells 5.6× the coins it buys)",
+     "lastShare": 0.173,
+     "into": 1
+    }
+   ]
+  },
+  {
+   "gen": 40,
+   "week": 800,
+   "population": 182,
+   "indexes": {
+    "vault": 247.498,
+    "marks": 421.087,
+    "value": 636.07,
+    "priceOverValue": 0.678
+   },
+   "gini": 0.667,
+   "worthShare": [
+    0.506,
+    0.422,
+    0.072
+   ],
+   "cashShare": [
+    0.711,
+    0.272,
+    0.017
+   ],
+   "auctionOverMark": 2.061,
+   "book": {
+    "noOrders": 0.813,
+    "bids": 1543,
+    "asks": 923,
+    "bidDistLog": -1.2
+   },
+   "credit": {
+    "offered": 1237472,
+    "asked": 3502832,
+    "lent": 509222,
+    "debt": 2228140
+   },
+   "returnCarryOver": -0.114,
+   "largestFamily": 0.385,
+   "exits": {
+    "chose to leave": 9,
+    "died (heirs took over)": 14
+   },
+   "entries": 14,
+   "heirs": 14,
+   "quitNewMedian": 0.414,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.335,
+     "ret": 0.198,
+     "name": "trades at auction (79% of its trades), sells 49% above the mark, sells into auctions (~99 listings a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.313,
+     "ret": 0.048,
+     "name": "lists at auction less than most (~9 a gen), sells less than most (~33 a gen), sells 19% below the mark",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 15,
+     "share": 0.216,
+     "ret": 2.364,
+     "name": "opens packs (~30 a gen), bids at auction less than most (~137 a gen), lends coins (52% of its worth a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 16,
+     "share": 0.136,
+     "ret": 0.678,
+     "name": "buys 75% below the price guide, shorts less than most (~2.6 a gen), sells 54% below the price guide",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 41,
+   "week": 820,
+   "population": 170,
+   "indexes": {
+    "vault": 261.659,
+    "marks": 414.937,
+    "value": 636.07,
+    "priceOverValue": 0.658
+   },
+   "gini": 0.638,
+   "worthShare": [
+    0.491,
+    0.419,
+    0.09
+   ],
+   "cashShare": [
+    0.744,
+    0.236,
+    0.02
+   ],
+   "auctionOverMark": 1.843,
+   "book": {
+    "noOrders": 0.812,
+    "bids": 1416,
+    "asks": 1034,
+    "bidDistLog": -1.038
+   },
+   "credit": {
+    "offered": 792022,
+    "asked": 2012860,
+    "lent": 120210,
+    "debt": 1028002
+   },
+   "returnCarryOver": 0.088,
+   "largestFamily": 0.4,
+   "exits": {
+    "chose to leave": 19,
+    "died (heirs took over)": 13
+   },
+   "entries": 7,
+   "heirs": 13,
+   "quitNewMedian": 0.32,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.45,
+     "ret": 0.338,
+     "name": "trades at auction (74% of its trades), keeps 6% in cash, buys 39% above the price guide",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.302,
+     "ret": 0.217,
+     "name": "buys 53% below the price guide, sells 25% below the mark, buys less than most (~21 a gen)",
+     "cannibalizedBy": 15
+    },
+    {
+     "id": 15,
+     "share": 0.249,
+     "ret": 0.503,
+     "name": "bids at auction less than most (~139 a gen), opens packs (~26 a gen), trades with dealers and outsiders (64% of its trades)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": [
+    {
+     "id": 16,
+     "name": "buys 75% below the price guide, shorts less than most (~2.6 a gen), sells 54% below the price guide",
+     "lastShare": 0.136,
+     "into": 1
+    }
+   ]
+  },
+  {
+   "gen": 42,
+   "week": 840,
+   "population": 177,
+   "indexes": {
+    "vault": 307.654,
+    "marks": 425.638,
+    "value": 636.07,
+    "priceOverValue": 0.67
+   },
+   "gini": 0.667,
+   "worthShare": [
+    0.517,
+    0.414,
+    0.068
+   ],
+   "cashShare": [
+    0.744,
+    0.241,
+    0.014
+   ],
+   "auctionOverMark": 1.8,
+   "book": {
+    "noOrders": 0.835,
+    "bids": 1663,
+    "asks": 908,
+    "bidDistLog": -0.794
+   },
+   "credit": {
+    "offered": 1538970,
+    "asked": 3560942,
+    "lent": 651623,
+    "debt": 1400492
+   },
+   "returnCarryOver": -0.143,
+   "largestFamily": 0.407,
+   "exits": {
+    "chose to leave": 7,
+    "died (heirs took over)": 14
+   },
+   "entries": 14,
+   "heirs": 14,
+   "quitNewMedian": 0.365,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.727,
+     "ret": 0.201,
+     "name": "keeps 11% in cash, opens fewer packs than most (~1.3 a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 15,
+     "share": 0.273,
+     "ret": 0.313,
+     "name": "keeps 62% in cash, opens packs (~23 a gen), net seller (sells 2.9× the coins it buys)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": [
+    {
+     "id": 1,
+     "name": "buys 53% below the price guide, sells 25% below the mark, buys less than most (~21 a gen)",
+     "lastShare": 0.302,
+     "into": 2
+    }
+   ]
+  },
+  {
+   "gen": 43,
+   "week": 860,
+   "population": 174,
+   "indexes": {
+    "vault": 280.973,
+    "marks": 439.685,
+    "value": 636.07,
+    "priceOverValue": 0.675
+   },
+   "gini": 0.672,
+   "worthShare": [
+    0.512,
+    0.418,
+    0.07
+   ],
+   "cashShare": [
+    0.727,
+    0.262,
+    0.011
+   ],
+   "auctionOverMark": 1.867,
+   "book": {
+    "noOrders": 0.83,
+    "bids": 1691,
+    "asks": 764,
+    "bidDistLog": -0.94
+   },
+   "credit": {
+    "offered": 739074,
+    "asked": 2690549,
+    "lent": 125943,
+    "debt": 776760
+   },
+   "returnCarryOver": -0.133,
+   "largestFamily": 0.362,
+   "exits": {
+    "chose to leave": 14,
+    "died (heirs took over)": 14
+   },
+   "entries": 11,
+   "heirs": 14,
+   "quitNewMedian": 0.352,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.432,
+     "ret": 0.038,
+     "name": "trades at auction (75% of its trades), buys 51% above the mark, keeps 6% in cash",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 17,
+     "share": 0.349,
+     "ret": 0.215,
+     "name": "sells 53% below the price guide, buys 36% below the mark, bids in sealed auctions (~2087 bids a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 15,
+     "share": 0.219,
+     "ret": 1.246,
+     "name": "bids at auction less than most (~29 a gen), opens packs (~25 a gen), net seller (sells 4.4× the coins it buys)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 44,
+   "week": 880,
+   "population": 177,
+   "indexes": {
+    "vault": 287.002,
+    "marks": 433.092,
+    "value": 636.07,
+    "priceOverValue": 0.672
+   },
+   "gini": 0.672,
+   "worthShare": [
+    0.527,
+    0.405,
+    0.068
+   ],
+   "cashShare": [
+    0.729,
+    0.257,
+    0.014
+   ],
+   "auctionOverMark": 1.601,
+   "book": {
+    "noOrders": 0.791,
+    "bids": 2190,
+    "asks": 1039,
+    "bidDistLog": -0.943
+   },
+   "credit": {
+    "offered": 1754590,
+    "asked": 1652033,
+    "lent": 252710,
+    "debt": 1038756
+   },
+   "returnCarryOver": 0.035,
+   "largestFamily": 0.345,
+   "exits": {
+    "chose to leave": 8,
+    "died (heirs took over)": 15
+   },
+   "entries": 11,
+   "heirs": 15,
+   "quitNewMedian": 0.35,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.39,
+     "ret": -0.086,
+     "name": "trades at auction (78% of its trades), buys 52% above the mark, keeps 5% in cash",
+     "cannibalizedBy": 17
+    },
+    {
+     "id": 17,
+     "share": 0.384,
+     "ret": 0.256,
+     "name": "buys 61% below the price guide, buys less than most (~27 a gen), lists at auction less than most (~23 a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 15,
+     "share": 0.227,
+     "ret": 0.249,
+     "name": "bids at auction less than most (~75 a gen), trades with dealers and outsiders (63% of its trades), opens packs (~25 a gen)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 45,
+   "week": 900,
+   "population": 161,
+   "indexes": {
+    "vault": 227.812,
+    "marks": 436.77,
+    "value": 636.07,
+    "priceOverValue": 0.662
+   },
+   "gini": 0.691,
+   "worthShare": [
+    0.542,
+    0.398,
+    0.06
+   ],
+   "cashShare": [
+    0.731,
+    0.253,
+    0.016
+   ],
+   "auctionOverMark": 1.474,
+   "book": {
+    "noOrders": 0.817,
+    "bids": 1798,
+    "asks": 790,
+    "bidDistLog": -1.295
+   },
+   "credit": {
+    "offered": 1381565,
+    "asked": 2246379,
+    "lent": 184190,
+    "debt": 787566
+   },
+   "returnCarryOver": 0.013,
+   "largestFamily": 0.335,
+   "exits": {
+    "chose to leave": 24,
+    "died (heirs took over)": 20
+   },
+   "entries": 8,
+   "heirs": 20,
+   "quitNewMedian": 0.337,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.35,
+     "ret": -0.02,
+     "name": "trades at auction (81% of its trades), buys 58% above the mark, buys a lot (~120 a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 17,
+     "share": 0.3,
+     "ret": 0.174,
+     "name": "buys 64% below the price guide, sells less than most (~34 a gen), lists at auction less than most (~19 a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 15,
+     "share": 0.206,
+     "ret": 0.223,
+     "name": "trades with dealers and outsiders (69% of its trades), bids at auction less than most (~268 a gen), rarely trades at auction (16% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 18,
+     "share": 0.144,
+     "ret": -0.236,
+     "name": "forced to sell (121% of its worth a gen), borrows (107% of its worth a gen), trades 8.7× its worth a gen",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 46,
+   "week": 920,
+   "population": 161,
+   "indexes": {
+    "vault": 276.569,
+    "marks": 427.077,
+    "value": 636.07,
+    "priceOverValue": 0.677
+   },
+   "gini": 0.692,
+   "worthShare": [
+    0.556,
+    0.38,
+    0.065
+   ],
+   "cashShare": [
+    0.717,
+    0.275,
+    0.008
+   ],
+   "auctionOverMark": 1.705,
+   "book": {
+    "noOrders": 0.784,
+    "bids": 2024,
+    "asks": 1082,
+    "bidDistLog": -1.25
+   },
+   "credit": {
+    "offered": 1501457,
+    "asked": 2781314,
+    "lent": 116489,
+    "debt": 465712
+   },
+   "returnCarryOver": -0.019,
+   "largestFamily": 0.311,
+   "exits": {
+    "chose to leave": 8,
+    "died (heirs took over)": 17
+   },
+   "entries": 8,
+   "heirs": 17,
+   "quitNewMedian": 0.313,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.513,
+     "ret": 0.489,
+     "name": "trades at auction (75% of its trades), keeps 8% in cash, buys a lot (~97 a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 17,
+     "share": 0.291,
+     "ret": 1.325,
+     "name": "sells 55% below the price guide, lists at auction less than most (~17 a gen), buys less than most (~22 a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 15,
+     "share": 0.196,
+     "ret": 0.677,
+     "name": "bids at auction less than most (~503 a gen), keeps 77% in cash, opens packs (~28 a gen)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": [
+    {
+     "id": 18,
+     "name": "forced to sell (121% of its worth a gen), borrows (107% of its worth a gen), trades 8.7× its worth a gen",
+     "lastShare": 0.144,
+     "into": 2
+    }
+   ]
+  },
+  {
+   "gen": 47,
+   "week": 940,
+   "population": 155,
+   "indexes": {
+    "vault": 311.656,
+    "marks": 426.588,
+    "value": 636.07,
+    "priceOverValue": 0.668
+   },
+   "gini": 0.703,
+   "worthShare": [
+    0.569,
+    0.372,
+    0.059
+   ],
+   "cashShare": [
+    0.761,
+    0.23,
+    0.009
+   ],
+   "auctionOverMark": 1.909,
+   "book": {
+    "noOrders": 0.838,
+    "bids": 1261,
+    "asks": 840,
+    "bidDistLog": -1.498
+   },
+   "credit": {
+    "offered": 1024131,
+    "asked": 1498496,
+    "lent": 72331,
+    "debt": 534111
+   },
+   "returnCarryOver": -0.128,
+   "largestFamily": 0.31,
+   "exits": {
+    "chose to leave": 17,
+    "died (heirs took over)": 15
+   },
+   "entries": 11,
+   "heirs": 15,
+   "quitNewMedian": 0.323,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.728,
+     "ret": 0.136,
+     "name": "bids in sealed auctions (~1876 bids a gen), trades with other bots (76% of its trades), trades at auction (71% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 15,
+     "share": 0.272,
+     "ret": 0.473,
+     "name": "bids at auction less than most (~243 a gen), trades with dealers and outsiders (68% of its trades), rarely trades at auction (19% of its trades)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": [
+    {
+     "id": 17,
+     "name": "sells 55% below the price guide, lists at auction less than most (~17 a gen), buys less than most (~22 a gen)",
+     "lastShare": 0.291,
+     "into": 2
+    }
+   ]
+  },
+  {
+   "gen": 48,
+   "week": 960,
+   "population": 162,
+   "indexes": {
+    "vault": 323.232,
+    "marks": 431.223,
+    "value": 636.07,
+    "priceOverValue": 0.676
+   },
+   "gini": 0.703,
+   "worthShare": [
+    0.554,
+    0.385,
+    0.061
+   ],
+   "cashShare": [
+    0.768,
+    0.223,
+    0.009
+   ],
+   "auctionOverMark": 1.675,
+   "book": {
+    "noOrders": 0.809,
+    "bids": 1732,
+    "asks": 916,
+    "bidDistLog": -1.448
+   },
+   "credit": {
+    "offered": 556964,
+    "asked": 2237041,
+    "lent": 103869,
+    "debt": 794778
+   },
+   "returnCarryOver": 0.096,
+   "largestFamily": 0.303,
+   "exits": {
+    "chose to leave": 10,
+    "died (heirs took over)": 14
+   },
+   "entries": 17,
+   "heirs": 14,
+   "quitNewMedian": 0.369,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.688,
+     "ret": 0.556,
+     "name": "keeps 9% in cash, bids in sealed auctions (~2230 bids a gen), trades at auction (70% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 15,
+     "share": 0.223,
+     "ret": -0.014,
+     "name": "keeps 74% in cash, opens packs (~24 a gen), bids at auction less than most (~314 a gen)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 19,
+     "share": 0.089,
+     "ret": -0.106,
+     "name": "buys less than most (~8.7 a gen), lists at auction less than most (~3.1 a gen), bids at auction less than most (~621 a gen)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 49,
+   "week": 980,
+   "population": 168,
+   "indexes": {
+    "vault": 414.952,
+    "marks": 413.382,
+    "value": 636.07,
+    "priceOverValue": 0.653
+   },
+   "gini": 0.71,
+   "worthShare": [
+    0.575,
+    0.367,
+    0.058
+   ],
+   "cashShare": [
+    0.75,
+    0.229,
+    0.021
+   ],
+   "auctionOverMark": 2.062,
+   "book": {
+    "noOrders": 0.769,
+    "bids": 3017,
+    "asks": 1013,
+    "bidDistLog": -1.407
+   },
+   "credit": {
+    "offered": 920031,
+    "asked": 2705881,
+    "lent": 46327,
+    "debt": 654432
+   },
+   "returnCarryOver": -0.07,
+   "largestFamily": 0.298,
+   "exits": {
+    "chose to leave": 7,
+    "died (heirs took over)": 14
+   },
+   "entries": 13,
+   "heirs": 14,
+   "quitNewMedian": 0.372,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.296,
+     "ret": -0.065,
+     "name": "buys 83% above the mark, buys a lot (~112 a gen), trades at auction (75% of its trades)",
+     "cannibalizedBy": 19
+    },
+    {
+     "id": 20,
+     "share": 0.241,
+     "ret": 2.064,
+     "name": "sells 32% below the mark, rarely trades at auction (21% of its trades), trades with dealers and outsiders (58% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 19,
+     "share": 0.222,
+     "ret": 1.256,
+     "name": "shorts less than most (~2.6 a gen), sells less than most (~24 a gen), trades with other bots (86% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 15,
+     "share": 0.16,
+     "ret": 0.268,
+     "name": "bids at auction less than most (~25 a gen), trades with dealers and outsiders (70% of its trades), opens packs (~31 a gen)",
+     "cannibalizedBy": 20
+    },
+    {
+     "id": 21,
+     "share": 0.08,
+     "ret": -0.722,
+     "name": "forced to sell (112% of its worth a gen), borrows (146% of its worth a gen), trades 6.5× its worth a gen",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  }
+ ]
+}

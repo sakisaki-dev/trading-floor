@@ -1,0 +1,596 @@
+{
+ "source": "page-seed83148-realism-w149.json",
+ "seed": 83148,
+ "preset": "realism",
+ "weeks": 149,
+ "savedAt": "2026-11-08T13:08:24.294Z",
+ "presetRules": {
+  "allowance": 200,
+  "livingCost": 200,
+  "lifestyle": 0.0005,
+  "royaltyFunding": "minted",
+  "royaltyRate": 0.05,
+  "holdCost": 0.0005,
+  "wealthTax": 0.001,
+  "wealthTaxTo": "equal",
+  "wealthTaxForced": true,
+  "outsideCollectors": true,
+  "outsideMode": "value",
+  "outsideBudget": 100000,
+  "outsideNews": true,
+  "guideOn": true,
+  "guideEvery": 4,
+  "guideLag": 1,
+  "fee": 0.01,
+  "centralBank": false,
+  "closedEconomy": false,
+  "markRule": "book",
+  "markHalfLife": 4,
+  "priceRule": "comps",
+  "compsWeeks": 4,
+  "singleBidder": "own",
+  "forcedSale": "book",
+  "forcedOrder": "network",
+  "liquidation": "auction",
+  "vaultIndex": "repeatSales",
+  "priceAnchor": true,
+  "priceRange": 0.6,
+  "keepMax": 1,
+  "rateMax": 0.05,
+  "priceMap": "log",
+  "priceLogK": 0.6,
+  "priceClamp": 50,
+  "rateMap": "log",
+  "rateLogMid": 0.025,
+  "rateClamp": 10,
+  "deployOrders": 40,
+  "maxListings": 10,
+  "maxShorts": 30,
+  "maxPacks": 8,
+  "fitnessValue": "bid",
+  "evolve": true,
+  "evolveShare": 0.1,
+  "nnFitnessGens": 6,
+  "practiceGens": 3,
+  "adaptOn": true,
+  "adaptEvery": 10,
+  "adaptSize": 0.05,
+  "quitRule": "network",
+  "mortality": true,
+  "lifespan": [
+   6,
+   14
+  ],
+  "heirs": 1,
+  "estateSale": 0.4,
+  "cashShockChance": 0.005,
+  "cashShockSize": 0.1,
+  "lossRate": 0.01,
+  "turnover": true,
+  "entryRate": 0.25,
+  "entryHype": 1,
+  "entryReturns": 1,
+  "entryNews": 1,
+  "botScale": "cards",
+  "valueModel": "league",
+  "valueBasis": "form",
+  "formSeasons": 2,
+  "rookieRule": "measured",
+  "injuries": true,
+  "injuryByAge": true,
+  "retirement": true,
+  "retirementByAge": true,
+  "awards": true,
+  "rookies": true,
+  "pressure": true,
+  "pressureStrength": 1,
+  "hypeInjury": 0,
+  "startSeason": "latest",
+  "leagueFill": "full",
+  "games": true,
+  "prizeShare": 0,
+  "gameFloor": null,
+  "credit": true,
+  "maxLTV": 0.6,
+  "marginCall": 0.75,
+  "loanWeeks": 8,
+  "shorting": true,
+  "fashion": false,
+  "store": false,
+  "priceLimit": 0,
+  "positionLimit": 0,
+  "capPoorest": false,
+  "leagueUpdates": false,
+  "printRunK": 40,
+  "printRunExp": 0.5,
+  "printRunMin": 2,
+  "printRunValueFloor": 0.5,
+  "printRunUnit": 100,
+  "poolMultiplier": 10,
+  "packsPerWeek": 33,
+  "packMix": {
+   "standard": 0.75,
+   "premium": 0.21,
+   "elite": 0.025,
+   "holo": 0.015
+  },
+  "startCash": 20000,
+  "newcomerCashSd": 0.5,
+  "concentrationFree": 3,
+  "concentrationSlope": 0.06,
+  "itemHaircut": 0.9,
+  "nnResearchError": 0.2,
+  "gameNoise": 0.4,
+  "formBlendSeasons": 2,
+  "championWeight": "production",
+  "rngStreams": "split",
+  "awardWinner": "top"
+ },
+ "startingRules": {
+  "seed": 83148,
+  "allowance": 800,
+  "centralBank": true
+ },
+ "end": {
+  "week": 149,
+  "bots": 411,
+  "lineages": {
+   "count": 286,
+   "depth": 5,
+   "topShare": 0.083,
+   "topSize": 17
+  },
+  "indexes": {
+   "vault": 94.893,
+   "marks": 464.32,
+   "value": 498.778,
+   "priceOverValue": 0.969
+  },
+  "gini": 0.596,
+  "cashShare": [
+   0.515,
+   0.43,
+   0.055
+  ],
+  "auctionOverMark": 1.828,
+  "topCards": [
+   {
+    "label": "WR Arland Schwartz · Holo Autograph, Inscribed 6/25, Sharpie blue, inscribed (hof)",
+    "mark": 2543152,
+    "value": 2410650
+   },
+   {
+    "label": "WR Cannon Smithson · Holo Locker",
+    "mark": 877040,
+    "value": 723675
+   },
+   {
+    "label": "LB Dimitrius Pritchard · Base Autograph, Patch 5/10, Sharpie black",
+    "mark": 439458,
+    "value": 391290
+   }
+  ]
+ },
+ "generations": [
+  {
+   "gen": 1,
+   "week": 20,
+   "population": 520,
+   "indexes": {
+    "vault": 94.166,
+    "marks": 161.377,
+    "value": 276.795,
+    "priceOverValue": 0.616
+   },
+   "gini": 0.337,
+   "worthShare": [
+    0.263,
+    0.46,
+    0.277
+   ],
+   "cashShare": [
+    0.354,
+    0.468,
+    0.179
+   ],
+   "auctionOverMark": 1.794,
+   "book": {
+    "noOrders": 0.229,
+    "bids": 6542,
+    "asks": 2770,
+    "bidDistLog": -0.383
+   },
+   "credit": {
+    "offered": 1400111,
+    "asked": 1153651,
+    "lent": 305380,
+    "debt": 2673211
+   },
+   "returnCarryOver": null,
+   "largestFamily": 0.002,
+   "exits": {},
+   "entries": 19,
+   "heirs": 0,
+   "quitNewMedian": 0.395,
+   "tactics": [
+    {
+     "id": 1,
+     "share": 0.588,
+     "ret": 0.11,
+     "name": "holds ~13 weeks, sells less than most (~17 a gen), sells 57% above the price guide",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 2,
+     "share": 0.412,
+     "ret": 0.241,
+     "name": "holds ~4.9 weeks, sells a lot (~64 a gen), sells 1% below the price guide",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 2,
+   "week": 40,
+   "population": 478,
+   "indexes": {
+    "vault": 87.164,
+    "marks": 248.575,
+    "value": 290.602,
+    "priceOverValue": 0.884
+   },
+   "gini": 0.45,
+   "worthShare": [
+    0.326,
+    0.476,
+    0.199
+   ],
+   "cashShare": [
+    0.434,
+    0.461,
+    0.106
+   ],
+   "auctionOverMark": 1.811,
+   "book": {
+    "noOrders": 0.228,
+    "bids": 5451,
+    "asks": 3281,
+    "bidDistLog": -0.343
+   },
+   "credit": {
+    "offered": 1690413,
+    "asked": 1835054,
+    "lent": 523385,
+    "debt": 3562768
+   },
+   "returnCarryOver": 0.138,
+   "largestFamily": 0.011,
+   "exits": {
+    "chose to leave": 74
+   },
+   "entries": 32,
+   "heirs": 0,
+   "quitNewMedian": 0.463,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.522,
+     "ret": -0.111,
+     "name": "holds ~8.2 weeks, sells a lot (~67 a gen), sells 13% above the price guide",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.478,
+     "ret": 0.12,
+     "name": "holds ~21 weeks, sells less than most (~21 a gen), sells 71% above the price guide",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 3,
+   "week": 60,
+   "population": 450,
+   "indexes": {
+    "vault": 86.972,
+    "marks": 275.653,
+    "value": 327.245,
+    "priceOverValue": 0.89
+   },
+   "gini": 0.492,
+   "worthShare": [
+    0.343,
+    0.492,
+    0.165
+   ],
+   "cashShare": [
+    0.461,
+    0.457,
+    0.082
+   ],
+   "auctionOverMark": 1.741,
+   "book": {
+    "noOrders": 0.244,
+    "bids": 6037,
+    "asks": 3307,
+    "bidDistLog": -0.326
+   },
+   "credit": {
+    "offered": 1611210,
+    "asked": 1525893,
+    "lent": 587623,
+    "debt": 4449902
+   },
+   "returnCarryOver": 0.066,
+   "largestFamily": 0.013,
+   "exits": {
+    "chose to leave": 48
+   },
+   "entries": 20,
+   "heirs": 0,
+   "quitNewMedian": 0.441,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.618,
+     "ret": 0.307,
+     "name": "rarely trades at auction (6% of its trades), buys 15% below the mark, keeps 68% in cash",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.382,
+     "ret": 0.64,
+     "name": "trades at auction (53% of its trades), buys 39% above the mark, keeps 26% in cash",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 4,
+   "week": 80,
+   "population": 420,
+   "indexes": {
+    "vault": 87.161,
+    "marks": 318.251,
+    "value": 384.8,
+    "priceOverValue": 0.873
+   },
+   "gini": 0.521,
+   "worthShare": [
+    0.369,
+    0.479,
+    0.152
+   ],
+   "cashShare": [
+    0.475,
+    0.445,
+    0.079
+   ],
+   "auctionOverMark": 1.964,
+   "book": {
+    "noOrders": 0.29,
+    "bids": 5293,
+    "asks": 3162,
+    "bidDistLog": -0.281
+   },
+   "credit": {
+    "offered": 1616452,
+    "asked": 2241748,
+    "lent": 855851,
+    "debt": 3860460
+   },
+   "returnCarryOver": 0.154,
+   "largestFamily": 0.021,
+   "exits": {
+    "chose to leave": 39
+   },
+   "entries": 9,
+   "heirs": 0,
+   "quitNewMedian": 0.394,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.7,
+     "ret": -0.102,
+     "name": "rarely trades at auction (7% of its trades), buys 13% below the mark, trades with other bots (58% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.3,
+     "ret": 0.8,
+     "name": "trades at auction (65% of its trades), buys 51% above the mark, trades with other bots (85% of its trades)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 5,
+   "week": 100,
+   "population": 411,
+   "indexes": {
+    "vault": 89.112,
+    "marks": 380.8,
+    "value": 429.186,
+    "priceOverValue": 0.934
+   },
+   "gini": 0.557,
+   "worthShare": [
+    0.394,
+    0.475,
+    0.131
+   ],
+   "cashShare": [
+    0.498,
+    0.439,
+    0.063
+   ],
+   "auctionOverMark": 1.663,
+   "book": {
+    "noOrders": 0.309,
+    "bids": 5202,
+    "asks": 2886,
+    "bidDistLog": -0.283
+   },
+   "credit": {
+    "offered": 1750449,
+    "asked": 2607109,
+    "lent": 666274,
+    "debt": 4488398
+   },
+   "returnCarryOver": 0.065,
+   "largestFamily": 0.02,
+   "exits": {
+    "chose to leave": 33
+   },
+   "entries": 24,
+   "heirs": 0,
+   "quitNewMedian": 0.436,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.698,
+     "ret": 0.452,
+     "name": "rarely trades at auction (6% of its trades), buys 14% below the mark",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.302,
+     "ret": -0.131,
+     "name": "trades at auction (61% of its trades), buys 42% above the mark, sells 83% above the price guide",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 6,
+   "week": 120,
+   "population": 413,
+   "indexes": {
+    "vault": 92.793,
+    "marks": 397.52,
+    "value": 452.735,
+    "priceOverValue": 0.928
+   },
+   "gini": 0.571,
+   "worthShare": [
+    0.408,
+    0.472,
+    0.12
+   ],
+   "cashShare": [
+    0.522,
+    0.42,
+    0.058
+   ],
+   "auctionOverMark": 1.829,
+   "book": {
+    "noOrders": 0.319,
+    "bids": 6381,
+    "asks": 3125,
+    "bidDistLog": -0.33
+   },
+   "credit": {
+    "offered": 1531953,
+    "asked": 3004182,
+    "lent": 605939,
+    "debt": 4645414
+   },
+   "returnCarryOver": 0.025,
+   "largestFamily": 0.029,
+   "exits": {
+    "chose to leave": 25,
+    "died (heirs took over)": 44
+   },
+   "entries": 27,
+   "heirs": 44,
+   "quitNewMedian": 0.409,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.619,
+     "ret": 0.297,
+     "name": "rarely trades at auction (8% of its trades), buys 13% below the mark, trades with other bots (53% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.381,
+     "ret": 0.001,
+     "name": "trades at auction (57% of its trades), buys 41% above the mark, trades with other bots (81% of its trades)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  },
+  {
+   "gen": 7,
+   "week": 140,
+   "population": 416,
+   "indexes": {
+    "vault": 95.809,
+    "marks": 428.562,
+    "value": 486.943,
+    "priceOverValue": 0.899
+   },
+   "gini": 0.591,
+   "worthShare": [
+    0.432,
+    0.456,
+    0.112
+   ],
+   "cashShare": [
+    0.536,
+    0.415,
+    0.049
+   ],
+   "auctionOverMark": 1.708,
+   "book": {
+    "noOrders": 0.332,
+    "bids": 6363,
+    "asks": 3225,
+    "bidDistLog": -0.332
+   },
+   "credit": {
+    "offered": 2001123,
+    "asked": 2603504,
+    "lent": 694381,
+    "debt": 6091695
+   },
+   "returnCarryOver": 0.072,
+   "largestFamily": 0.041,
+   "exits": {
+    "chose to leave": 15,
+    "died (heirs took over)": 37
+   },
+   "entries": 18,
+   "heirs": 37,
+   "quitNewMedian": 0.37,
+   "tactics": [
+    {
+     "id": 2,
+     "share": 0.645,
+     "ret": 0.035,
+     "name": "rarely trades at auction (6% of its trades), buys 14% below the mark, trades with other bots (52% of its trades)",
+     "cannibalizedBy": null
+    },
+    {
+     "id": 1,
+     "share": 0.355,
+     "ret": -0.008,
+     "name": "trades at auction (64% of its trades), buys 43% above the mark, trades with other bots (82% of its trades)",
+     "cannibalizedBy": null
+    }
+   ],
+   "tacticsDied": []
+  }
+ ]
+}

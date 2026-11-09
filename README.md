@@ -80,6 +80,22 @@ population, family, trading, lending, cash and price figures can be checked in
   that incentive.
 - By week 7,973 the 10% of bots with the most cash held 85% of all coins, and the poorer half held under 1%.
 
+### Real-world parallels
+
+None of these patterns were programmed. Each one emerged and turned out to match something economists or biologists
+have documented. [docs/PARALLELS.md](docs/PARALLELS.md) gives the numbers, the source and where each analogy breaks.
+
+| In the sandbox | In the real world |
+|---|---|
+| Sealed-bid auctions clear at 1.8–2.2× the mark, and the cards lose 22–30% on resale | The winner's curse in oil lease auctions (Capen, Clapp and Campbell, 1971) |
+| Bots scored on marked value learned to overpay for cards they already held, raising the mark on every copy | Mutual funds buying their own holdings at the quarter's close (Carhart et al., 2002) |
+| Marks climb to about 5× what cards resell for, because few cards ever trade | Stale marks on illiquid assets; Enron's mark-to-market accounting |
+| When the dealers left, trading between bots collapsed and took about 2,400 weeks to recover | Auction-rate securities in 2008, when the dealers stopped bidding |
+| A tactic built on heavy borrowing appeared 5 times and was wiped out each time within a generation | LTCM, Archegos, the leverage cycle |
+| Last generation's best bots do no better than average in the next | Mutual fund performance doesn't persist (Carhart, 1997) |
+| Wealth concentrates when one heir takes the estate and levels off when two share it | Primogeniture against partible inheritance |
+| One family grows to 93% of the population | Neutral drift and founder effects (Kimura) |
+
 ### Corrections
 
 - A few players' marks rose 4–9% a week for hundreds of weeks with no sales, until one card was marked at 2 × 10²⁸
@@ -118,7 +134,7 @@ on every push.
 | `page/` · `docs/trading-floor.html` | The browser page and its built, self-contained copy |
 | `tools/` · `scripts/` | Reports, the page build, figures, run summaries |
 | `tests/` | Mechanism, network, information and determinism tests |
-| `results/` | Small summaries of long runs, checked into git |
+| `results/` | Small summaries of the runs the findings cite, checked into git |
 | `data-build/` | How `data/` was built from the Retro Bowl save (provenance) |
 
 ## Coming next
@@ -136,6 +152,7 @@ on every push.
 | | |
 |---|---|
 | [MODEL.md](docs/MODEL.md) | The full model, in the standard ODD format, with every assumption listed |
+| [PARALLELS.md](docs/PARALLELS.md) | Real-world parallels for each finding, with sources and where each one breaks |
 | [METRICS.md](docs/METRICS.md) · [TACTICS.md](docs/TACTICS.md) | What gets measured, and how tactics are detected |
 | [AUDIT.md](docs/AUDIT.md) | A full audit of the engine: 141 findings, 116 fixed in 2.0.0, 25 waiting for the government build |
 | [DEVLOG.md](docs/DEVLOG.md) | Every experiment so far, in order |
@@ -146,7 +163,8 @@ on every push.
 ## Fine print
 
 - All results come from one league built from one save. Most rest on three seeds or fewer, and the long runs on one
-  seed each. They say nothing yet about real markets.
+  seed each. The parallels show that the sandbox can produce these patterns, not that real markets produce them for
+  the same reasons.
 - League stats were transcribed from a personal Retro Bowl save. Retro Bowl is made by New Star Games. Team names
   follow the NFL. This project is not affiliated with either.
 - Cite with [CITATION.cff](CITATION.cff). No license has been chosen yet, so all rights are reserved.
