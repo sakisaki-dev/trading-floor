@@ -395,7 +395,8 @@ The driver writes `state/` through a whitelist of fields, never by copying engin
 - public league data: games, stats, injuries, awards, retirements, rookies;
 - the treasury's ledger by line and week, the own account, the opening grant;
 - its own decision log, the board and its notebook;
-- the rules file (10.3).
+- the rules file (10.3);
+- the statistics office's tables (8.4).
 
 ### 8.3 Fields named by the audit and excluded
 
@@ -409,6 +410,29 @@ Built from bots' networks: `sens`, `gen.netDist*`, `gen.respDist*`, `gen.respNea
 government has; if wanted, it is a separate, labelled arm.
 
 The leak scan (17.2) checks each field's source, not only whether its numbers match hidden data.
+
+### 8.4 The statistics office (2026-11-10)
+
+The engine measured several aggregates every week that any real government's statistics office would publish, but
+`gov/state.mjs` never wrote them, so the government could not see them. They were never wired, not withheld on purpose:
+none is built from hidden value or the bots' networks, and none is in 8.3. They are now in `state/now.json` as
+`statistics` and, as single numbers, in `indicators` and `history.csv` (so rules and wake triggers can use them):
+
+- the living cost's two fixed numbers (`cfg.livingCost` per bot per week and `cfg.lifestyle` × equity), the coins paid
+  on it and the bots that could not pay it (`broke`), with the number of bots;
+- forced sales by cause (living costs, holding costs, wealth tax, loan default, margin call, estate, cash shock, poll
+  tax, targeted levy, sales tax; frame `forced`), and the liquidator's sales counted apart (`liquidatorSales`; its rows
+  in `trades.jsonl` carry `liquidator: true` and keep `outside: true`);
+- bills owed (arrears) by bill, total debt, defaults and margin calls;
+- the credit market: coins offered, asked for, lent, repaid at maturity and from forced sales, written off, and the rate
+  (frame `credit`, without its `all` and `top` summaries of the bots' network outputs);
+- cash and worth by decile, ranked as transfers rank `cashDecile` and `worthDecile`, and the shares of the top 10%,
+  next 40% and bottom 50% (frame `mkt.cashTop10`, `mkt.cashShare`, and the same for worth);
+- coins created and removed across the whole economy, by line (frame `money.created`, `money.removed`).
+
+This is information only: the engine's results are unchanged (every frame hash on `tests/same_results.mjs` and on the
+replay of `runs/plumbing-200`). `NOW_KEYS` and `STAT_KEYS` in `gov/state.mjs` list every key now.json may carry, and the
+leak test fails on any key not listed.
 
 ## 9. What it can change
 

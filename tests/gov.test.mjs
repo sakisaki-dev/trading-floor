@@ -4,7 +4,7 @@
 // scripted stub government (elections and notebook handover, replay from the decision log, resume).
 //   node tests/gov.test.mjs [--quick]     (--quick skips the driver runs)
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import crypto from 'node:crypto'; import { execFileSync } from 'node:child_process'; import { fileURLToPath } from 'node:url'; import assert from 'node:assert/strict';
-import * as E from '../engine.mjs'; import { StateWriter, EXCLUDED_KEYS } from '../gov/state.mjs'; import { rulesMarkdown } from '../gov/rules.mjs';
+import * as E from '../engine.mjs'; import { StateWriter, EXCLUDED_KEYS, NOW_KEYS, STAT_KEYS } from '../gov/state.mjs'; import { rulesMarkdown } from '../gov/rules.mjs';
 const here = path.dirname(fileURLToPath(import.meta.url)), root = path.join(here, '..'), d = path.join(root, 'data'), rd = (f) => JSON.parse(fs.readFileSync(path.join(d, f), 'utf8'));
 const lib = rd('library.json'); lib.timeline = rd('timeline.json'); for (const k of ['history', 'kits', 'names']) lib[k] = rd(k + '.json');
 lib.leagueRates = rd('league_rates.json'); lib.rookieNames = rd('rookie_names.json'); lib.nflAge = rd('nfl_age.json');
@@ -150,6 +150,19 @@ await test('the state whitelist: no hidden-value or network field, no hidden val
   const hidden = [...W.players.map((p) => p.F), W.hist.f.at(-1), W.hist.bub.at(-1), E.bubble(W), W.cards.reduce((a, c) => a + c.F * c.circ, 0)].filter((x) => x > 0 && !Number.isInteger(x)).map((x) => String(x)).filter((s) => s.length > 8);
   for (const h of hidden) assert.ok(!all.includes(h), `hidden value ${h} appears in state/`);
   const md = fs.readFileSync(path.join(dir, 'rules.md'), 'utf8'); for (const k of [...Object.keys(E.GOV_DIALS), ...E.GOV_INDICATORS, ...E.BOARD_WORDS.up, ...E.BOARD_WORDS.negation]) assert.ok(md.includes(k), `rules.md lacks ${k}`);
+  // now.json through the whitelist (spec 8.2, 8.4): every key listed, the statistics office's tables key by key; keys that are
+  // names from the world only from the engine's own lists. Anything unlisted fails here
+  const now = JSON.parse(fs.readFileSync(path.join(dir, 'now.json'), 'utf8')), fr = E.frame(W, { full: true }), sub = (o, list, what) => { for (const k of Object.keys(o)) assert.ok(list.includes(k), `${what}.${k} is not on the whitelist`); };
+  sub(now, NOW_KEYS, 'now'); assert.deepEqual(Object.keys(now.indicators), E.GOV_INDICATORS); assert.deepEqual(Object.keys(now.statistics), Object.keys(STAT_KEYS).filter((k) => k !== 'decile'));
+  for (const [k, v] of Object.entries(now.statistics)) { const L = STAT_KEYS[k]; if (L === 1) assert.equal(typeof v, 'number', k); else if (L === 'causes') sub(v, Object.keys(E.GOV_FORCED), k); else if (v != null) sub(v, L, k); }
+  sub(now.statistics.arrears.byBill, E.GOV_BILLS, 'arrears.byBill');
+  for (const k of ['cash', 'worth']) { const D = now.statistics[k].deciles; assert.equal(D.length, 10); D.forEach((d) => sub(d, STAT_KEYS.decile, `${k}.deciles`)); assert.equal(D.reduce((a, d) => a + d.bots, 0), W.bots.length); assert.ok(Math.abs(D.reduce((a, d) => a + d.coins, 0) - now.statistics[k].total) < 0.01 * Math.max(1, Math.abs(now.statistics[k].total)));
+    assert.ok(D[9].mean >= D[0].mean, `${k}: decile 10 holds at least decile 1`); }
+  assert.deepEqual(Object.keys(now.statistics.money.created), Object.keys(fr.money.created)); assert.deepEqual(Object.keys(now.statistics.money.removed), Object.keys(fr.money.removed));
+  // the same numbers as the engine's own frame
+  const I = now.indicators, m = fr.mkt; assert.equal(I.broke, m.broke); assert.equal(I.defaults, m.defaults); assert.equal(I.marginCalls, m.calls); assert.ok(Math.abs(I.debt - m.debt) <= 1); assert.ok(Math.abs(I.cashTop10 - m.cashTop10) <= 6e-4);
+  m.cashShare.forEach((x, i) => assert.ok(Math.abs([I.cashTop10, I.cashMid40, I.cashBottom50][i] - x) <= 6e-4)); assert.equal(I.forcedSales, Object.values(fr.forced || {}).reduce((a, b) => a + b, 0));
+  assert.ok(Math.abs(I.moneyCreated - fr.money.totalIn) <= 1 && Math.abs(I.moneyRemoved - fr.money.totalOut) <= 1); assert.equal(I.creditLent, now.statistics.credit.lent); assert.equal(now.statistics.livingCost.fixedPerBot, W.cfg.livingCost);
 });
 
 // ---------- The driver, end to end, with the scripted stub government (a process per turn, the session's file protocol) ----------

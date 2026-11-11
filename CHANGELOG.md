@@ -17,6 +17,11 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 
 ### Added
 
+- Government runs: the statistics office (`docs/regulator-spec.md` 8.4). `state/now.json` gains `statistics` (the
+  living cost's numbers and the bots that cannot pay it, forced sales by cause, the liquidator's sales, arrears, debt,
+  defaults and margin calls, the credit market, cash and worth by decile, money created and removed by line), and
+  `GOV_INDICATORS` gains 35 indicators for rules and wake triggers (appended; existing ones unchanged). Never wired
+  before, not hidden on purpose. Information only: every frame hash is unchanged, so the engine version does not change.
 - Page: a **Government** switch in the control bar, with a select of the scripted governments (A0–A4 and the stub). On,
   the world restarts as the regulated preset (250 bots) with that government running in the page's worker
   (`gov/page_gov.mjs`: regulate.mjs's loop for scripted governments, with budget day, wake rules, predictions,

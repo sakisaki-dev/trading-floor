@@ -6,6 +6,14 @@
 import fs from 'node:fs'; import path from 'node:path'; import * as E from '../engine.mjs';
 // Field names that must never appear in state/ (spec 8.3); the leak test checks for each as a JSON key
 export const EXCLUDED_KEYS = ['F', 'F0', 'Fpub', 'Fq', 'values', 'bub', 'bands', 'bandHold', 'vcap', 'risk', 'riskRating', 'endPF', 'sens', 'netDist', 'respDist', 'respNear', 'cluster', 'quitAll', 'quitNew', 'adapt', 'limits', 'why', 'buyerWhy', 'sellerWhy', 'aiDetail', 'aiLog', 'rates', 'hidden', 'seed', 'weeksPlanned', 'fit', 'persist', 'tactics'];
+// The whitelist itself: every key now.json may carry, and inside `statistics` every key of every table (spec 8.2, 8.4).
+// Keys that are names from the world (ledger and money lines, forced-sale causes, bills) are checked against the engine's
+// own lists by tests/gov.test.mjs; anything else is a leak
+export const NOW_KEYS = ['week', 'season', 'indicators', 'dials', 'transfers', 'payOrder', 'publish', 'rules', 'treasury', 'statistics', 'ruleErrors', 'lastErrors', 'wake'];
+export const STAT_KEYS = { bots: 1, livingCost: ['fixedPerBot', 'shareOfEquity', 'paid', 'botsShort'], forcedSales: 'causes', liquidatorSales: 1, arrears: ['bots', 'coins', 'byBill', 'paidToDate'],
+  credit: ['rate', 'offered', 'asked', 'lent', 'repaidAtMaturity', 'repaidFromForcedSales', 'writtenOff', 'debt', 'defaults', 'marginCalls'], cash: ['total', 'deciles'], worth: ['total', 'deciles'], decile: ['decile', 'bots', 'coins', 'mean', 'share'],
+  money: ['created', 'removed', 'totalCreated', 'totalRemoved', 'net'] };
+const deep = (v, k = 4) => (Array.isArray(v) ? v.map((x) => deep(x, k)) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([a, x]) => [a, deep(x, k)])) : typeof v === 'number' ? R(v, k) : v);
 const R = (x, k = 2) => (x == null || !Number.isFinite(x) ? x ?? null : Math.round(x * 10 ** k) / 10 ** k);
 const TRADE_WINDOW = 52; // weeks of trades kept in state/trades.jsonl (older weeks are in history.csv as totals)
 const LEAGUE_KINDS = new Set(['champion', 'award', 'hof', 'retire', 'rookie', 'injury', 'return', 'season']);
@@ -26,14 +34,14 @@ export class StateWriter {
     const now = { week: t, season: W.seasonLabel || null, indicators: Object.fromEntries(Object.entries(ind).map(([k, v]) => [k, typeof v === 'number' ? R(v, 4) : v])),
       dials, transfers: G.transfers, payOrder: G.payOrder, publish: G.pub, rules: G.rules,
       treasury: { balance: R(W.treasury), ownAccount: R(G.account), openingGrant: R(G.grant), lastWeek: lines, owedLastWeek: G.owed ? Object.fromEntries(Object.entries(G.owed).map(([k, v]) => [k, R(v)])) : null, fractionsPaid: G.frac ? Object.fromEntries(Object.entries(G.frac).map(([k, v]) => [k, R(v, 4)])) : null },
-      ruleErrors: G.ruleErr, ...extra };
+      statistics: deep(E.govStats(W)), ruleErrors: G.ruleErr, ...extra };
     atomic(path.join(this.dir, 'now.json'), JSON.stringify(now, null, 1));
     fs.appendFileSync(path.join(this.dir, 'ledger.csv'), Object.entries(lines).map(([k, v]) => `${t},${k},${v}\n`).join(''));
     fs.appendFileSync(path.join(this.dir, 'history.csv'), `${[t, ...E.GOV_INDICATORS.filter((k) => k !== 'week').map((k) => (ind[k] == null ? '' : R(ind[k], 4)))].join(',')}\n`);
     // trades as they happen: card, price, quantity, week (no names); auction results and pack clearing prices
     const wk = []; for (const j of W.journal) { if (j.t !== t) continue;
-      if (j.type === 'trade') wk.push({ week: t, kind: 'trade', card: j.card, price: j.price, qty: 1, outside: j.buyer === 'outside collector' || j.seller === 'outside collector' || j.seller === 'Vault store' || j.seller === 'liquidator' });
-      else if (j.type === 'auctionResult' && j.price != null) wk.push({ week: t, kind: 'auction', card: j.card, price: j.price, qty: 1, bids: j.bids });
+      if (j.type === 'trade') wk.push({ week: t, kind: 'trade', card: j.card, price: j.price, qty: 1, outside: j.buyer === 'outside collector' || j.seller === 'outside collector' || j.seller === 'Vault store' || j.seller === 'liquidator', ...(j.seller === 'liquidator' ? { liquidator: true } : {}) });
+      else if (j.type === 'auctionResult' && j.price != null) wk.push({ week: t, kind: 'auction', card: j.card, price: j.price, qty: 1, bids: j.bids, ...(j.seller === 'liquidator' ? { liquidator: true } : {}) });
       else if (j.type === 'exited') wk.push({ week: t, kind: 'exit', reason: j.reason });
       else if (j.type === 'entered') wk.push({ week: t, kind: 'entry' }); }
     for (const [type, p] of Object.entries(W.packWeek || {})) wk.push({ week: t, kind: 'packs', type, released: p.released, bids: p.bids, sold: p.sold, clearingPrice: R(p.price) });

@@ -3642,14 +3642,49 @@ export function applyControls(W, controls) {
 }
 // The public indicators: built only from prices, trades, the population, the treasury's own books and the league's public
 // record (never hidden value or the bots' networks). Rules, wake triggers and the state files read these.
-export const GOV_INDICATORS = ['week', 'bots', 'joined', 'left', 'vaultIndex', 'vaultIndex1w', 'vaultIndex4w', 'vaultIndex20w', 'marksIndex', 'trades', 'auctionSales', 'treasury', 'treasury20w', 'revenue', 'revenue4w', 'spending', 'spending4w', 'consumption', 'ownAccount', 'medianWorth', 'meanCash', 'gini', 'packPrice', 'creditRate', 'approval'];
+export const GOV_INDICATORS = ['week', 'bots', 'joined', 'left', 'vaultIndex', 'vaultIndex1w', 'vaultIndex4w', 'vaultIndex20w', 'marksIndex', 'trades', 'auctionSales', 'treasury', 'treasury20w', 'revenue', 'revenue4w', 'spending', 'spending4w', 'consumption', 'ownAccount', 'medianWorth', 'meanCash', 'gini', 'packPrice', 'creditRate', 'approval',
+  // the statistics office (spec 8.4, added 2026-11-10): measured every week by the engine, never wired into the view before
+  'livingPaid', 'broke', 'forcedSales', 'forcedLiving', 'forcedHolding', 'forcedWealthTax', 'forcedLoanDefault', 'forcedMarginCall', 'forcedEstate', 'forcedCashShock', 'forcedPollTax', 'forcedLevy', 'forcedSalesTax', 'forcedOther', 'liquidatorSales',
+  'arrears', 'arrearsBots', 'debt', 'defaults', 'marginCalls', 'creditOffered', 'creditAsked', 'creditLent', 'creditRepaid', 'creditRepaidForced', 'creditWrittenOff',
+  'cashTop10', 'cashMid40', 'cashBottom50', 'worthTop10', 'worthMid40', 'worthBottom50', 'moneyCreated', 'moneyRemoved', 'moneyNet'];
+// The causes a forced sale is counted under (W.forcedWeek: copies sold into bids or put up at auction with no minimum, each
+// counted under its seller's largest cause this week), and the indicator each one feeds
+export const GOV_FORCED = { 'living costs': 'forcedLiving', 'holding costs': 'forcedHolding', 'wealth tax': 'forcedWealthTax', 'loan default': 'forcedLoanDefault', 'margin call': 'forcedMarginCall', estate: 'forcedEstate', 'cash shock': 'forcedCashShock', 'poll tax': 'forcedPollTax', 'targeted levy': 'forcedLevy', 'sales tax': 'forcedSalesTax', other: 'forcedOther' };
+export const GOV_BILLS = Object.keys(BILLS); // the bills a bot can owe (arrears.byBill in the statistics office's tables)
+// Shares of the total held by the top 10%, the next 40% and the bottom 50% (ranked richest first; as marketStats' cashShare)
+function govShares(xs) { const s = xs.slice().sort((a, b) => b - a), n = s.length, tot = s.reduce((a, b) => a + b, 0) || 1, k = Math.max(1, Math.round(n * 0.1)), h = Math.max(1, Math.round(n * 0.5)), sum = (a) => a.reduce((x, y) => x + y, 0) / tot;
+  return n ? [sum(s.slice(0, k)), sum(s.slice(k, h)), sum(s.slice(h))] : [0, 0, 0]; }
+// Copies the liquidator sold this week (trades and auctions it was the seller of), from the journal
+function govLiqSales(W) { let n = 0; const J = W.journal; for (let i = J.length - 1; i >= 0; i--) { const j = J[i]; if (j.t !== W.t) break; if (j.seller === 'liquidator' && (j.type === 'trade' || (j.type === 'auctionResult' && j.winner))) n++; } return n; }
 export function govIndicators(W) {
   const G = W.gov, h = W.hist, p = h.p, L = (a, k = 1) => (a.length >= k ? a[a.length - k] : null), ch = (k) => (p.length > k && p[p.length - 1 - k] > 0 ? p[p.length - 1] / p[p.length - 1 - k] - 1 : 0);
   const sum = (a, k) => a.slice(-k).reduce((s, x) => s + x, 0), ws = W.bots.map((b) => worth(W, b)).sort((a, b) => a - b), T20 = G.Th.length > 20 ? G.Th[G.Th.length - 21] : G.Th[0];
   return { week: W.t, bots: W.bots.length, joined: W.turnover?.joined ?? 0, left: W.turnover?.left ?? 0, vaultIndex: L(p) ?? 100, vaultIndex1w: ch(1), vaultIndex4w: ch(4), vaultIndex20w: ch(20), marksIndex: h.pMark?.length ? L(h.pMark) : null,
     trades: L(h.trades) ?? 0, auctionSales: W.aucWeek || 0, treasury: W.treasury, treasury20w: W.treasury - (T20 ?? 0), revenue: L(G.revH) ?? 0, revenue4w: sum(G.revH, 4), spending: L(G.spendH) ?? 0, spending4w: sum(G.spendH, 4),
     consumption: G.lastCons || 0, ownAccount: G.account, medianWorth: ws.length ? ws[ws.length >> 1] : 0, meanCash: W.bots.length ? W.bots.reduce((s, b) => s + b.cash, 0) / W.bots.length : 0, gini: L(h.gini) ?? 0,
-    packPrice: W.packPx?.standard ?? packInfo(W, 'standard').price ?? 0, creditRate: W.credit?.rate ?? 0, approval: G.term ? govApproval(W).share : null };
+    packPrice: W.packPx?.standard ?? packInfo(W, 'standard').price ?? 0, creditRate: W.credit?.rate ?? 0, approval: G.term ? govApproval(W).share : null, ...govOffice(W, ws) };
+}
+// The statistics office's indicators (read only: nothing here changes the world). ws: every bot's worth
+function govOffice(W, ws) {
+  const C = W.credit || {}, M = W.moneyWeek, fw = W.forcedWeek || {}, o = { livingPaid: W.living?.spent || 0, broke: W.living?.broke || 0, forcedSales: 0 };
+  for (const k of Object.values(GOV_FORCED)) o[k] = 0; for (const [k, v] of Object.entries(fw)) { o.forcedSales += v; o[GOV_FORCED[k] || 'forcedOther'] += v; }
+  o.liquidatorSales = govLiqSales(W); let an = 0, av = 0; for (const b of W.bots) { const a = arrearsOf(b); if (a > 0) { an++; av += a; } } o.arrears = av; o.arrearsBots = an;
+  Object.assign(o, { debt: totalDebt(W), defaults: C.defaults || 0, marginCalls: C.calls || 0, creditOffered: C.offered || 0, creditAsked: C.asked || 0, creditLent: C.lent || 0, creditRepaid: C.repaid || 0, creditRepaidForced: C.repaidForced || 0, creditWrittenOff: C.writtenOff || 0 });
+  const c = govShares(W.bots.map((b) => b.cash)), w = govShares(ws); [o.cashTop10, o.cashMid40, o.cashBottom50] = c; [o.worthTop10, o.worthMid40, o.worthBottom50] = w;
+  o.moneyCreated = M?.totalIn || 0; o.moneyRemoved = M?.totalOut || 0; o.moneyNet = M?.net || 0; return o;
+}
+// The statistics office's tables for state/now.json (read only): the living cost's settings, forced sales by cause, bills
+// owed by bill, the credit market, cash and worth by decile (ranked as transfers rank them: 1 = poorest tenth, ties by id)
+// and the coins created and removed across the whole economy by line
+export function govStats(W) {
+  const C = W.credit || {}, M = W.moneyWeek, cfg = W.cfg, bs = W.bots, n = bs.length, byBill = {}; let an = 0, av = 0;
+  for (const b of bs) { if (!b.arrears) continue; let s = 0; for (const k in b.arrears) { s += b.arrears[k]; byBill[k] = (byBill[k] || 0) + b.arrears[k]; } if (s > 0) { an++; av += s; } }
+  const deciles = (key) => { const r = bs.map((b) => [b.id, key(b)]).sort((a, c) => a[1] - c[1] || a[0] - c[0]), tot = r.reduce((s, e) => s + e[1], 0), d = Array.from({ length: 10 }, (_, i) => ({ decile: i + 1, bots: 0, coins: 0 }));
+    r.forEach((e, i) => { const x = d[Math.floor((i * 10) / n)]; x.bots++; x.coins += e[1]; }); return { total: tot, deciles: d.map((x) => ({ ...x, mean: x.bots ? x.coins / x.bots : null, share: tot ? x.coins / tot : null })) }; };
+  return { bots: n, livingCost: { fixedPerBot: cfg.livingCost, shareOfEquity: cfg.lifestyle, paid: W.living?.spent || 0, botsShort: W.living?.broke || 0 },
+    forcedSales: { ...(W.forcedWeek || {}) }, liquidatorSales: govLiqSales(W), arrears: { bots: an, coins: av, byBill, paidToDate: W.arrearsPaid || 0 },
+    credit: { rate: C.rate ?? null, offered: C.offered || 0, asked: C.asked || 0, lent: C.lent || 0, repaidAtMaturity: C.repaid || 0, repaidFromForcedSales: C.repaidForced || 0, writtenOff: C.writtenOff || 0, debt: totalDebt(W), defaults: C.defaults || 0, marginCalls: C.calls || 0 },
+    cash: deciles((b) => b.cash), worth: deciles((b) => worth(W, b)), money: M ? { created: { ...M.created }, removed: { ...M.removed }, totalCreated: M.totalIn, totalRemoved: M.totalOut, net: M.net } : null };
 }
 // Wake triggers: [{ field, op, value }] on the public indicators; returns the ones that fire now
 export function checkTriggers(W, triggers, ind = govIndicators(W)) {
