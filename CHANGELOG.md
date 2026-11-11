@@ -15,6 +15,22 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-10
+
+### Fixed
+
+- Repeat sales (the Vault index, `h.p`): a card's opening price starts its chain as the documentation says, but was
+  dated week 0 for every card. Rookies, players switched on at a season rollover and their market cards opened later
+  (2,144 cards by week 80 on seed 31761), so their first pair was booked as if it spanned from week 0, and after
+  week 52 the gap limit dropped it. Now each card records the week it opened (`openT`) and its chain starts there.
+  Results change wherever such a card trades: bots read the Vault index, and so does the government. Found while
+  explaining the marks-vs-repeat-sales gap (DEVLOG, 2026-11-10); about +5% on the index at week 80 on that seed.
+
+### Added (no change to results)
+
+- Scripted government `L`, the Laffer sweep (spec 13.3): one tax fixed at a level from week 0, all revenue recycled as
+  allowance the next week. `--government L --arm-options '{"dial":"fee","level":0.04}'`.
+
 ### Added
 
 - Government runs: the statistics office (`docs/regulator-spec.md` 8.4). `state/now.json` gains `statistics` (the

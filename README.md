@@ -1,7 +1,7 @@
 ![Trading Floor](docs/figures/banner.svg)
 
 [![tests](https://github.com/sakisaki-dev/trading-floor/actions/workflows/test.yml/badge.svg)](https://github.com/sakisaki-dev/trading-floor/actions/workflows/test.yml)
-[![engine](https://img.shields.io/badge/engine-2.0.0-58a6ff)](CHANGELOG.md)
+[![engine](https://img.shields.io/badge/engine-2.0.1-58a6ff)](CHANGELOG.md)
 [![live demo](https://img.shields.io/badge/demo-run%20it%20in%20your%20browser-3fd49a)](https://sakisaki-dev.github.io/trading-floor/)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-9ea7b3)](.nvmrc)
 
@@ -35,8 +35,15 @@ changed while it runs.
   and −0.08 under all 11 settings tested.*
 - The population fell from 501 to 344: 189 bots arrived and 346 left.
 - In a typical week 68% of cards have no bot orders, and asks outnumber bids 4 to 1.*
-- Bots mark their cards at about 5× what cards resell for (marks index 385, repeat-sales index 77). We have not yet
-  found out whether this is the bots' behaviour or a bug.
+- The marks index ends near 385 and the repeat-sales index near 77, but bots do not mark cards at 5× what they
+  resell for. For cards that trade, the median mark equals the card's own last sale (1.00×). About three quarters of
+  the gap comes from how the two indexes are built:
+  - the marks index is an arithmetic, value-weighted average, while repeat sales is geometric and per pair;
+  - only about a quarter of the marks basket traded in the last half year;
+  - repeat sales counts each card's opening price as a first sale, and first sales came in about a third below it.
+
+  About a fifth is real: cards that don't trade keep marks that auction and dealer prices hold up. A small part was a
+  dating bug in repeat sales, fixed in 2.0.1 ([DEVLOG](docs/DEVLOG.md)).
 - The quitting rule had the largest effect of any setting. When bots can quit after heavy losses, the correlation
   between prices and player performance rises from 0.39 to 0.69, and the Gini of wealth falls from 0.56 to 0.47.*
 
@@ -89,7 +96,7 @@ have documented. [docs/PARALLELS.md](docs/PARALLELS.md) gives the numbers, the s
 |---|---|
 | Sealed-bid auctions clear at 1.8–2.2× the mark, and the cards lose 22–30% on resale | The winner's curse in oil lease auctions (Capen, Clapp and Campbell, 1971) |
 | Bots scored on marked value learned to overpay for cards they already held, raising the mark on every copy | Mutual funds buying their own holdings at the quarter's close (Carhart et al., 2002) |
-| Marks climb to about 5× what cards resell for, because few cards ever trade | Stale marks on illiquid assets; Enron's mark-to-market accounting |
+| Cards that don't trade keep marks that occasional auction and dealer prices hold up | Stale marks on illiquid assets |
 | When the dealers left, trading between bots collapsed and took about 2,400 weeks to recover | Auction-rate securities in 2008, when the dealers stopped bidding |
 | A tactic built on heavy borrowing appeared 5 times and was wiped out each time within a generation | LTCM, Archegos, the leverage cycle |
 | Last generation's best bots do no better than average in the next | Mutual fund performance doesn't persist (Carhart, 1997) |

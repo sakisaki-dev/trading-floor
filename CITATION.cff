@@ -6,7 +6,7 @@ title: "Trading Floor: an agent-based simulation of a trading-card market"
 type: software
 authors:
   - name: "sakisaki-dev"
-version: 2.0.0
+version: 2.0.1
 date-released: 2026-11-07
 repository-code: "https://github.com/sakisaki-dev/trading-floor"
 abstract: >-

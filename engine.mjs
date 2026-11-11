@@ -2017,9 +2017,9 @@ function noteWhy(W, j, bd, ak) {
 // since the two clear at different levels (auction sales ran a median ~40% above trades of the same card). Mixing them
 // made the index drift up on flat prices: rises came as trade→auction pairs over longer gaps, falls as auction→trade
 // pairs a week later, and least squares gives long-gap pairs more weight. Within a chain the first sale of a week is
-// paired with the chain's last sale of an earlier week (at most rsMaxGap weeks back); a card's opening price starts chain 0.
+// paired with the chain's last sale of an earlier week (at most rsMaxGap weeks back); a card's opening price starts chain 0, dated the week the card opened (openT; 0 for the save's cards).
 function noteTrade(W, c, price, kind = 0) {
-  const R = (c.rs ||= [{ t0: null, p0: null, wt: 0, wp: c.P0 }, { t0: null, p0: null, wt: null, wp: null }]), r = R[kind];
+  const R = (c.rs ||= [{ t0: null, p0: null, wt: c.openT ?? 0, wp: c.P0 }, { t0: null, p0: null, wt: null, wp: null }]), r = R[kind];
   if (r.wt !== W.t) { if (r.wt != null) { r.t0 = r.wt; r.p0 = r.wp; } if (r.t0 != null && W.t - r.t0 <= W.cfg.rsMaxGap && r.p0 > 0 && price > 0) (W.rsPairs ||= []).push([r.t0, Math.log(price / r.p0)]); r.wt = W.t; r.wp = price; } else r.wp = price;
   if (c.lastTradeT !== W.t) { c.lastTradeT = W.t; c.lastTradeP = price; } else c.lastTradeP = price;
 }
@@ -3019,7 +3019,7 @@ function leagueValues(W) {
     p.F = Math.max(0.05 * cfg.coinScale, v / cfg.valueDivisor); if (p.rookie && p.P === 1 && p.F0 === 1) { p.F0 = p.F; opening.push([p, o]); } // his first price is set below, once every OVR is in
     const e = (W.era[p.id] ||= { on: true }); e.ovr = o; e.legacy = legacy; e.skill = s.skill; e.totals = s.tot; e.value = v; e.active = s.active; e.age = lgAge(p); e.injured = !!(s.out && W.L.week >= s.out[0] && W.L.week <= s.out[1]);
   }
-  for (const [p, o] of opening) { p.P = p.P0 = openPriceOf(W, p, o); p.Ph = [p.P]; resetMarkets(W, p); } // a rookie's cards open at comparable sales (openPrice), not at his hidden value
+  for (const [p, o] of opening) { p.P = p.P0 = openPriceOf(W, p, o); p.Ph = [p.P]; p.openT = W.t; resetMarkets(W, p); } // a rookie's cards open at comparable sales (openPrice), not at his hidden value
   packCache = null; packCacheT = null;
 }
 
@@ -3035,7 +3035,7 @@ function fillLeague(W) {
   fillRosters(W, null, W.players.filter((p) => p.lg?.active).map((p) => p.lg.seasons)); // seasons played, as the save's active players have
   leagueInjuries(W); leagueValues(W);
   for (const p of W.players) { if (p.ref) continue; const e = W.era[p.id], lib = W.library.players[p.id];
-    p.F0 = p.F; p.P = p.P0 = openPriceOf(W, p, e.ovr, true); p.Ph = [p.P]; p.lg.v0 = p.F; Object.assign(lib, { ovr: e.ovr, careerLegacy: e.legacy, stats: libStats(p.pos, p.lg.tot), hidden: { value: e.value } }); }
+    p.F0 = p.F; p.P = p.P0 = openPriceOf(W, p, e.ovr, true); p.Ph = [p.P]; p.openT = W.t; p.lg.v0 = p.F; Object.assign(lib, { ovr: e.ovr, careerLegacy: e.legacy, stats: libStats(p.pos, p.lg.tot), hidden: { value: e.value } }); }
   keep.forEach(([F, F0, P, P0, Ph, e], i) => { Object.assign(W.players[i], { F, F0, P, P0, Ph }); if (e) W.era[i] = e; }); // the save's players open at the site's prices, as in a save-only league
   const copies = (xs) => xs.reduce((a, p) => a + (p.on !== false ? p.S0 : 0), 0); W.fillK = copies(W.players) / Math.max(1, copies(W.players.filter((p) => p.ref))); // money follows the cards
   W.newPlayers = W.players.filter((p) => !p.ref).map((p) => W.library.players[p.id]); packCache = null; packCacheT = null;
@@ -3132,7 +3132,7 @@ export function startTimeline(W) {
   for (const c of W.players) {
     const row = rows[c.key];
     if (!row) { c.on = false; c.pool = 0; c.S0 = 0; W.era[c.id] = { on: false }; continue; }
-    W.era[c.id] = eraFrom(row); c.F = c.F0 = Math.max(0.05 * W.cfg.coinScale, row[0] / W.cfg.valueDivisor); c.P = c.P0 = c.F; c.Ph = [c.F];
+    W.era[c.id] = eraFrom(row); c.F = c.F0 = Math.max(0.05 * W.cfg.coinScale, row[0] / W.cfg.valueDivisor); c.P = c.P0 = c.F; c.Ph = [c.F]; c.openT = W.t;
     c.S0 = printRun(W.cfg, row[0]); c.pool = c.S0 * W.cfg.poolMultiplier; c.on = true;
   }
   return true;
@@ -3302,7 +3302,7 @@ function makeMarket(W, p, d, f) {
     volH: { get() { return volSync(W, m, W._clrT ?? 0); }, enumerable: true }, // the weekly volume history, padded on read (volSync)
     _vh: { value: [], writable: true }, _vT: { value: W._clrT ?? 0, writable: true },
   });
-  Object.assign(m, { id: mktId(p.id, d, f), pid: p.id, d, f, mult, isPlayer: false, isMkt: true, key: `${p.key}|${DESIGNS[d]}|${FINISHES[f]}`, label: `${p.pos} ${p.name} · ${FINISHES[f]} ${DESIGNS[d]}`, P: p.P * mult, P0: p.P * mult, Ph: [p.P * mult], circ: 0, S0: 0, ohlc: [] }); // the player's price, which is his value only where that value is the public opening (the save's cards)
+  Object.assign(m, { id: mktId(p.id, d, f), pid: p.id, d, f, mult, isPlayer: false, isMkt: true, key: `${p.key}|${DESIGNS[d]}|${FINISHES[f]}`, label: `${p.pos} ${p.name} · ${FINISHES[f]} ${DESIGNS[d]}`, P: p.P * mult, P0: p.P * mult, Ph: [p.P * mult], openT: W.t, circ: 0, S0: 0, ohlc: [] }); // the player's price, which is his value only where that value is the public opening (the save's cards)
   return m;
 }
 // A card market's weekly volume history. clear() writes a week's entry only for a card with orders or copies out; a card with
@@ -3314,7 +3314,7 @@ function volSync(W, c, upTo) {
   if (n >= 60) { h.length = 0; for (let i = 0; i < 60; i++) h.push(0); } else { for (let i = 0; i < n; i++) h.push(0); if (h.length > 60) h.splice(0, h.length - 60); }
   c._vT = upTo; return h;
 }
-function resetMarkets(W, p) { for (let d = 0; d < 4; d++) for (let f = 0; f < 4; f++) { const m = W.cards[mktId(p.id, d, f)]; if (!m) continue; m.P = m.P0 = p.P * m.mult; m.Ph = [m.P]; } } // each card at the player's opening price × its premium
+function resetMarkets(W, p) { for (let d = 0; d < 4; d++) for (let f = 0; f < 4; f++) { const m = W.cards[mktId(p.id, d, f)]; if (!m) continue; m.P = m.P0 = p.P * m.mult; m.Ph = [m.P]; m.openT = W.t; } } // each card at the player's opening price × its premium
 // The site's real price history, imported as each card's past: every market snapshot, its value × the rarity
 function seedHistory(W) {
   const H = W.library.history; if (!H || W.cfg.startSeason === 'first') return;

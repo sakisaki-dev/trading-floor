@@ -1122,3 +1122,52 @@ was forced to sell (7%, −22%) branched off and was gone a generation later. Fr
 roughly in half, into auction traders who rarely open packs and bots that trade with dealers and outsiders and open about
 8 packs a generation; both returned +15% to +19% at week 120, and the tracker flagged the pack-openers as cannibalizing
 the auction traders in generation 5. One seed, so these are observations, not findings.
+
+## The marks-vs-repeat-sales gap, explained (2026-11-10, engine 2.0.0 → 2.0.1)
+
+By week 200 of Realism the marks index sits near 4× the repeat-sales (Vault) index, and the README said bots mark
+their cards at about 5× what they resell for. They don't. For cards that trade, the median of mark ÷ the card's own
+last trade is 1.00 at every checkpoint. The gap is mostly how the two indexes are built.
+
+The probe was Realism, seed 31761, practiceGens 0, using instrumented engine copies whose hooks only read state. Every
+probe followed the identical trajectory. At week 200 the marks index was 323 and repeat sales 85. The gap,
+ln(323/85) = 1.34, splits into four steps:
+
+| Step | Index | Log points | Share |
+|---|---|---|---|
+| Arithmetic, value-weighted marks basket → geometric mean of the same marks (cards' P/P0 run from 0.13× at the 10th percentile to 107× at the 99th) | 323 → 201 | 0.47 | 36% |
+| Print-run weights → equal weights | 201 → 176 | 0.13 | 10% |
+| Each card's mark → its own last trade (only 26% of basket weight traded in the last 26 weeks; recently traded cards are marked at about repeat-sales level, idle ones at 126–161) | 176 → 139 | 0.24 | 18% |
+| How repeat sales is built | 139 → 85 | 0.49 | 37% |
+
+How repeat sales is built:
+- The opening price counts as each card's first sale, and first sales came in about a third below it. Without the
+  opening pairs, the index's fall from 100 to 70 in weeks 1–5 disappears.
+- Short gaps between sales average −1%, long gaps +14%.
+- Second and later trades in a week are not paired.
+
+Marks move mostly through auctions, which clear at 1.7–2.2× the mark and feed comparable sales: +1.01 log points of the
+marks index to week 200. Dealer trades add +0.43, comparable-sales marks +0.34 and `bookMark` −0.42. A counterfactual in
+which auction sales neither re-mark the card nor feed comparables kept the gap (2.35× at week 45, against 2.2–2.8× in
+the baseline). Auctions are the largest channel in the accounting, but they are not the cause.
+
+Verdict:
+- About three quarters is measurement and definition.
+- About a fifth is genuine: idle cards keep marks that auction and dealer prices hold up.
+- A small part was a bug. A late-opening card's first pair was dated week 0, since `noteTrade` started every chain at
+  `wt: 0`, against METRICS.md's "a card's opening price counts as its first trade". These are rookies, players
+  switched on at rollovers, and their market cards: 2,144 cards by week 80. Their opening pairs averaged −0.99 log
+  points and were booked as if they spanned from week 0, then dropped by the 52-week gap limit. Fixed in 2.0.1 (each
+  card records `openT`), about +5% on the index at week 80.
+
+There is no runaway like the round-3 ask ratchet.
+
+In the 1,500-week government pilot (runs/g1), market cap grew from 18M to 59M because circulation grew from 10,604 to
+34,004 cards. Market cap per card stayed at 1,695–1,741. By week 1,500 repeat sales had passed the marks index (455
+against 405).
+
+Left open, as measurement choices with no effect on the world:
+- reporting a geometric or recently-traded marks index with a stale-weight share;
+- whether P0 should count as a sale at all.
+
+Bots never read the marks index. Only the crash and rally log and the government's `marksIndex` do.

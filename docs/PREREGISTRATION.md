@@ -26,6 +26,18 @@ These happened before this file existed. They are reported with every result.
    wrote to `now.json` (spec 8.4). Nothing from 8.3 is added. g1 and G1 therefore differ in what the government sees,
    and the scripted arms are unaffected, because they read only fields that existed before.
 
+## Deviations after part 1
+
+Part 1 above is unchanged. Each deviation is listed here as it happens.
+
+5. **A bug fix moved the engine to 2.0.1 during Gate B** (2026-11-10). Repeat sales dated every card's opening price
+   at week 0. Rule 1.1 classifies this as a bug, because the documentation says the opening counts as the card's
+   first trade, which means the week it opened. The eight runs started at `aef611e` (2.0.0) are kept as the **pilot
+   comparison set for g1**, which ran on the same engine. They are reported only against g1. Gate B proper runs on
+   2.0.1 in `runs/gateb/`.
+6. **The 7,000-week do-nothing run is deferred.** On a full machine it would take more than a day. It runs after the
+   rest of Gate B.
+
 ## Part 1
 
 ### 1.1 The bug-versus-result rubric

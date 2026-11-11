@@ -78,6 +78,12 @@ venture holdings, Level 3 assets on bank balance sheets, Enron's long-term energ
 mark-to-market values its own models produced. In each case the reported value can drift well above what the asset
 would fetch, and the gap shows only when something has to be sold.
 
+**Engine 2.0 correction (2026-11-10).** Most of the 2.0 gap between the marks index and repeat sales is how the two
+indexes are built, not overvaluation. The marks index is an arithmetic, value-weighted average, and repeat sales is
+geometric and counts each opening price as a first sale. For cards that trade, the median mark equals the card's own
+last sale. About a fifth of the gap is the stale-marks effect described here: idle cards keep marks that occasional
+auction and dealer prices hold up ([DEVLOG](DEVLOG.md)).
+
 **Where it breaks.** Enron's marks were set by people with a reason to inflate them. The sandbox's marks come from a
 fixed rule with no one steering it. The runaway mark is closer to a pricing feedback loop than to fraud.
 
