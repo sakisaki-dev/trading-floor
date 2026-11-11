@@ -208,7 +208,7 @@ for (let week = 1; week <= target; week++) {
   if (replaying) for (const e of logged.get(week) || []) applyLogged(e);
   else { while (pending.length && (A.lockstep == null || pending[0].applyAt <= week)) applyTurn(pending.shift()); }
   E.step(W);
-  const f = E.frame(W, { full: true }), h = frameHash(f); gz.write(JSON.stringify(f) + '\n'); f.govX = E.govView(W); // govX: the page's view of the layer, added after the hash and frames.jsonl.gz (display only)
+  const f = E.frame(W, { full: true }), h = frameHash(f); gz.write(JSON.stringify(f) + '\n'); f.govX = E.govView(W); f.welfare = E.welfareStats(W); // govX and welfare (bot welfare at bid value): added after the hash and frames.jsonl.gz (display and analysis only)
   if (replaying && priorHashes[week] && priorHashes[week] !== h) throw new Error(`week ${week} differs from the logged run (hash ${h.slice(0, 12)} against ${priorHashes[week].slice(0, 12)})`);
   if (!(resumeDir && week <= lastLoggedWeek)) fs.appendFileSync(hashF, h + '\n');
   frames.push(f); if (frames.length > FULL_WEEKS) thin(frames.length - 1 - FULL_WEEKS);

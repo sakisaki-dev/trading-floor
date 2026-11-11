@@ -3845,6 +3845,13 @@ function govFrame(W) {
 // allowance input for a bot at the median worth), what each weekly spending line was owed, the players the board
 // mentions most with their two card inputs, and the lump sums booked out of fitness this week.
 export const GOV_VIEW_IN = ['policy: royaltyRate', 'policy: allowance paid (÷ worth)', 'policy: fee', 'policy: packSalesTax'];
+// Bot welfare at bid value (spec 2.3): what each bot could actually sell for this week (realValue). Measurement only: it
+// reads the world and draws nothing, and regulate.mjs adds it to a frame after the frame's hash, so results don't change.
+export function welfareStats(W) {
+  const v = W.bots.map((b) => realValue(W, b)).sort((x, y) => x - y), n = v.length; if (!n) return null;
+  const q = (p) => v[Math.min(n - 1, Math.floor(p * n))], sum = (a) => a.reduce((x, y) => x + y, 0), h = Math.round(n * 0.5);
+  return { median: Math.round(q(0.5)), mean: Math.round(sum(v) / n), p10: Math.round(q(0.1)), p90: Math.round(q(0.9)), bottom50Mean: Math.round(sum(v.slice(0, h)) / Math.max(1, h)), negative: Math.round((v.filter((x) => x < 0).length / n) * 1000) / 1000 };
+}
 export function govView(W) {
   const G = W.gov; if (!G) return null; const R = (x, k = 4) => (typeof x === 'number' && Number.isFinite(x) ? Math.round(x * 10 ** k) / 10 ** k : x ?? null);
   const ind = govIndicators(W), nw = Math.max(NW_FLOOR * W.cfg.coinScale, ind.medianWorth || 0), x = new Float64Array(BOT_IN_BASE.length + govBotIn(G.boardIn).length);

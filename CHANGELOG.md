@@ -15,6 +15,13 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 
 ## [Unreleased]
 
+### Added
+- Bot welfare at bid value (spec 2.3): `welfareStats()` measures what each bot could sell its holdings for that week
+  (median, mean, 10th and 90th percentiles, the poorer half's mean, the share below zero). `regulate.mjs` adds it to each
+  frame as `welfare` after the frame's hash, so no result or replay hash changes.
+- `tools/compare_arms.mjs` reports the worth and cash shares (Gini goes above 1 once many bots have negative worth),
+  welfare at bid value, the spec 2.3 primary outcomes and every 10th week of each series (`--json`).
+
 ## [2.0.1] - 2026-11-10
 
 ### Fixed

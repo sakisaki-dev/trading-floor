@@ -4,15 +4,21 @@
 // A run dir holds run.json from regulate.mjs. A0 runs are recognised by meta.government === 'A0'.
 import fs from 'node:fs'; import path from 'node:path';
 const argv = process.argv.slice(2), jI = argv.indexOf('--json'), jsonOut = jI >= 0 ? argv.splice(jI, 2)[1] : null;
-// GOV_INDICATORS at the time govX.ind was first recorded; later engines may append fields, never reorder these.
-const IND = ['week', 'bots', 'joined', 'left', 'vaultIndex', 'vaultIndex1w', 'vaultIndex4w', 'vaultIndex20w', 'marksIndex', 'trades', 'auctionSales', 'treasury', 'treasury20w', 'revenue', 'revenue4w', 'spending', 'spending4w', 'consumption', 'ownAccount', 'medianWorth', 'meanCash', 'gini', 'packPrice', 'creditRate', 'approval'];
+// govX.ind is in GOV_INDICATORS order; later engines append fields and never reorder, so older runs just lack the new ones.
+import { GOV_INDICATORS as IND } from '../engine.mjs';
 const at = (k) => IND.indexOf(k);
 // What each week contributes: [name, (frame) => number]
 const SERIES = [
   ['bots', (f) => f.govX?.ind?.[at('bots')]],
   ['medianWorth', (f) => f.govX?.ind?.[at('medianWorth')]],
   ['meanCash', (f) => f.govX?.ind?.[at('meanCash')]],
-  ['gini', (f) => f.h?.gini],
+  ['gini', (f) => f.h?.gini], // above 1 once many bots have negative worth: read the shares below instead
+  ['worthTop10', (f) => f.govX?.ind?.[at('worthTop10')]],
+  ['worthBottom50', (f) => f.govX?.ind?.[at('worthBottom50')]],
+  ['cashBottom50', (f) => f.govX?.ind?.[at('cashBottom50')]],
+  ['welfareMedian', (f) => f.welfare?.median], // bot welfare at bid value (spec 2.3); runs before 2026-11-11 lack it
+  ['welfareBottom50', (f) => f.welfare?.bottom50Mean],
+  ['negativeShare', (f) => f.welfare?.negative],
   ['brokeShare', (f) => (f.mkt?.broke != null && f.govX?.ind?.[at('bots')] ? f.mkt.broke / f.govX.ind[at('bots')] : null)],
   ['arrearsBots', (f) => f.arrears?.bots],
   ['cashTop10', (f) => f.mkt?.cashTop10],
@@ -33,6 +39,14 @@ function load(dir) {
   for (const [k, g] of SERIES) { const s = F.slice(1).map(g); out.end[k] = s[s.length - 1] ?? null; out.all[k] = mean(s); out.half[k] = mean(s.slice(s.length >> 1)); }
   for (const f of F.slice(1)) for (const side of ['created', 'removed']) for (const [k, v] of Object.entries(f.money?.[side] || {})) out.flows[side][k] = (out.flows[side][k] || 0) + v;
   out.turns = r.gov?.decisions?.filter((d) => d.type === 'turn').length ?? 0;
+  // Spec 2.3 primary outcomes from the treasury's ledger lines (frame gov.lines: positive in, negative out). Revenue is
+  // every inflow but the opening grant; transfers to bots are every outflow but consumption and the own account.
+  const P = { rev: 0, toBots: 0, cons: 0 }, wk = [];
+  for (const f of F.slice(1)) { let tb = 0; for (const [k, v] of Object.entries(f.gov?.lines || {})) { if (k === 'openingGrant') continue; if (v > 0) P.rev += v; else if (k === 'consumption' || k === 'ownAccount') P.cons -= v; else tb -= v; } P.toBots += tb; wk.push(tb); }
+  const roll = wk.map((_, i) => wk.slice(Math.max(0, i - 3), i + 1).reduce((s, x) => s + x, 0)).sort((x, y) => x - y), need = (roll[Math.floor(0.95 * (roll.length - 1))] || 0) / 4;
+  out.primary = { fiscalStance: P.rev ? P.toBots / P.rev : null, bufferWeeks: need ? (F[n].gov?.T ?? 0) / need : null, consumptionShare: P.rev ? P.cons / P.rev : 0, revenue: P.rev, transfersToBots: P.toBots };
+  // every 10th week of each series, for figures
+  out.series = Object.fromEntries(SERIES.map(([k, g]) => [k, F.filter((_, i) => i % 10 === 0).map(g)]));
   return out;
 }
 const runs = argv.map(load), a0 = runs.filter((r) => r.gov === 'A0');
@@ -46,5 +60,8 @@ for (const win of ['end', 'half']) {
     console.log([k, ...cells, a0.length > 1 ? `${fmt(lo)}–${fmt(hi)}` : ''].join('\t'));
   }
 }
+console.log('\nPrimary outcomes (spec 2.3; bot welfare is welfareMedian above, at bid value, for runs that record it)');
+console.log(['outcome', ...runs.map((r) => r.dir)].join('\t'));
+for (const k of ['fiscalStance', 'bufferWeeks', 'consumptionShare', 'revenue', 'transfersToBots']) console.log([k, ...runs.map((r) => fmt(r.primary[k]))].join('\t'));
 console.log('\n▲/▼: beyond the range of the A0 seeds.');
-if (jsonOut) fs.writeFileSync(jsonOut, JSON.stringify(runs, null, 1));
+if (jsonOut) fs.writeFileSync(jsonOut, JSON.stringify(runs));
