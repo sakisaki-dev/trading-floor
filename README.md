@@ -1,7 +1,7 @@
 ![Trading Floor](docs/figures/banner.svg)
 
 [![tests](https://github.com/sakisaki-dev/trading-floor/actions/workflows/test.yml/badge.svg)](https://github.com/sakisaki-dev/trading-floor/actions/workflows/test.yml)
-[![engine](https://img.shields.io/badge/engine-2.0.1-58a6ff)](CHANGELOG.md)
+[![engine](https://img.shields.io/badge/engine-2.1.0-58a6ff)](CHANGELOG.md)
 [![live demo](https://img.shields.io/badge/demo-run%20it%20in%20your%20browser-3fd49a)](https://sakisaki-dev.github.io/trading-floor/)
 [![node](https://img.shields.io/badge/node-%E2%89%A520-9ea7b3)](.nvmrc)
 

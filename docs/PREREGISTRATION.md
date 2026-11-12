@@ -37,6 +37,13 @@ Part 1 above is unchanged. Each deviation is listed here as it happens.
    2.0.1 in `runs/gateb/`.
 6. **The 7,000-week do-nothing run is deferred.** On a full machine it would take more than a day. It runs after the
    rest of Gate B.
+7. **The regulated preset's living cost now scales with wealth** (2026-11-12, engine 2.1.0). Eight do-nothing runs
+   that each changed one setting (DEVLOG, "What drains the regulated world") showed that the fixed 200 coins a bot a
+   week left two thirds of bots broke under every government, so no policy could show against the seed spread. This is
+   a change of world, not a bug fix: the owner chose it. The regulated preset now charges `livingCost` 0 and
+   `lifestyle` 0.001 (about the same total, in proportion to equity), the setting tested as `livingProp`. Gate B is
+   started over on 2.1.0 in `runs/gateb/`; nothing run before is part of it. The Claude government is not re-run in
+   this stretch (no subscription use), so G1 waits.
 
 ## Part 1
 

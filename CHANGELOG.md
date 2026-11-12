@@ -15,6 +15,13 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-12
+
+### Changed
+- The regulated preset's living cost scales with wealth: `livingCost` 200 → 0 and `lifestyle` 0.0005 → 0.001 (about the
+  same total, charged in proportion to equity). With the fixed 200 a week, two thirds of bots were broke under every
+  government and policy could not show (DEVLOG, "What drains the regulated world"). Realism is unchanged.
+
 ### Added
 - Bot welfare at bid value (spec 2.3): `welfareStats()` measures what each bot could sell its holdings for that week
   (median, mean, 10th and 90th percentiles, the poorer half's mean, the share below zero). `regulate.mjs` adds it to each

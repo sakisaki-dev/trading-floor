@@ -1,7 +1,7 @@
 {
  "allowance": 200,
- "livingCost": 200,
- "lifestyle": 0.0005,
+ "livingCost": 0,
+ "lifestyle": 0.001,
  "royaltyFunding": "house",
  "royaltyRate": 0.05,
  "holdCost": 0.0005,

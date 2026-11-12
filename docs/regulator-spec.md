@@ -238,7 +238,8 @@ published values that are not dials:
 - newcomers' starting cash (in);
 - outside collectors' and the store's sales and purchases (in and out);
 - pack revenue to the publisher (out);
-- living and lifestyle costs: Realism values `livingCost` 200 and `lifestyle` 0.0005 (out);
+- living and lifestyle costs: Realism values `livingCost` 200 and `lifestyle` 0.0005; the regulated preset from engine
+  2.1.0 charges `livingCost` 0 and `lifestyle` 0.001, in proportion to equity (PREREGISTRATION deviation 7) (out);
 - cash shocks (out);
 - cash carried out by bots who leave (out);
 - liquidator proceeds of seized cards (out, or to claimant lenders, AUDIT 5c).
