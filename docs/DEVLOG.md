@@ -1171,3 +1171,31 @@ Left open, as measurement choices with no effect on the world:
 - whether P0 should count as a sale at all.
 
 Bots never read the marks index. Only the crash and rally log and the government's `marksIndex` do.
+
+## What drains the regulated world (2026-11-11, engine 2.0.1, commit 136d768)
+
+Under every government tried (Claude, do-nothing, balanced, greedy, generous) the regulated world lost bots and most of
+the rest went broke, and the policies barely differed from the spread of do-nothing seeds. To find the cause, eight
+do-nothing runs (A0, seed 1, 750 weeks, `runs/drain/`) each changed one setting of the regulated preset. One seed
+each, so small differences are noise. Means over weeks 376–750:
+
+| Setting changed | Bots (from 501) | Broke | Worth below zero | Median welfare at bid | Top 10% of worth | Top 10% of cash |
+|---|---|---|---|---|---|---|
+| none (base) | 206 | 66% | 51% | 0.2k | 87% | 93% |
+| livingCost 0 | 286 | 7% | 1% | 29k | 60% | 90% |
+| livingCost 100 | 263 | 41% | 20% | 9k | 74% | 93% |
+| livingCost 0, lifestyle 0.001 (scaled to wealth) | 278 | 8% | 1% | 31k | 56% | 87% |
+| quitChance 0 | 976 | 93% | 88% | −48k | — | 100% |
+| cashShockChance 0 | 207 | 47% | 28% | 10k | 77% | 92% |
+| credit off | 238 | 84% | 42% | 8k | 76% | 100% |
+| wealthTax 0 | 187 | 55% | 36% | 9k | 81% | 93% |
+
+- The fixed living cost (200 coins a bot a week) causes the poverty: without it the broke share falls from 66% to 7%.
+  The same total charged in proportion to wealth gives the same relief and the least concentrated wealth.
+- Quitting is how the world sheds the bots the living cost ruins, not a separate drain. With no quitting nobody left
+  (638 joined, 0 left), the population passed 1,100, and 93% were broke: the market's income supports only a limited
+  number of bots at 200 a week, and quitting keeps the population near that number. Bots also leave when not broke
+  (896 left with no living cost), so quitting is partly the newcomers' random networks.
+- Lending between bots helps the poor: with credit off, more bots were broke (84%) and the top 10% held all the cash.
+- Cash shocks and the wealth tax change little that one seed can show.
+- None of these settings moved cash concentration much (87–100% in the top 10%): that comes from the market itself.
