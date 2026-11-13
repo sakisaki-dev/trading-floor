@@ -287,31 +287,41 @@
   <!-- The government (docs/regulator-spec.md §16): shown only for a run with a government (a replayed or followed
        regulate.mjs run). The government never sees this page. -->
   <section class="panel gov" id="govPanel" aria-labelledby="gov-h" hidden>
-    <div class="head"><h2 id="gov-h">Government</h2><span class="note" id="govNote">what it read, changed, posted and wrote · the government never sees this page · how each part works is at the end</span></div>
+    <div class="head"><h2 id="gov-h">Government</h2><span class="note" id="govNote">what it changed, why, and what it told the bots · newest first · it never sees this page</span></div>
     <div class="gov__status" id="govStatus" role="status"></div>
-    <div class="stats" id="govStats"></div>
-    <div class="grid two">
-      <div>
-        <div class="head"><h2 class="h3">Treasury and its own account</h2><span class="legend"><span><i class="line" style="background:var(--c-blue)"></i>Treasury</span><span><i class="line" style="background:var(--c-orange)"></i>Own account</span><span><i class="line" style="background:var(--faint)"></i>Decision</span></span></div>
-        <canvas id="govT" class="ch" aria-label="Treasury balance and the government's own account, week by week, with its decisions marked"></canvas>
+    <!-- The main view: one timeline of its turns (dial moves, commentary, board posts), with its notebook beside it -->
+    <div class="gov__main">
+      <div class="gov__feedcol">
+        <div class="gov__bar" id="govFilter" role="group" aria-label="Show in the timeline"></div>
+        <ol class="gov__tl" id="govFeed" aria-label="The government's turns, newest first"></ol>
       </div>
-      <div>
-        <div class="head"><h2 class="h3">Revenue and spending a week</h2><span class="legend"><span><i class="line" style="background:var(--c-green)"></i>Revenue</span><span><i class="line" style="background:var(--c-pink)"></i>Spending</span><span><i class="line" style="background:var(--c-orange)"></i>Consumption</span></span></div>
-        <canvas id="govRS" class="ch" aria-label="Treasury revenue, spending and consumption per week"></canvas>
+      <aside class="gov__side" aria-labelledby="gov-nb-h">
+        <div class="gov__moved" id="govMoved"></div>
+        <div class="head"><h2 class="h3" id="gov-nb-h">Notebook</h2><span class="note" id="govNbNote">its own file · new lines marked</span></div>
+        <div id="govNb" class="gov__nb"></div>
+      </aside>
+    </div>
+    <!-- External stats: the treasury, the ledger, every dial and how the layer works (drawGovHow in ui.js), folded away
+         by default; the choice is remembered in localStorage -->
+    <div class="gov__xhead">
+      <button type="button" class="gov__xbtn" id="govXBtn" aria-expanded="false" aria-controls="govX"><span class="gov__xchev" aria-hidden="true"></span><span id="govXLbl">Show external stats</span></button>
+      <span class="note">treasury · ledger · dials · what the bots read · indicators</span>
+    </div>
+    <div class="gov__x" id="govX" hidden>
+      <div class="gx__real" id="gxReal"></div>
+      <div class="stats gov__tiles" id="govStats"></div>
+      <div class="gx gx--top">
+        <article class="gx__c" id="gx-treasury"><header><h3>Treasury</h3><span id="gxSecT"></span></header>
+          <div id="gxEq"></div>
+          <canvas id="govT" class="ch gx__ch" aria-label="Treasury balance and the government's own account, week by week, with its decisions marked"></canvas>
+          <p class="gx__leg"><i style="background:var(--c-blue)"></i>treasury <i style="background:var(--c-orange)"></i>own account <i style="background:var(--faint)"></i>a decision</p></article>
+        <article class="gx__c" id="gx-lines"><header><h3>Revenue and spending</h3><span class="seg gx__seg" id="gxPer" role="group" aria-label="Period"><button type="button" data-per="week" aria-pressed="true">Week</button><button type="button" data-per="20" aria-pressed="false">20 wk</button><button type="button" data-per="run" aria-pressed="false">Run</button></span><span id="gxSecL"></span></header>
+          <div id="gxLines"></div>
+          <canvas id="govRS" class="ch gx__ch" aria-label="Treasury revenue, spending and consumption per week"></canvas>
+          <p class="gx__leg"><i style="background:var(--c-green)"></i>revenue <i style="background:var(--c-pink)"></i>spending <i style="background:var(--c-orange)"></i>consumption · a week</p></article>
       </div>
+      <div class="gx" id="gx" aria-label="How the government works, with this week's numbers"></div>
     </div>
-    <div class="tablewrap"><table id="govLines" class="gov__lines"><thead><tr><th>Ledger line</th><th class="num">This week</th><th class="num">Last 20 weeks</th><th class="num">Whole run</th></tr></thead><tbody></tbody></table></div>
-    <div class="grid three gov__cols">
-      <div><div class="head"><h2 class="h3">Commentary</h2><span class="note">week read → week it took effect</span></div><div id="govComm" class="gov__feed"></div></div>
-      <div><div class="head"><h2 class="h3">The board</h2><span class="note">every post, with the numbers the bots read from it</span></div><div id="govBoard" class="gov__feed"></div></div>
-      <div><div class="head"><h2 class="h3">Notebook</h2><span class="note" id="govNbNote">its own file · new lines marked</span></div><div id="govNb" class="gov__nb"></div></div>
-    </div>
-    <div class="head"><h2 class="h3">Dials timeline</h2><span class="note">every setting it touched, old → new, at the week it took effect</span></div>
-    <div id="govDials" class="gov__dials"></div>
-    <!-- How the government works: every part of the spec with its live numbers (drawGovHow in ui.js) -->
-    <div class="head gx__head"><h2 class="h3" id="gx-h">How the government works</h2><span class="note">each part of the spec, working, with this week's numbers · § opens that section of the spec</span></div>
-    <div class="gx__real" id="gxReal"></div>
-    <div class="gx" id="gx" aria-labelledby="gx-h"></div>
   </section>
 
   <section class="panel health" id="healthPanel" aria-labelledby="hb2-h">

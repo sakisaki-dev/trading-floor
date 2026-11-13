@@ -1410,152 +1410,263 @@ function drawCons() {
 
 
 /* ---------- The government (regulated runs: docs/regulator-spec.md §16) ---------- */
-// Shown only for a run that has one (a replayed or followed regulate.mjs run): status, the treasury and its own account,
-// the ledger by line, the commentary, the board with its parsed signals, the notebook (new lines marked) and every dial
-// it touched. Everything follows the cursor in a replay. With no government the panel stays hidden and nothing else changes.
+// Shown only for a run that has one (a replayed or followed regulate.mjs run). The main view is the government itself:
+// one timeline of its turns, newest first (each dial move old → new with the week read and the week applied, its
+// commentary, its board post with the numbers the bots read from it, rejected controls and predictions), the dials it has
+// moved and its notebook. The treasury, the ledger, every dial and how the layer works are "external stats", folded away
+// until shown. Everything follows the cursor in a replay. With no government the panel stays hidden.
 const UI_GOV_REV = new Set(['fees', 'holding', 'wealthTax', 'packTax', 'outsideTax', 'exitTax', 'pollTax', 'levy']);
 const UI_GOV_NAME = { fees: 'Trade and auction fees', holding: 'Holding costs', wealthTax: 'Wealth tax', packTax: 'Pack sales tax', outsideTax: 'Outside sales tax', exitTax: 'Exit tax', pollTax: 'Poll tax', levy: 'Levies', allowance: 'Allowance', transfers: 'Transfers', royalties: 'Royalties', consumption: 'Government consumption', feeSubsidy: 'Fee subsidy', packSubsidy: 'Pack subsidy', outsideSubsidy: 'Outside subsidy', exitSubsidy: 'Exit subsidy', wealthSubsidy: 'Wealth subsidy', holdSubsidy: 'Holding subsidy', openingGrant: 'Opening grant' };
 let GOV_ON = false; // a run with a government is shown (applyLayout keeps the panel hidden otherwise)
 function govShow(on) { const p = $('govPanel'); GOV_ON = !!on; if (!p || p.hidden === !on) return; p.hidden = !on; if (typeof drawNav === 'function' && typeof ROWS !== 'undefined') drawNav(); }
 const uiGovVal = (v) => (typeof v === 'number' ? (Math.abs(v) >= 1000 ? fmt(v) : String(+v.toPrecision(4))) : typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v));
+// The panel's presentation state (display only, kept in this browser): external stats shown or folded, the timeline's
+// filter and length, the ledger's period and which disclosures are open.
+const GOV_X_KEY = 'tf-gov-stats';
+let GOV_X = false; try { GOV_X = localStorage.getItem(GOV_X_KEY) === 'shown'; } catch {}
+let GOV_FILTER = 'all', GOV_LIMIT = 8, GX_PER = 'week'; const GX_DET = new Map();
+function govXSet(v, save = true) {
+  GOV_X = !!v; if (save) try { localStorage.setItem(GOV_X_KEY, GOV_X ? 'shown' : 'hidden'); } catch {}
+  const b = $('govXBtn'), x = $('govX'); if (b) b.setAttribute('aria-expanded', String(GOV_X)); if ($('govXLbl')) $('govXLbl').textContent = GOV_X ? 'Hide external stats' : 'Show external stats'; if (x) x.hidden = !GOV_X;
+  if (GOV_X) { wake = true; drawGov(); }
+}
+const govSame = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// A dial's value in words: numbers short, the structured controls (transfers, payOrder, publish, rules) spelled out
+function govFmt(k, v) {
+  if (k === 'payOrder') return Array.isArray(v) ? v.join(' → ') : v == null ? 'pro rata' : String(v);
+  if (v == null) return k === 'rules' ? 'none' : '–';
+  if (k === 'transfers') return Array.isArray(v) ? (v.length ? v.map((x) => `${gxN(x.amount)} → ${x.to && typeof x.to === 'object' ? JSON.stringify(x.to) : x.to}${x.lo ? ` ${x.lo}–${x.hi ?? x.lo}` : ''}${x.weeks ? ` (${x.weeks} wk)` : ''}${x.player ? ` ${x.player}` : ''}`).join('; ') : 'none') : JSON.stringify(v);
+  if (k === 'publish' && typeof v === 'object') return Object.entries(v).map(([a, b]) => `${a} ${b ? 'shown' : 'withheld'}`).join(', ') || 'all shown';
+  if (k === 'rules' && typeof v === 'object') return Object.entries(v).map(([a, r]) => `${a} = ${r.base}${(r.terms || []).map(([x, c]) => ` + ${+c.toPrecision(3)}×${x}`).join('')}${r.min != null ? `, ≥ ${r.min}` : ''}${r.max != null ? `, ≤ ${r.max}` : ''}`).join('; ') || 'none';
+  if (typeof v === 'boolean') return v ? 'on' : 'off';
+  if (typeof v === 'number') return gxN(v);
+  return typeof v === 'object' ? JSON.stringify(v) : String(v);
+}
+// One dial move: name, old (struck), new, and an arrow for a number that went up or down
+const govMove = (c) => { const n = typeof c.old === 'number' && typeof c.new === 'number', dir = n ? (c.new > c.old ? 1 : c.new < c.old ? -1 : 0) : 0;
+  return `<li class="gt__mv"><code>${esc(c.dial)}</code><s>${esc(govFmt(c.dial, c.old))}</s><i aria-hidden="true">→</i><b>${esc(govFmt(c.dial, c.new))}</b>${dir ? `<em aria-label="${dir > 0 ? 'raised' : 'cut'}">${dir > 0 ? '▲' : '▼'}</em>` : ''}</li>`; };
+const govTone = (v) => `<span class="gt__tag ${v > 0.05 ? 'up' : v < -0.05 ? 'down' : ''}">tone ${(v >= 0 ? '+' : '') + (v ?? 0).toFixed(2)}</span>`;
+// The timeline: every turn (or scripted decision), handover and election up to the cursor, newest first. A turn that
+// changed nothing and said nothing folds into a "quiet" row with its neighbours.
+function govFeed(R, D, t) {
+  const posts = new Map(), scored = R.predictions || []; const items = [];
+  for (const d of D) {
+    if (d.type === 'handover') { items.push({ w: d.weekEffective ?? d.week + 1, html: `<li class="gt gt--ev"><div class="gt__h"><time>W${d.weekEffective ?? d.week + 1}</time><span class="gt__tag">handover</span><span>${esc(d.from)} → <b>${esc(d.to)}</b> · outgoing account ${fmt(d.outgoingAccount)}</span></div></li>`, kind: 'event' }); continue; }
+    if (d.type !== 'turn' && d.type !== 'arm') continue;
+    const mv = (d.changes || []).filter((c) => !govSame(c.old, c.new)), same = (d.changes || []).filter((c) => govSame(c.old, c.new)), b = d.board?.text ? d.board : null, errs = d.errors || [], failed = d.facts && !d.facts.ok;
+    const quiet = !mv.length && !d.commentary && !b && !errs.length && !failed && !d.budgetDay;
+    const kinds = [mv.length ? 'moves' : '', b ? 'posts' : '', errs.length || failed ? 'rejected' : '', d.commentary ? 'notes' : ''].filter(Boolean);
+    items.push({ w: d.weekEffective, d, mv, quiet, kinds, dials: mv.map((c) => c.dial), html: quiet ? null : (() => {
+      const p = b?.parsed || {}, lag = d.lagWeeks ?? d.weekEffective - d.weekRead;
+      const meta = [`read W${d.weekRead}`, `lag ${lag} wk`, d.gov && (R.governments || []).length > 1 ? esc(d.gov) : '', d.type === 'arm' ? `arm ${esc(d.arm)}` : ''].filter(Boolean).join(' · ');
+      const tags = [!mv.length ? '<span class="gt__tag">no dial moved</span>' : '', d.budgetDay ? '<span class="gt__tag gt__tag--acc">budget day</span>' : '', d.wakeReason === 'trigger' ? `<span class="gt__tag gt__tag--acc" title="${esc((d.triggers || []).map((x) => `${x.field} ${x.op} ${x.value}`).join(', '))}">woken by a trigger</span>` : '', failed ? '<span class="gt__tag down">turn failed</span>' : ''].join('');
+      const pr = (d.predictions || []).map((q) => { const s = scored.find((x) => x.turn === q.turn && x.metric === q.metric && x.due === q.due && x.direction === q.direction && x.hit != null && x.due <= t); return `<span class="gt__tag ${s ? (s.hit ? 'up' : 'down') : ''}" title="predicted from ${esc(gxN(q.base))} at W${q.from}${s ? `; was ${esc(gxN(s.value))}` : ''}">${esc(q.metric)} ${q.direction === 'up' ? '▲' : '▼'} by W${q.due}${s ? (s.hit ? ' ✓' : ' ✗') : ''}</span>`; }).join('');
+      const wk = d.wake ? [d.wake.inWeeks ? `in ${d.wake.inWeeks} wk` : '', ...(d.wake.when || []).map((x) => `${esc(x.field)} ${esc(x.op)} ${esc(gxN(x.value))}`)].filter(Boolean).join(' or ') : '';
+      return `<li class="gt${mv.length ? ' gt--mv' : b ? ' gt--post' : ''}"><div class="gt__h"><time>W${d.weekEffective}</time><span class="gt__meta">${meta}</span>${tags}</div>`
+        + (mv.length ? `<ul class="gt__mvs">${mv.map(govMove).join('')}</ul>` : '')
+        + (d.commentary ? `<p class="gt__why">${esc(d.commentary)}</p>` : '')
+        + (b ? `<blockquote class="gt__post"><p>${esc(b.text)}</p><footer>${govTone(p.tone)}${(p.mentions || []).map((m) => `<span class="gt__tag ${m.dir > 0 ? 'up' : m.dir < 0 ? 'down' : ''}">${esc(m.name)} ${m.dir > 0 ? '▲' : m.dir < 0 ? '▼' : '·'}</span>`).join('')}${Object.entries(p.dials || {}).map(([k, v]) => `<span class="gt__tag gt__tag--acc">promises ${esc(k)} ${v > 0 ? '▲' : '▼'}</span>`).join('')}</footer></blockquote>` : '')
+        + (errs.length ? `<ul class="gt__errs">${errs.map((e) => `<li><b>rejected</b> <code>${esc(e.dial ?? 'controls')}</code>${e.value !== undefined ? ` = ${esc(govFmt(e.dial, e.value)).slice(0, 160)}` : ''}: ${esc(e.error)}</li>`).join('')}</ul>` : '')
+        + (failed && d.facts.error ? `<p class="gt__errs">${esc(String(d.facts.error).slice(0, 300))}</p>` : '')
+        + (pr || wk || same.length ? `<div class="gt__foot">${pr}${wk ? `<span class="gt__tag">next look ${wk}</span>` : ''}${same.length ? `<span class="gt__tag" title="resubmitted at the value it already had">kept ${esc(same.map((c) => c.dial).join(', '))}</span>` : ''}</div>` : '')
+        + '</li>'; })() });
+  }
+  for (const e of (R.elections || []).filter((e) => e.week <= t)) items.push({ w: e.week + 0.5, kind: 'event', html: `<li class="gt gt--ev"><div class="gt__h"><time>W${e.week}</time><span class="gt__tag ${e.retained ? 'up' : 'down'}">election</span><span>${esc(e.gov || '')} ${e.retained ? 'kept' : 'replaced'} · approval ${e.approval?.share == null ? '–' : pct(e.approval.share)}</span></div></li>` });
+  items.sort((a, b) => b.w - a.w);
+  return items;
+}
 function drawGov() {
   const P = $('govPanel'); if (!P || P.hidden || !seen('govPanel')) return; const n = nNow(), f = cur(), G = f?.gov, R = govRec(); if (!G) return;
   const t = f.t, D = (R.decisions || []).filter((d) => d.weekEffective <= t + 1), turns = D.filter((d) => d.type === 'turn' || d.type === 'arm'); // a scripted arm's decisions are its turns
   { const S = R.status || {}, lags = turns.slice(1).map((d) => d.lagWeeks ?? d.weekEffective - d.weekRead).sort((a, b) => a - b), med = lags.length ? lags[lags.length >> 1] : null, page = mode === 'live' && !!LIVEGOV, live = page || (mode === 'replay' && RUN?.meta?.source === 'regulate.mjs' && cursor >= FRAMES.length - 1 && window.LIVE_RUN);
     const st = live ? S.state || 'watching' : 'replay', since = S.since ? Math.round((Date.now() - S.since) / 1000) : null, kind = govKindAt(R, t);
-    const what = !live ? `replay of week ${t}` : st === 'scripted' ? `${esc(govKindLabel(kind))}: decides after every week, from the public indicators` : st === 'thinking' ? `thinking for ${since} s (read week ${S.week})` : st === 'asleep' ? `asleep until week ${S.until}${S.when?.length ? ` or ${S.when.map((w) => `${w.field} ${w.op} ${w.value}`).join(', ')}` : ''}` : st === 'unavailable' ? `unavailable (${esc(S.error || 'usage window')}); the world runs on its last settings` : st === 'error' ? `last turn failed (${esc(S.error || '')}); retried on the next wake` : st;
+    const what = !live ? `replay of week ${t}` : st === 'scripted' ? `${esc(govKindLabel(kind))}: decides after every week` : st === 'thinking' ? `thinking for ${since} s (read week ${S.week})` : st === 'asleep' ? `asleep until week ${S.until}${S.when?.length ? ` or ${S.when.map((w) => `${w.field} ${w.op} ${w.value}`).join(', ')}` : ''}` : st === 'unavailable' ? `unavailable (${esc(S.error || 'usage window')}); the world runs on its last settings` : st === 'error' ? `last turn failed (${esc(S.error || '')}); retried on the next wake` : st;
     const c = R.clock || {}; $('govStatus').html = `<span class="gov__chip" data-s="${live ? esc(st) : 'replay'}">${esc(live ? (st === 'scripted' ? 'Scripted' : st) : 'Replay')}</span><span>${what}</span><span>pace <b>${page ? 'this browser: turns take no time' : R.lockstep != null ? `lockstep ${R.lockstep}` : R.pace ? `${R.pace} s a week` : 'no clock'}</b></span>${c.behindMs != null ? `<span>behind the clock <b>${fmt(c.behindMs / 1000)} s</b> over ${Math.round(c.slowWeeks)} slow weeks</span>` : ''}<span>${turns.length && turns[0].type === 'arm' ? 'decisions' : 'turns'} <b>${turns.length}</b></span><span>median lag <b>${med == null ? '–' : `${med} wk`}</b></span>${(R.governments || []).length > 1 ? `<span>government <b>${esc(R.governments.filter((g) => g.from <= t).at(-1)?.id || '')}</b> of ${R.governments.length}</span>` : ''}`; }
+  // The timeline: filter chips, then the newest items (quiet turns folded), then "show older"
+  { const all = govFeed(R, D, t), cnt = (k) => all.filter((x) => x.kinds?.includes(k)).length, dialF = GOV_FILTER.startsWith('dial:') ? GOV_FILTER.slice(5) : null;
+    const keep = (x) => GOV_FILTER === 'all' ? true : dialF ? x.dials?.includes(dialF) : x.kinds?.includes(GOV_FILTER);
+    const opts = [['all', 'All', null], ['moves', 'Dial moves', cnt('moves')], ['posts', 'Board posts', cnt('posts')], ['notes', 'Commentary', cnt('notes')], ...(cnt('rejected') ? [['rejected', 'Rejected', cnt('rejected')]] : [])];
+    $('govFilter').html = opts.map(([k, l, c]) => `<button type="button" data-gf="${k}" aria-pressed="${GOV_FILTER === k}">${l}${c != null ? ` <span>${c}</span>` : ''}</button>`).join('') + (dialF ? `<button type="button" data-gf="all" aria-pressed="true" class="gov__fdial" title="Show every turn">only <code>${esc(dialF)}</code> ✕</button>` : '');
+    const rows = []; let quiet = null, shown = 0, more = 0;
+    for (const x of all) {
+      if (!keep(x)) continue;
+      if (x.quiet) { if (GOV_FILTER !== 'all') continue; if (quiet) { quiet.n++; quiet.from = x.d.weekEffective; } else { quiet = { n: 1, from: x.d.weekEffective, to: x.d.weekEffective }; } continue; }
+      if (quiet) { if (shown < GOV_LIMIT) rows.push(`<li class="gt gt--quiet"><div class="gt__h"><time>W${quiet.from}${quiet.to !== quiet.from ? `–${quiet.to}` : ''}</time><span>${quiet.n} ${quiet.n === 1 ? 'turn' : 'turns'} held every dial and said nothing</span></div></li>`); quiet = null; }
+      if (shown < GOV_LIMIT) { rows.push(x.html); shown++; } else more++;
+    }
+    if (quiet && shown < GOV_LIMIT) rows.push(`<li class="gt gt--quiet"><div class="gt__h"><time>W${quiet.from}${quiet.to !== quiet.from ? `–${quiet.to}` : ''}</time><span>${quiet.n} ${quiet.n === 1 ? 'turn' : 'turns'} held every dial and said nothing</span></div></li>`);
+    $('govFeed').html = (rows.join('') || `<li class="gt gt--quiet"><div class="gt__h"><span>${GOV_FILTER === 'all' ? 'No turns yet.' : 'Nothing of this kind yet.'}</span></div></li>`)
+      + (more ? `<li class="gt__more"><button type="button" data-gmore="1">Show ${Math.min(more, 10)} older</button><span class="note">${more} more</span></li>` : GOV_LIMIT > 8 && shown > 8 ? '<li class="gt__more"><button type="button" data-gless="1">Show fewer</button></li>' : ''); }
+  // Beside it: every dial it has moved, opening → now, how often (a click filters the timeline to that dial)
+  { const cnt = new Map(), last = new Map(); for (const d of D) for (const c of d.changes || []) if (!govSame(c.old, c.new)) { cnt.set(c.dial, (cnt.get(c.dial) || 0) + 1); last.set(c.dial, d.weekEffective); }
+    const d0 = R.scale?.d0 || FRAMES[0]?.gov?.dials || {}, nowOf = (k) => k === 'transfers' ? G.transfers : k === 'payOrder' ? G.payOrder : k === 'publish' ? G.pub : k === 'rules' ? G.rules : G.dials?.[k], openOf = (k) => k in d0 ? d0[k] : k === 'transfers' ? [] : k === 'payOrder' ? null : undefined;
+    const ks = [...cnt.keys()].sort((a, b) => last.get(b) - last.get(a));
+    $('govMoved').html = `<div class="head"><h2 class="h3">Dials it moved</h2><span class="note">opening → now · tap to filter</span></div>` + (ks.length ? `<ul class="gov__mvd">${ks.map((k) => { const o = openOf(k), v = nowOf(k); return `<li><button type="button" data-gf="dial:${esc(k)}" aria-pressed="${GOV_FILTER === 'dial:' + k}"><code>${esc(k)}</code><span>${o === undefined ? '' : `<s>${esc(govFmt(k, o))}</s> → `}<b>${esc(govFmt(k, v))}</b></span><em>${cnt.get(k)}× · W${last.get(k)}</em></button></li>`; }).join('')}</ul>` : '<p class="note">None yet: every dial is at its opening value.</p>'); }
+  { const V = (R.nbVersions || []).filter((v) => v.week <= t + 1), cur1 = V.at(-1), prev = cur1 ? V.slice(0, -1).reverse().find((v) => v.gov === cur1.gov) : null, old = new Set((prev?.text || '').split('\n'));
+    $('govNbNote').textContent = cur1 ? `${cur1.gov} · as of week ${cur1.week} · new lines marked` : 'its own file · new lines marked';
+    $('govNb').html = cur1 ? cur1.text.split('\n').map((l) => (l && !old.has(l) ? `<span class="new">${esc(l)}</span>` : esc(l))).join('\n') : '<span class="note">Empty.</span>'; }
+  { const b = $('govXBtn'); if (b && b.getAttribute('aria-expanded') !== String(GOV_X)) govXSet(GOV_X, false); }
+  if (!GOV_X) return; // the external stats are folded: nothing below is drawn until they are shown
   { const cash = f.h?.money ?? 0, cards = f.mkt?.mcap ?? 0, share = G.T / Math.max(1, cash + G.T + cards), ap = G.approval;
     const tiles = [['Treasury', fmt(G.T)], ['Own account', fmt(G.acct)], ['Revenue this week', fmt(G.rev)], ['Spending this week', fmt(G.spend)], ['Paid of what was owed', G.frac ? pct(Math.min(...Object.values(G.frac))) : '–'], ['Treasury share (cards at marks)', pct(share)], ['Board tone', G.board ? (G.board.tone >= 0 ? '+' : '') + G.board.tone.toFixed(2) : '–'], ...(ap ? [['Approval so far', ap.share == null ? '–' : pct(ap.share)]] : [])];
     $('govStats').html = tiles.map(([k, v]) => `<div class="stat"><span>${k}</span><b>${v}</b></div>`).join(''); }
   const T = FRAMES.map((x) => x.gov?.T ?? null), A = FRAMES.map((x) => x.gov?.acct ?? null);
   line('govT', [{ data: T, color: SYS.blue, fill: true }, { data: A, color: SYS.orange }], { fy: fmt, min: 0 });
   line('govRS', [{ data: FRAMES.map((x) => x.gov?.rev ?? null), color: SYS.green }, { data: FRAMES.map((x) => x.gov?.spend ?? null), color: SYS.pink }, { data: FRAMES.map((x) => (x.gov ? -(x.gov.lines?.consumption || 0) : null)), color: SYS.orange, dash: true }], { fy: fmt, min: 0 });
-  { const c = charts.govT, cv = $('govT'); if (c && c.X && turns.length) { const x = cv.getContext('2d'), d = window.devicePixelRatio || 1; x.save(); x.setTransform(d, 0, 0, d, 0, 0); const Ht = cv.getBoundingClientRect().height; x.fillStyle = ink(0.35);
+  { const c = charts.govT, cv = $('govT'); if (c && c.X && turns.length && seen('govT')) { const x = cv.getContext('2d'), d = window.devicePixelRatio || 1; x.save(); x.setTransform(d, 0, 0, d, 0, 0); const Ht = cv.getBoundingClientRect().height; x.fillStyle = ink(0.35);
     for (const e of turns) { const i = FRAMES.findIndex((q) => q.t === e.weekEffective); if (i >= 0 && i < n) x.fillRect(Math.round(c.X(i)), Ht - c.pad.b - 6, 1, 6); } x.restore(); } }
-  { const sum = (from) => { const o = {}; for (let i = Math.max(0, from); i < n; i++) for (const [k, v] of Object.entries(FRAMES[i].gov?.lines || {})) o[k] = (o[k] || 0) + v; return o; }, a = G.lines || {}, b = sum(n - 20), c = sum(0);
-    const keys = [...new Set([...Object.keys(c)])].sort((p, q) => (UI_GOV_REV.has(q) - UI_GOV_REV.has(p)) || Math.abs(c[q]) - Math.abs(c[p]));
-    $('govLines').tBodies[0].html = keys.map((k) => `<tr class="${UI_GOV_REV.has(k) ? 'rev' : k === 'consumption' ? 'co' : k === 'openingGrant' ? '' : 'sp'}"><td>${esc(UI_GOV_NAME[k] || k)}</td><td class="num">${fmt(a[k] || 0)}</td><td class="num">${fmt(b[k] || 0)}</td><td class="num">${fmt(c[k] || 0)}</td></tr>`).join('') || '<tr><td colspan="4" class="note">No ledger lines yet.</td></tr>'; }
-  $('govComm').html = turns.slice(-40).reverse().map((d) => `<div class="gov__item"><time>W${d.weekRead} → W${d.weekEffective}${d.gov && (R.governments || []).length > 1 ? ` · ${esc(d.gov)}` : ''}${d.budgetDay ? ' · budget day' : ''}${d.type === 'arm' ? ` · arm ${esc(d.arm)}` : ''}${d.wakeReason === 'trigger' ? ' · woken by a trigger' : ''}</time>${d.commentary ? `<p>${esc(d.commentary)}</p>` : ''}<span class="note">${d.changes?.length ? d.changes.map((c) => esc(c.dial) + (JSON.stringify(c.old) === JSON.stringify(c.new) ? ' (same value)' : '')).join(', ') : 'no changes'}${d.errors?.length ? ` · <span class="err">${d.errors.length} rejected: ${d.errors.map((e) => esc(e.dial ?? 'controls')).join(', ')}</span>` : ''}${d.facts && !d.facts.ok ? ` · <span class="err">turn failed</span>` : ''}</span></div>`).join('') || '<p class="note">No turns yet.</p>';
-  $('govBoard').html = turns.filter((d) => d.board?.text).slice(-30).reverse().map((d) => { const p = d.board.parsed || {}; const ment = (p.mentions || []).map((m) => `${esc(m.name)} ${m.dir > 0 ? '▲' : m.dir < 0 ? '▼' : '·'}`).join(', '); const dl = Object.entries(p.dials || {}).map(([k, v]) => `${esc(k)} ${v > 0 ? '▲' : '▼'}`).join(', ');
-    return `<div class="gov__item"><time>W${d.weekEffective}</time><p>${esc(d.board.text)}</p><span class="note">tone ${(p.tone ?? 0).toFixed(2)}${ment ? ` · players: ${ment}` : ''}${dl ? ` · dials: ${dl}` : ''}</span></div>`; }).join('') || '<p class="note">Nothing posted yet.</p>';
-  { const V = (R.nbVersions || []).filter((v) => v.week <= t + 1), cur1 = V.at(-1), prev = cur1 ? V.slice(0, -1).reverse().find((v) => v.gov === cur1.gov) : null, old = new Set((prev?.text || '').split('\n'));
-    $('govNbNote').textContent = cur1 ? `${cur1.gov} · as of week ${cur1.week} · ${cur1.text.length.toLocaleString()} characters · new lines marked` : 'its own file · new lines marked';
-    $('govNb').html = cur1 ? cur1.text.split('\n').map((l) => (l && !old.has(l) ? `<span class="new">${esc(l)}</span>` : esc(l))).join('\n') : '<span class="note">Empty.</span>'; }
+  // The ledger by line as a diverging bar chart: revenue to the right, spending to the left, for the week, 20 weeks or the run
+  { const sum = (from) => { const o = {}; for (let i = Math.max(0, from); i < n; i++) for (const [k, v] of Object.entries(FRAMES[i].gov?.lines || {})) o[k] = (o[k] || 0) + v; return o; };
+    const L = GX_PER === 'week' ? { ...(G.lines || {}) } : sum(GX_PER === '20' ? n - 20 : 0), keys = Object.keys(L).filter((k) => L[k]).sort((p, q) => (UI_GOV_REV.has(q) - UI_GOV_REV.has(p)) || Math.abs(L[q]) - Math.abs(L[p]));
+    const max = Math.max(1, ...keys.map((k) => Math.abs(L[k]))), rv = keys.filter((k) => L[k] > 0 && k !== 'openingGrant').reduce((s, k) => s + L[k], 0), sp = keys.filter((k) => L[k] < 0).reduce((s, k) => s - L[k], 0);
+    for (const b of document.querySelectorAll('#gxPer button')) b.setAttribute('aria-pressed', String(b.dataset.per === GX_PER));
+    $('gxLines').html = keys.length ? `<p class="gx__net"><span class="up">+${fmt(rv)} in</span><span class="down">−${fmt(sp)} out</span>${L.openingGrant ? `<span>+${fmt(L.openingGrant)} grant</span>` : ''}<b>${rv - sp + (L.openingGrant || 0) >= 0 ? '+' : '−'}${fmt(Math.abs(rv - sp + (L.openingGrant || 0)))} net</b></p><ul class="gx__div">${keys.map((k) => { const v = L[k], w = (Math.abs(v) / max) * 50, cls = UI_GOV_REV.has(k) ? 'rev' : k === 'consumption' ? 'co' : k === 'openingGrant' ? 'gr' : 'sp';
+      return `<li class="${cls}"><span>${esc(UI_GOV_NAME[k] || k)}</span><span class="gx__dbar" aria-hidden="true"><i style="${v >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`}"></i></span><b class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : '−'}${fmt(Math.abs(v))}</b></li>`; }).join('')}</ul>` : '<p class="note">No line moved in this period.</p>'; }
   drawGovHow(f, G, R, D, t, n);
-  $('govDials').html = D.flatMap((d) => (d.changes || []).filter((c) => JSON.stringify(c.old) !== JSON.stringify(c.new)).map((c) => [d.weekEffective, c, d.type === 'arm' ? d.arm : d.gov])).slice(-200).reverse().map(([w, c, who]) => `<div class="gov__dial"><time>W${w}</time><code>${esc(c.dial)}</code><span>${esc(uiGovVal(c.old))} → ${esc(uiGovVal(c.new))}</span></div>`).join('') || '<p class="note">No dial changed yet.</p>';
 }
-/* ---------- How the government works (the end of the Government panel) ---------- */
-// Every part of the spec, with this week's numbers: a plain line, the section it comes from, and its live values. It
-// reads the frames (f.gov from the engine's govFrame, f.govX from govView), the record (regulate.mjs's govRecord or the
-// page's own, gov/page_gov.mjs) and the run's config, so it works for a browser world, a --serve run and a replay alike.
+/* ---------- How the government works (the external stats) ---------- */
+// Every part of the spec, as pictures with this week's numbers: one short line each, the section it comes from as a §
+// icon. It reads the frames (f.gov from the engine's govFrame, f.govX from govView), the record (regulate.mjs's
+// govRecord or the page's own, gov/page_gov.mjs) and the run's config, so it works for a browser world, a --serve run
+// and a replay alike. It is drawn only while the external stats are shown.
 const govRec = () => (mode === 'replay' ? RUN?.gov || {} : LIVEGOV || {});
 const GOV_KIND_LABEL = { A0: 'Scripted A0: do nothing', A1: 'Scripted A1: balanced-budget thermostat', A2: 'Scripted A2: greedy (fixed 5% fee, no spending)', A3: 'Scripted A3: generous (spends all revenue)', A4: 'Scripted A4: random legal moves', stub: 'Scripted stub: every kind of control', claude: 'A Claude session', replay: 'A replayed decision log', none: 'No driver' };
 const govKindLabel = (k) => GOV_KIND_LABEL[k] || String(k || '');
 const govKindAt = (R, t) => { const K = R.kinds; if (K?.length) { let k = K[0].kind; for (const x of K) if (x.from <= t) k = x.kind; return k; } return R.kind || RUN?.meta?.government || null; };
 const SPEC_URL = 'https://github.com/sakisaki-dev/trading-floor/blob/main/docs/regulator-spec.md';
 const ghSlug = (h) => h.toLowerCase().replace(/[^a-z0-9 -]/g, '').trim().replace(/ /g, '-');
-const specA = (sec, title) => `<a class="gx__sec" href="${SPEC_URL}#${ghSlug(sec + ' ' + title)}" target="_blank" rel="noopener" title="regulator-spec.md §${sec} ${esc(title)}">§${sec}</a>`;
+const specA = (sec, title) => `<a class="gx__sec" href="${SPEC_URL}#${ghSlug(sec + ' ' + title)}" target="_blank" rel="noopener" title="Spec §${sec} ${esc(title)}" aria-label="Spec section ${sec}: ${esc(title)}">§<span>${sec}</span></a>`;
 const GX_REV = ['fees', 'holding', 'wealthTax', 'packTax', 'outsideTax', 'exitTax', 'pollTax', 'levy'];
 const gxI = (v) => (v == null ? '–' : Math.round(v).toLocaleString());
 const gxN = (v, d = 4) => (v == null || (typeof v === 'number' && !isFinite(v)) ? '–' : typeof v === 'number' ? (Math.abs(v) >= 1000 ? fmt(v) : String(+v.toPrecision(d))) : typeof v === 'boolean' ? (v ? 'on' : 'off') : String(v));
-const gxRange = (D) => (D.bool ? 'true or false' : `${D.lo === -Infinity ? '−∞' : gxN(D.lo)} to ${D.hi === Infinity ? '∞' : gxN(D.hi)}${D.int ? ', whole' : ''}`);
+const gxEnd = (v) => (v === -Infinity ? '−∞' : v === Infinity ? '∞' : gxN(v));
 // A small inline line chart (SVG, so the card's HTML diff redraws it): the series' last `k` weeks up to the cursor
-function gxSpark(series, n, k = 104) {
+function gxSpark(series, n, k = 104, cls = '') {
   const from = Math.max(0, n - k), pts = series.map((s) => ({ ...s, d: s.data.slice(from, n) })); let lo = Infinity, hi = -Infinity;
   for (const s of pts) for (const v of s.d) if (v != null && isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
-  if (!isFinite(lo)) return '<div class="gx__spark gx__spark--empty"></div>'; if (hi - lo < 1e-9) { hi += 1; lo -= 1; } const Wd = 240, Ht = 44, m = Math.max(1, pts[0].d.length - 1);
+  if (!isFinite(lo)) return `<div class="gx__spark gx__spark--empty ${cls}"></div>`; if (hi - lo < 1e-9) { hi += 1; lo -= 1; } const Wd = 240, Ht = 44, m = Math.max(1, pts[0].d.length - 1);
   const path = (d) => d.map((v, i) => (v == null ? null : `${((i / m) * Wd).toFixed(1)},${(Ht - 3 - ((v - lo) / (hi - lo)) * (Ht - 6)).toFixed(1)}`)).filter(Boolean).join(' ');
   const zero = lo < 0 && hi > 0 ? `<line x1="0" x2="${Wd}" y1="${(Ht - 3 - ((0 - lo) / (hi - lo)) * (Ht - 6)).toFixed(1)}" y2="${(Ht - 3 - ((0 - lo) / (hi - lo)) * (Ht - 6)).toFixed(1)}" class="z"/>` : '';
-  return `<svg class="gx__spark" viewBox="0 0 ${Wd} ${Ht}" preserveAspectRatio="none" aria-hidden="true">${zero}${pts.map((s) => `<polyline points="${path(s.d)}" style="stroke:${s.color}"${s.dash ? ' stroke-dasharray="3 3"' : ''}/>`).join('')}</svg>`;
+  return `<svg class="gx__spark ${cls}" viewBox="0 0 ${Wd} ${Ht}" preserveAspectRatio="none" aria-hidden="true">${zero}${pts.map((s) => `<polyline points="${path(s.d)}" style="stroke:${s.color}"${s.dash ? ' stroke-dasharray="3 3"' : ''}/>`).join('')}</svg>`;
 }
-const gxKV = (rows) => `<dl class="gx__kv">${rows.filter(Boolean).map(([k, v, cls]) => `<dt>${k}</dt><dd${cls ? ` class="${cls}"` : ''}>${v}</dd>`).join('')}</dl>`;
-const gxCard = (id, title, sec, line, body, wide) => `<article class="gx__c${wide ? ' gx__c--wide' : ''}" id="gx-${id}"><header><h3>${title}</h3>${sec}</header><p class="gx__why">${line}</p>${body}</article>`;
+const gxCard = (id, title, sec, line, body, cls = '') => `<article class="gx__c ${cls}" id="gx-${id}"><header><h3>${title}</h3>${sec}</header>${line ? `<p class="gx__why">${line}</p>` : ''}${body}</article>`;
 const gxBar = (v, span = 1) => { const x = Math.max(-1, Math.min(1, (v || 0) / span)); return `<span class="gx__bar" aria-hidden="true"><i style="${x >= 0 ? `left:50%;width:${x * 50}%` : `left:${50 + x * 50}%;width:${-x * 50}%`}"></i></span>`; };
+const gxMini = (rows) => `<div class="gx__minis">${rows.filter(Boolean).map(([k, v, cls]) => `<div class="gx__mini"><b${cls ? ` class="${cls}"` : ''}>${v}</b><span>${k}</span></div>`).join('')}</div>`;
+const gxChips = (xs, cls = '') => `<p class="gx__chips ${cls}">${xs.map((x) => `<code>${x}</code>`).join('')}</p>`;
+// A folding section that keeps its open state across redraws (GX_DET; `open0` is its default)
+const gxDet = (key, sum, body, open0 = false, cls = '') => { const o = GX_DET.has(key) ? GX_DET.get(key) : open0; return `<details class="gx__det ${cls}" data-k="${key}"${o ? ' open' : ''}><summary>${sum}</summary>${body}</details>`; };
+// A dial's gauge: its legal range (an open end fades), the opening value (a hollow tick) and the value now (a dot), on
+// an asinh scale with the dial's own scale s, the same transform the bots read it through
+function gxGauge(k, Dl, v, v0, S) {
+  if (Dl.bool) return `<span class="gg gg--bool" aria-hidden="true"><i class="${v ? 'on' : ''}">off</i><i class="${v ? 'on' : ''}">on</i></span>`;
+  const s = typeof Dl.s === 'number' ? Dl.s : Dl.s === 'allowance' ? S?.allowance ?? 1 : Dl.s === 'spend' ? S?.spend ?? 1 : 1, g = (x) => Math.asinh(x / s);
+  const fv = typeof v === 'number' ? g(v) : null, f0 = typeof v0 === 'number' ? g(v0) : fv, lo = isFinite(Dl.lo) ? g(Dl.lo) : Math.min(fv ?? 0, f0 ?? 0) - 3, hi = isFinite(Dl.hi) ? g(Dl.hi) : Math.max(fv ?? 0, f0 ?? 0) + 3;
+  const P = (x) => (x == null ? null : Math.max(0, Math.min(100, ((x - lo) / Math.max(1e-9, hi - lo)) * 100)).toFixed(1));
+  return `<span class="gg${isFinite(Dl.lo) ? '' : ' gg--ol'}${isFinite(Dl.hi) ? '' : ' gg--or'}" aria-hidden="true">${f0 != null ? `<i class="gg__o" style="left:${P(f0)}%"></i>` : ''}${fv != null ? `<i class="gg__v" style="left:${P(fv)}%"></i>` : ''}</span><span class="gg__r" aria-hidden="true"><span>${gxEnd(Dl.lo)}</span><span>${gxEnd(Dl.hi)}</span></span>`;
+}
+const GX_IND_GROUPS = [['Market', ['vaultIndex', 'vaultIndex1w', 'vaultIndex4w', 'vaultIndex20w', 'marksIndex', 'trades', 'auctionSales', 'packPrice']],
+  ['Money', ['treasury', 'treasury20w', 'revenue', 'revenue4w', 'spending', 'spending4w', 'consumption', 'ownAccount', 'livingPaid', 'moneyCreated', 'moneyRemoved', 'moneyNet']],
+  ['People', ['week', 'bots', 'joined', 'left', 'approval', 'medianWorth', 'meanCash']],
+  ['Credit', ['creditRate', 'debt', 'defaults', 'marginCalls', 'creditOffered', 'creditAsked', 'creditLent', 'creditRepaid', 'creditRepaidForced', 'creditWrittenOff', 'arrears', 'arrearsBots']],
+  ['Distress', ['broke', 'forcedSales', 'forcedLiving', 'forcedHolding', 'forcedWealthTax', 'forcedLoanDefault', 'forcedMarginCall', 'forcedEstate', 'forcedCashShock', 'forcedPollTax', 'forcedLevy', 'forcedSalesTax', 'forcedOther', 'liquidatorSales']],
+  ['Distribution', ['gini', 'cashTop10', 'cashMid40', 'cashBottom50', 'worthTop10', 'worthMid40', 'worthBottom50']]];
 function drawGovHow(f, G, R, D, t, n) {
   if (!$('gx')) return; const X = f.govX || null, S = R.scale || null, cfg = (mode === 'replay' ? RUN?.config : LIVECFG) || {}, gcfg = cfg.government === true ? {} : cfg.government || {}, kind = govKindAt(R, t), page = R.source === 'page' || (mode === 'live' && !!LIVEGOV);
-  const isArm = /^A\d/.test(kind || ''), prev = FRAMES[n - 2]?.gov, F0 = FRAMES[0]?.gov, noX = '<p class="note">This run file has no per-week view of the layer (it predates the page\'s <code>govX</code>); runs from this version have it.</p>';
-  // the banner: which government this is, and the real one
-  $('gxReal').html = page ? `<b>${esc(govKindLabel(kind))}</b>, running in this browser's worker (<code>gov/page_gov.mjs</code>, the same arms and stub as <code>regulate.mjs</code>). It is scripted: the page can't run a Claude session. The real government is a Claude session that <code>regulate.mjs</code> runs on your Mac; its live view is this same panel: <code>node regulate.mjs --government claude --brief v1 --model claude-haiku-5-5 --session-root /Users/Shared/tf-gov/g1 --seed 1 --weeks 7000 --pace 4 --out runs/g1 --serve 4322</code> (docs/GOVERNMENT.md).`
-    : `<b>${esc(govKindLabel(kind))}</b>${R.source === 'regulate.mjs' || RUN?.meta?.source === 'regulate.mjs' ? `, run by <code>regulate.mjs</code>${window.LIVE_RUN ? ' and followed live (<code>--serve</code>)' : ' (replay)'}` : ''}. ${kind === 'claude' ? 'Each turn is an isolated Claude session reading <code>state/</code> and writing its controls, board post and notebook.' : 'Scripted: no model.'}`;
+  const isArm = /^A\d/.test(kind || ''), prev = FRAMES[n - 2]?.gov, F0 = FRAMES[0]?.gov, noX = '<p class="note">This run file predates the per-week view of the layer (<code>govX</code>).</p>';
+  const CMD = 'node regulate.mjs --government claude --brief v1 --model claude-haiku-5-5 --session-root /Users/Shared/tf-gov/g1 --seed 1 --weeks 7000 --pace 4 --out runs/g1 --serve 4322';
+  $('gxReal').html = `<b>${esc(govKindLabel(kind))}</b> · ${page ? 'scripted, in this browser\'s worker' : `${R.source === 'regulate.mjs' || RUN?.meta?.source === 'regulate.mjs' ? `<code>regulate.mjs</code>, ${window.LIVE_RUN ? 'followed live' : 'replayed'}` : 'replayed'}${kind === 'claude' ? ' · each turn an isolated Claude session' : ''}`}` + (page ? ' ' + gxDet('real', 'the real government', `<p class="note">A Claude session run by <code>regulate.mjs</code> on your Mac, shown in this same panel (docs/GOVERNMENT.md):</p><code class="gx__cmd">${CMD}</code>`, false, 'gx__info') : '');
+  // The treasury as an equation (the chart under it is static: drawGov paints it)
+  { const Tp = prev ? prev.T : 0, lines = G.lines || {}, rev = G.rev || 0, spend = G.spend || 0, grant = lines.openingGrant || 0, chk = +G.check || 0;
+    $('gxSecT').html = specA('5.1', 'State and flows, exactly');
+    $('gxEq').html = `<div class="gx__eq"><span title="last week">${fmt(Tp)}</span><i>+</i><span class="up" title="revenue">${fmt(rev)}</span><i>−</i><span class="down" title="spending">${fmt(spend)}</span>${grant ? `<i>+</i><span title="opening grant">${fmt(grant)}</span>` : ''}<i>=</i><b title="treasury now">${fmt(G.T)}</b></div><p class="gx__eqk">last week + in − out${grant ? ' + grant' : ''} = now · own account <b>${fmt(G.acct)}</b> · consumption <b>${fmt(-(lines.consumption || 0))}</b> · unexplained <b class="${Math.abs(chk) > 0.01 ? 'down' : 'up'}">${chk.toFixed(2)}</b></p>`;
+    $('gxSecL').html = specA('4.1', 'Money in: the treasury collects'); }
   const C = [];
-  // 1. The treasury: its books move only by its own lines
-  { const Tp = prev ? prev.T : 0, lines = G.lines || {}, rev = G.rev || 0, spend = G.spend || 0, grant = lines.openingGrant || 0, cons = -(lines.consumption || 0);
-    C.push(gxCard('treasury', 'The treasury', specA('5.1', 'State and flows, exactly'), 'Every coin of tax and fee revenue goes in, everything given out comes from it, and nothing else moves it: no borrowing, no printing.',
-      `<div class="gx__eq"><span>${fmt(Tp)}</span><i>+</i><span class="up">${fmt(rev)}</span><i>−</i><span class="down">${fmt(spend)}</span>${grant ? `<i>+</i><span>${fmt(grant)}</span>` : ''}<i>=</i><b>${fmt(G.T)}</b></div><p class="gx__eqk">last week + revenue − spending${grant ? ' + opening grant' : ''} = treasury now</p>`
-      + gxKV([['Treasury', fmt(G.T)], ['Own account', fmt(G.acct)], ['Consumption this week', fmt(cons)], ['Unexplained by its lines', `${(+G.check || 0).toFixed(2)} coins`, Math.abs(G.check || 0) > 0.01 ? 'down' : 'up'], ['Opening grant', fmt(S?.grant ?? F0?.lines?.openingGrant ?? null)]])
-      + gxSpark([{ data: FRAMES.map((x) => x.gov?.T ?? null), color: SYS.blue }, { data: FRAMES.map((x) => x.gov?.acct ?? null), color: SYS.orange }], n) + '<p class="gx__leg"><i style="background:var(--c-blue)"></i>treasury <i style="background:var(--c-orange)"></i>own account · 2 years</p>')); }
-  // 2. Revenue and spending by line, this week
-  { const L = G.lines || {}, rows = Object.entries(L).filter(([k]) => k !== 'openingGrant').sort((a, b) => GX_REV.includes(b[0]) - GX_REV.includes(a[0]) || Math.abs(b[1]) - Math.abs(a[1]));
-    C.push(gxCard('lines', 'Revenue and spending by line', specA('4.1', 'Money in: the treasury collects'), 'Revenue is taxes and fees on the bots\' own holdings and activity; spending is the allowance, transfers, royalties, consumption and any subsidy from a negative rate.',
-      rows.length ? `<table class="gx__t"><tbody>${rows.map(([k, v]) => `<tr class="${GX_REV.includes(k) ? 'rev' : k === 'consumption' ? 'co' : 'sp'}"><td>${esc(UI_GOV_NAME[k] || k)}</td><td class="num ${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${fmt(v)}</td></tr>`).join('')}</tbody></table>` : '<p class="note">No line moved this week.</p>')); }
-  // 3. Pro rata when short
-  { const O = X?.owed, Fr = G.frac || {}, keys = O ? Object.keys(O).filter((k) => O[k] > 0 || (Fr[k] ?? 1) < 1) : [], short = Object.values(Fr).some((v) => v < 0.9999), tot = keys.reduce((s, k) => s + (O[k] || 0), 0), order = G.payOrder || null;
-    C.push(gxCard('prorata', 'When the treasury is short', specA('4.3', 'When the treasury is short'), `Every week the weekly lines are added up and paid together. If the treasury holds less than they owe, each line gets the same share, treasury ÷ owed${order ? ', except the lines its payOrder ranks first' : ''}. Royalties owed are first capped at royaltyCap × treasury.`,
-      (O ? `<p class="gx__flag ${short ? 'down' : 'up'}">${short ? `Short this week: owed ${fmt(tot)}, ${order ? `paid in the order ${order.map(esc).join(' → ')}, the rest pro rata` : `every line paid ${pct(Math.min(...keys.map((k) => Fr[k] ?? 1)))}`}` : `Paid in full this week (owed ${fmt(tot)})`}</p>
-      <table class="gx__t"><thead><tr><th>Line</th><th class="num">Owed</th><th class="num">Paid</th><th class="num">Share</th></tr></thead><tbody>${keys.map((k) => `<tr><td>${esc(UI_GOV_NAME[k] || k)}</td><td class="num">${fmt(O[k])}</td><td class="num">${fmt(O[k] * (Fr[k] ?? 1))}</td><td class="num">${pct(Fr[k] ?? 1)}</td></tr>`).join('') || '<tr><td colspan="4" class="note">Nothing owed this week.</td></tr>'}</tbody></table>` : (G.frac ? gxKV(Object.entries(Fr).map(([k, v]) => [esc(UI_GOV_NAME[k] || k), pct(v)])) : '') + (X ? '' : noX))
-      + gxSpark([{ data: FRAMES.map((x) => (x.gov?.frac ? Math.min(...Object.values(x.gov.frac)) : null)), color: SYS.pink }], n) + '<p class="gx__leg"><i style="background:var(--c-pink)"></i>smallest share paid, week by week (1 = in full)</p>')); }
-  // 4. Every dial: legal range, now, opening, the week its value took effect and who set it
-  { const who = new Map(); for (const d of D) for (const c of d.changes || []) if (JSON.stringify(c.old) !== JSON.stringify(c.new)) who.set(c.dial, d);
-    const d0 = S?.d0 || F0?.dials || {}, rows = Object.entries(GOV_DIALS).map(([k, Dl]) => { const v = G.dials?.[k]; let i = n - 1; while (i > 0 && JSON.stringify(FRAMES[i - 1]?.gov?.dials?.[k]) === JSON.stringify(v)) i--; const wk = i > 0 ? FRAMES[i].t : null, d = who.get(k), viaRule = G.rules?.[k], changed = JSON.stringify(v) !== JSON.stringify(d0[k]);
-      const at = wk == null ? '<span class="k">opening</span>' : `W${wk}${d && d.weekEffective === wk ? ` <span class="k">read W${d.weekRead}${d.type === 'arm' ? ` · ${esc(d.arm)}` : d.gov ? ` · ${esc(d.gov)}` : ''}</span>` : viaRule ? ' <span class="k">rule</span>' : ''}`;
-      return `<tr${changed ? ' class="chg"' : ''}><td><code>${k}</code></td><td class="k">${gxRange(Dl)}</td><td class="num">${esc(gxN(v))}</td><td class="num k">${esc(gxN(d0[k]))}</td><td>${at}</td></tr>`; }).join('');
-    const sc = [G.transfers?.length ? ['transfers', esc(G.transfers.map((x) => `${x.amount} → ${x.to}${x.lo ? ` ${x.lo}–${x.hi ?? x.lo}` : ''}${x.weeks ? ` (${x.weeks} wk)` : ''}${x.player ? ` ${x.player}` : ''}`).join('; '))] : ['transfers', '<span class="k">none</span>'],
-      ['payOrder', G.payOrder ? esc(G.payOrder.join(' → ')) : '<span class="k">null: pro rata</span>'], ['publish', esc(Object.entries(G.pub || {}).map(([k, v]) => `${k} ${v ? 'shown' : 'withheld'}`).join(', '))],
-      ['rules', G.rules ? esc(Object.entries(G.rules).map(([k, r]) => `${k} = ${r.base}${(r.terms || []).map(([a, c]) => ` + ${+c.toPrecision(3)}×${a}`).join('')}${r.min != null ? `, ≥ ${r.min}` : ''}${r.max != null ? `, ≤ ${r.max}` : ''}`).join('; ')) : '<span class="k">none</span>'],
-      ...(G.ruleErr?.length ? [['rule results rejected', `<span class="down">${esc(G.ruleErr.map((e) => `${e.dial}: ${e.error}`).join('; '))}</span>`]] : [])];
+  // Every dial as a gauge: legal range, opening (hollow tick), now (dot); a changed one is marked with the week it took effect
+  { const who = new Map(); for (const d of D) for (const c of d.changes || []) if (!govSame(c.old, c.new)) who.set(c.dial, d);
+    const d0 = S?.d0 || F0?.dials || {}, tiles = Object.entries(GOV_DIALS).map(([k, Dl]) => { const v = G.dials?.[k]; let i = n - 1; while (i > 0 && govSame(FRAMES[i - 1]?.gov?.dials?.[k], v)) i--; const wk = i > 0 ? FRAMES[i].t : null, d = who.get(k), viaRule = G.rules?.[k], changed = !govSame(v, d0[k]);
+      const at = wk == null ? '' : `W${wk}${d && d.weekEffective === wk ? ` · read W${d.weekRead}` : viaRule ? ' · rule' : ''}`;
+      return `<div class="gx__dial${changed ? ' chg' : ''}" title="${esc(k)}: ${esc(Dl.unit || '')} · legal ${esc(gxEnd(Dl.lo))} to ${esc(gxEnd(Dl.hi))}${Dl.int ? ', whole' : ''}"><div class="gx__dt"><code>${k}</code><b>${esc(gxN(v))}</b></div>${gxGauge(k, Dl, v, d0[k], S)}<div class="gx__db">${changed ? `<span>was ${esc(gxN(d0[k]))}</span><em>${at}</em>` : `<span class="k">opening</span>${at ? `<em>${at}</em>` : ''}`}</div></div>`; }).join('');
+    const sc = [['transfers', govFmt('transfers', G.transfers || [])], ['payOrder', govFmt('payOrder', G.payOrder ?? null)], ['publish', govFmt('publish', G.pub || {})], ['rules', G.rules ? govFmt('rules', G.rules) : 'none']];
     const errs = (R.lastErrors?.length && t >= FRAMES.length - 1 ? R.lastErrors : [...D].reverse().find((d) => d.errors?.length)?.errors) || [];
-    C.push(gxCard('dials', 'The dials and their legal ranges', specA('9.3', 'Legal ranges'), 'Everything it may change, with the only check: type, finite, and inside its range. A value outside is rejected, never clipped; the old value stays. A changed dial is marked; "read W → W" is its turn\'s lag.',
-      `<div class="tablewrap"><table class="gx__t gx__dials"><thead><tr><th>Dial</th><th>Legal</th><th class="num">Now</th><th class="num">Opening</th><th>In effect from</th></tr></thead><tbody>${rows}</tbody></table></div>${gxKV(sc)}${errs.length ? `<p class="gx__flag down">Last rejected: ${errs.map((e) => `${esc(e.dial ?? 'controls')} = ${esc(gxN(e.value))} (${esc(e.error)})`).join('; ')}</p>` : ''}`, true)); }
-  // 5. The clock: the week it read against the week its changes took effect
-  { const T = D.filter((d) => d.type === 'turn' || d.type === 'arm'), last = T.slice(-6).reverse(), lags = T.map((d) => d.weekEffective - d.weekRead).sort((a, b) => a - b);
-    C.push(gxCard('clock', 'The clock: read, then applied', specA('7', "Time: the world doesn't wait"), `The world doesn't wait. A turn reads the latest finished week, and what it writes takes effect at the start of the week after the turn ends; the weeks that pass while it thinks are its lag.${page ? ' In this browser a scripted turn takes no time, so every lag is 1 week; a Claude session\'s lag is the weeks the world runs while it thinks.' : ''}`,
-      gxKV([['Decisions so far', gxI(T.length)], ['Median lag', lags.length ? `${lags[lags.length >> 1]} wk` : '–'], ['Longest lag', lags.length ? `${lags[lags.length - 1]} wk` : '–'], ['Pace', page ? 'one week per tick (Speed)' : R.lockstep != null ? `lockstep ${R.lockstep}` : R.pace ? `${R.pace} s a week` : 'no clock'], ...(R.clock?.behindMs != null ? [['Behind the clock', `${fmt(R.clock.behindMs / 1000)} s over ${Math.round(R.clock.slowWeeks)} weeks`]] : [])])
-      + `<ul class="gx__list">${last.map((d) => `<li><b>read W${d.weekRead}</b> → <b>applied W${d.weekEffective}</b> <span class="k">lag ${d.weekEffective - d.weekRead} · ${d.changes?.length ? esc(d.changes.map((c) => c.dial).join(', ')) : 'no change'}</span></li>`).join('') || '<li class="k">No decision yet.</li>'}</ul>`)); }
-  // 6. Wake: in N weeks or on a trigger
+    C.push(gxCard('dials', 'Dials', specA('9.3', 'Legal ranges'), 'Each bar is the legal range; ○ opening, ● now. A value outside is rejected, never clipped.',
+      `<div class="gx__dials">${tiles}</div><dl class="gx__sc">${sc.map(([k, v]) => `<dt><code>${k}</code></dt><dd>${esc(v)}</dd>`).join('')}${G.ruleErr?.length ? `<dt>rule results rejected</dt><dd class="down">${esc(G.ruleErr.map((e) => `${e.dial}: ${e.error}`).join('; '))}</dd>` : ''}</dl>${errs.length ? `<p class="gx__flag down">Last rejected: ${errs.map((e) => `${esc(e.dial ?? 'controls')} = ${esc(govFmt(e.dial, e.value)).slice(0, 200)} (${esc(e.error)})`).join('; ')}</p>` : ''}`, 'gx__c--wide')); }
+  // When the treasury is short: each line's share paid as a bar
+  { const O = X?.owed, Fr = G.frac || {}, keys = O ? Object.keys(O).filter((k) => O[k] > 0 || (Fr[k] ?? 1) < 1) : Object.keys(Fr), short = Object.values(Fr).some((v) => v < 0.9999), tot = keys.reduce((s, k) => s + (O?.[k] || 0), 0), order = G.payOrder || null;
+    C.push(gxCard('prorata', 'When the treasury is short', specA('4.3', 'When the treasury is short'), `Short weeks pay each line the same share${order ? ', after the lines payOrder ranks first' : ''}.`,
+      `<p class="gx__flag ${short ? 'down' : 'up'}">${short ? 'Short this week' : 'Paid in full'}${O ? ` · owed ${fmt(tot)}` : ''}${order ? ` · order ${order.map(esc).join(' → ')}` : ''}</p>`
+      + (keys.length ? `<ul class="gx__paid">${keys.map((k) => { const s = Fr[k] ?? 1; return `<li><span>${esc(UI_GOV_NAME[k] || k)}</span><span class="gx__pbar" aria-hidden="true"><i style="width:${(s * 100).toFixed(1)}%"></i></span><b>${pct(s)}</b>${O ? `<em>${fmt(O[k] * s)} / ${fmt(O[k])}</em>` : ''}</li>`; }).join('')}</ul>` : '<p class="note">Nothing owed this week.</p>') + (X ? '' : noX)
+      + gxSpark([{ data: FRAMES.map((x) => (x.gov?.frac ? Math.min(...Object.values(x.gov.frac)) : null)), color: SYS.pink }], n) + '<p class="gx__leg"><i style="background:var(--c-pink)"></i>smallest share paid · 2 years</p>')); }
+  // The clock: a histogram of lags (weeks between the week read and the week applied)
+  { const T = D.filter((d) => d.type === 'turn' || d.type === 'arm'), lags = T.map((d) => d.weekEffective - d.weekRead).sort((a, b) => a - b), hist = new Map(); for (const l of lags) hist.set(l, (hist.get(l) || 0) + 1);
+    const lo = lags[0] ?? 1, hi = lags.at(-1) ?? 1, mx = Math.max(1, ...hist.values()), bins = []; for (let l = lo; l <= hi && bins.length < 40; l++) bins.push([l, hist.get(l) || 0]);
+    C.push(gxCard('clock', 'Lag: read → applied', specA('7', "Time: the world doesn't wait"), page ? 'In this browser a turn takes no time, so every lag is 1 week.' : 'The world keeps running while it thinks; changes land the week after the turn ends.',
+      gxMini([['decisions', gxI(T.length)], ['median lag', lags.length ? `${lags[lags.length >> 1]} wk` : '–'], ['longest', lags.length ? `${hi} wk` : '–'], ['pace', page ? 'per tick' : R.lockstep != null ? `lockstep ${R.lockstep}` : R.pace ? `${R.pace} s/wk` : 'none'], ...(R.clock?.behindMs != null ? [['behind clock', `${fmt(R.clock.behindMs / 1000)} s`]] : [])])
+      + (bins.length ? `<div class="gx__hist" role="img" aria-label="Turns by lag in weeks">${bins.map(([l, c]) => `<span title="${c} ${c === 1 ? 'turn' : 'turns'} with a lag of ${l} wk"><i style="height:${Math.max(c ? 6 : 0, (c / mx) * 100)}%"></i><em>${l}</em></span>`).join('')}</div><p class="gx__leg">turns by lag (weeks)</p>` : '<p class="note">No decision yet.</p>'))); }
+  // Wake: next wake, triggers, predictions
   { const T = D.filter((d) => d.type === 'turn'); let inW = null, when = []; for (const d of T) if (d.wake) { inW = d.wake.inWeeks ?? inW; when = d.wake.when || []; } const lt = T.at(-1), atEnd = mode === 'live' || cursor >= FRAMES.length - 1;
     const next = atEnd && R.wake?.at != null && !isArm ? R.wake.at : lt ? lt.weekEffective - 1 + (inW ?? R.wakeDefault ?? 10) : null, trig = atEnd && R.wake?.when ? R.wake.when : when, fired = T.filter((d) => d.wakeReason === 'trigger' || d.triggers?.length).length;
-    C.push(gxCard('wake', 'Wake triggers and the next wake', specA('15.1', 'The driver'), isArm ? 'A scripted arm has no wake schedule: it decides after every week from the public indicators. A session (the stub or Claude) ends each turn with when to wake it: in N weeks, or when a trigger on an indicator fires, whichever comes first.' : 'Each turn ends with when to wake it next: in N weeks (1 to 100), or when a trigger on a public indicator fires, whichever comes first. Without one the last setting stands.',
-      isArm ? gxKV([['Schedule', 'every week'], ['Decisions that changed a value', gxI(D.filter((d) => d.type === 'arm' && d.changes?.some((c) => JSON.stringify(c.old) !== JSON.stringify(c.new))).length)]]) : gxKV([['Next wake', next == null ? '–' : `week ${next}${next <= t ? ' (now)' : ` (in ${next - t} wk)`}`], ['Wake in', inW == null ? `${R.wakeDefault ?? 10} wk (default)` : `${inW} wk`], ['Triggers', trig?.length ? esc(trig.map((w) => `${w.field} ${w.op} ${w.value}`).join(' or ')) : 'none'], ['Turns woken by a trigger', gxI(fired)], ['Predictions scored', (() => { const P = (R.predictions || []).filter((p) => p.due <= t && p.hit != null); return P.length ? `${P.filter((p) => p.hit).length} of ${P.length} right` : '–'; })()]]))); }
-  // 7. Budget day and the opening grant
-  { const bd = D.find((d) => d.budgetDay || d.weekRead === 0), ts = gcfg.treasuryStart ?? 4;
-    C.push(gxCard('budget', 'Budget day and the opening', specA('4.6', 'The opening'), 'Before the first week the treasury gets an opening grant (its own line) worth a few weeks of a typical week\'s spending at the opening dials, and the government takes one turn with the clock stopped.',
-      gxKV([['Opening grant', S?.grant != null ? `${ts} × ${fmt(S.need0)} = <b>${fmt(S.grant)}</b>` : fmt(F0?.lines?.openingGrant ?? null)], ['Budget-day turn', bd ? `read W0 → applied W${bd.weekEffective}` : 'no move (A0) or not yet'], ['It changed', bd?.changes?.length ? esc(bd.changes.map((c) => `${c.dial} ${gxN(c.old)} → ${gxN(c.new)}`).join(', ')) : '<span class="k">nothing</span>']]))); }
-  // 8. What the bots read: every dial through one transform, the board and the placebo
-  { const names = R.inputNames || [...GOV_VIEW_IN, ...govBotIn(true)], x = X?.x;
-    C.push(gxCard('inputs', 'What the bots read', specA('9.4', 'How the bots perceive dials'), `Every bot's stance network reads these ${names.length} inputs each week (on top of its ${BOT_IN_BASE.length} own). Each dial enters as tanh(asinh(v ÷ s) − asinh(v₀ ÷ s)) against its opening value v₀, so an unchanged dial reads 0. The allowance input is what was actually paid (here for a bot at the median worth); a withheld statistic reads 0.`,
-      x ? `<ul class="gx__in">${names.map((nm, i) => `<li><span>${esc(nm.replace(/^policy: /, ''))}</span>${gxBar(x[i], i === 1 ? 3 : 1)}<b class="${x[i] > 0.0005 ? 'up' : x[i] < -0.0005 ? 'down' : ''}">${x[i] == null ? '–' : (x[i] >= 0 ? '+' : '') + x[i].toFixed(3)}</b></li>`).join('')}</ul>` : noX, true)); }
-  // 9. The board: posts become numbers by a fixed rule
-  { const posts = (R.posts || []).filter((p) => p.week <= t + 1), lp = posts.at(-1), p = lp?.parsed, B = G.board || {};
-    C.push(gxCard('board', 'The board', specA('11.3', 'The board'), 'A post becomes numbers by a fixed rule, with no model: up and down words give each sentence a direction, players named in it take it, and raise or cut words next to a dial\'s name promise a move. Each signal fades by half in 4 weeks and is squashed with tanh; a post is read from the next week.',
-      (lp ? `<blockquote class="gx__post"><time>W${lp.week}</time>${esc(lp.text)}</blockquote>` + gxKV([['Read as', `tone ${(p?.tone ?? 0).toFixed(2)} over ${p?.sentences ?? 0} sentences`], ['Players', p?.mentions?.length ? esc(p.mentions.map((m) => `${m.name} ${m.dir > 0 ? '▲' : m.dir < 0 ? '▼' : '·'} (${m.by})`).join(', ')) : 'none'], ['Dials promised', p?.dials && Object.keys(p.dials).length ? esc(Object.entries(p.dials).map(([k, v]) => `${k} ${v > 0 ? '▲' : '▼'}`).join(', ')) : 'none']]) : `<p class="note">${isArm ? 'The scripted arms never post (A0b, the arm with the board inputs removed, is <code>government.board: false</code>).' : 'Nothing posted yet.'}</p>`)
-      + `<h4>What every bot reads from it now</h4>` + gxKV([['Tone', (B.tone ?? 0).toFixed(3)], ['Activity', (B.act ?? 0).toFixed(3)], ['Promised dial moves', (B.promised ?? 0).toFixed(3)], ['Posts waiting for next week', X ? gxI(X.pending) : '–']])
-      + (X?.board?.length ? `<h4>Card inputs (two per player)</h4><table class="gx__t"><thead><tr><th>Player</th><th class="num">Mentions</th><th class="num">Direction</th></tr></thead><tbody>${X.board.map(([nm, a, b]) => `<tr><td>${esc(nm)}</td><td class="num">${a.toFixed(3)}</td><td class="num ${b > 0 ? 'up' : b < 0 ? 'down' : ''}">${(b >= 0 ? '+' : '') + b.toFixed(3)}</td></tr>`).join('')}</tbody></table>` : '')
-      + gxSpark([{ data: FRAMES.map((x) => x.gov?.board?.tone ?? null), color: SYS.teal }, { data: FRAMES.map((x) => x.gov?.board?.promised ?? null), color: SYS.purple, dash: true }], n) + '<p class="gx__leg"><i style="background:var(--c-teal)"></i>tone <i style="background:var(--c-purple)"></i>promised moves · 2 years</p>')); }
-  // 10. The placebo
-  C.push(gxCard('placebo', 'The placebo input', specA('11.4', 'The placebo input and credibility'), 'One more input, from its own random stream, unrelated to anything the government does: a post-like pulse in half the weeks, faded and squashed like the board. If the bots react to it as much as to the board, the board means nothing to them.',
-    gxKV([['Now', ((G.board?.placebo) ?? 0).toFixed(3)]]) + gxSpark([{ data: FRAMES.map((x) => x.gov?.board?.placebo ?? null), color: SYS.indigo }], n) + '<p class="gx__leg"><i style="background:var(--c-indigo)"></i>placebo input · 2 years</p>'));
-  // 11. Elections, approval and the notebook handover
+    const P = (R.predictions || []).filter((p) => p.due <= t && p.hit != null), hit = P.filter((p) => p.hit).length;
+    C.push(gxCard('wake', 'Next wake', specA('15.1', 'The driver'), isArm ? 'A scripted arm decides after every week.' : 'In N weeks, or sooner if a trigger fires.',
+      isArm ? gxMini([['schedule', 'every week'], ['decisions that changed a value', gxI(D.filter((d) => d.type === 'arm' && d.changes?.some((c) => !govSame(c.old, c.new))).length)]])
+        : gxMini([['next wake', next == null ? '–' : `W${next}`, 'acc'], ['in', next == null ? '–' : next <= t ? 'now' : `${next - t} wk`], ['wake every', inW == null ? `${R.wakeDefault ?? 10} wk` : `${inW} wk`], ['woken by trigger', gxI(fired)]])
+          + (trig?.length ? gxChips(trig.map((w) => esc(`${w.field} ${w.op} ${gxN(w.value)}`))) : '<p class="gx__leg">no triggers set</p>')
+          + (P.length ? `<div class="gx__ratio"><span class="gx__pbar" aria-hidden="true"><i style="width:${((hit / P.length) * 100).toFixed(1)}%"></i></span><b>${hit} of ${P.length}</b><span>predictions right</span></div>` : ''))); }
+  // Budget day and the opening grant
+  { const bd = D.find((d) => d.budgetDay || d.weekRead === 0), ts = gcfg.treasuryStart ?? 4, mv = (bd?.changes || []).filter((c) => !govSame(c.old, c.new));
+    C.push(gxCard('budget', 'Budget day', specA('4.6', 'The opening'), 'An opening grant, then one turn with the clock stopped.',
+      `<div class="gx__eq gx__eq--sm">${S?.grant != null ? `<span title="weeks">${ts}</span><i>×</i><span title="a typical week's spending at the opening dials">${fmt(S.need0)}</span><i>=</i><b title="opening grant">${fmt(S.grant)}</b>` : `<b>${fmt(F0?.lines?.openingGrant ?? null)}</b>`}</div><p class="gx__eqk">weeks × a week's spending = opening grant</p>`
+      + (bd ? `<p class="gx__leg">read W0 → applied W${bd.weekEffective}</p>${mv.length ? `<ul class="gt__mvs">${mv.map(govMove).join('')}</ul>` : '<p class="gx__leg">changed nothing</p>'}` : '<p class="gx__leg">no budget-day move (A0) or not yet</p>'))); }
+  // What the bots read: a heat strip of every input (0 = unchanged from the opening), the largest named
+  { const names = R.inputNames || [...GOV_VIEW_IN, ...govBotIn(true)], x = X?.x, lab = (nm) => nm.replace(/^policy: /, '');
+    const top = x ? names.map((nm, i) => [lab(nm), x[i], i]).filter(([, v]) => v != null && Math.abs(v) > 0.0005).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])) : [];
+    C.push(gxCard('inputs', 'What the bots read', specA('9.4', 'How the bots perceive dials'), `${names.length} inputs on top of each bot's ${BOT_IN_BASE.length} own; an unchanged dial reads 0.`,
+      x ? `<div class="gx__heat" role="img" aria-label="${top.length} of ${names.length} inputs away from 0">${names.map((nm, i) => { const v = x[i], sp = i === 1 ? 3 : 1; return `<span style="background:${v == null ? 'var(--fill)' : divergeInv(Math.max(-1, Math.min(1, v / sp)))}" title="${esc(lab(nm))}: ${v == null ? '–' : (v >= 0 ? '+' : '') + v.toFixed(3)}"></span>`; }).join('')}</div><p class="gx__leg"><i style="background:${divergeInv(-1)}"></i>−1 <i style="background:${divergeInv(0)}"></i>0 <i style="background:${divergeInv(1)}"></i>+1 · ${names.length - top.length} of ${names.length} read 0</p>`
+        + (top.length ? `<ul class="gx__in">${top.slice(0, 8).map(([nm, v, i]) => `<li><span>${esc(nm)}</span>${gxBar(v, i === 1 ? 3 : 1)}<b class="${v > 0 ? 'up' : 'down'}">${(v >= 0 ? '+' : '') + v.toFixed(3)}</b></li>`).join('')}</ul>${top.length > 8 ? `<p class="gx__leg">+${top.length - 8} more (hover the strip)</p>` : ''}` : '')
+        : noX, 'gx__c--wide2')); }
+  // The board and the placebo: what every bot reads from the posts, against a pulse that means nothing
+  { const posts = (R.posts || []).filter((p) => p.week <= t + 1), B = G.board || {}, pl = B.placebo ?? 0;
+    const gb = (k, v, c) => `<li><span>${k}</span>${gxBar(v)}<b class="${c || ''}">${(v >= 0 ? '+' : '') + (v ?? 0).toFixed(3)}</b></li>`;
+    C.push(gxCard('board', 'Board signal vs placebo', specA('11.3', 'The board') + specA('11.4', 'The placebo input and credibility'), 'Posts become numbers by a fixed rule; the placebo is a random pulse. If bots react to both alike, the board means nothing.',
+      `<ul class="gx__in gx__in--one">${gb('tone', B.tone ?? 0)}${gb('activity', B.act ?? 0)}${gb('promised moves', B.promised ?? 0)}${gb('placebo', pl)}</ul>`
+      + gxMini([['posts', gxI(posts.length)], ['waiting for next week', X ? gxI(X.pending) : '–']])
+      + gxSpark([{ data: FRAMES.map((x) => x.gov?.board?.tone ?? null), color: SYS.teal }, { data: FRAMES.map((x) => x.gov?.board?.placebo ?? null), color: SYS.indigo, dash: true }, { data: FRAMES.map((x) => x.gov?.board?.promised ?? null), color: SYS.purple }], n) + '<p class="gx__leg"><i style="background:var(--c-teal)"></i>tone <i style="background:var(--c-purple)"></i>promised <i style="background:var(--c-indigo)"></i>placebo · 2 years</p>'
+      + (X?.board?.length ? gxChips(X.board.map(([nm, a, b]) => `${esc(nm)} <span class="k">${a.toFixed(2)}</span> <span class="${b > 0 ? 'up' : b < 0 ? 'down' : ''}">${(b >= 0 ? '+' : '') + b.toFixed(2)}</span>`)) + '<p class="gx__leg">card inputs: mentions, direction</p>' : '')
+      + (isArm && !posts.length ? '<p class="gx__leg">The scripted arms never post.</p>' : ''))); }
+  // Elections, approval and the handover
   { const E = R.electionsCfg, govs = (R.governments || []).filter((g) => g.from <= t), el = (R.elections || []).filter((e) => e.week <= t), ap = G.approval, nb = (R.notebooks || []).filter((x) => x.week <= t);
     const handed = nb.length ? nb : (R.nbVersions || []).filter((v, i, a) => v.week <= t && i > 0 && a[i - 1].gov !== v.gov).map((v) => ({ id: v.gov }));
-    C.push(gxCard('elections', 'Elections, approval and handover', specA('6', 'Elections (run 2)'), 'At the end of each term approval is counted mechanically: a bot present the whole term approves if its worth grew; one that left counts against. Below the threshold a new government takes office with the treasury, every setting and the old notebooks; the outgoing one keeps its own account.',
-      E ? gxKV([['Term', `${E.term} weeks, kept at ${pct(E.threshold)} approval${E.threshold > 1 ? ' (never kept: shows the handover)' : ''}`], ['Next election', `week ${(Math.floor(t / E.term) + 1) * E.term} (in ${(Math.floor(t / E.term) + 1) * E.term - t} wk)`], ['Approval so far', ap ? `${ap.share == null ? '–' : pct(ap.share)} <span class="k">${ap.approve} of ${ap.eligible} (${ap.left} left)</span>` : '–'], ['Elections held', el.length ? `${el.length}: ${el.slice(-4).map((e) => `W${e.week} ${e.approval?.share == null ? '–' : pct(e.approval.share)} ${e.retained ? 'kept' : 'replaced'}`).join(', ')}` : 'none yet'], ['Notebooks handed over', handed.length ? esc(handed.map((x) => x.id).join(', ')) : 'none']])
-        + (govs.length ? `<table class="gx__t"><thead><tr><th>Government</th><th>In office</th><th class="num">Terms</th><th class="num">Own account</th></tr></thead><tbody>${govs.map((g) => `<tr><td>${esc(g.id)}</td><td>W${g.from}–${g.to ?? 'now'}</td><td class="num">${g.terms}</td><td class="num">${fmt(g.account)}</td></tr>`).join('')}</tbody></table>` : '')
-        : `<p class="gx__flag">Off in this world (run 1 has none).</p><p class="note">${page ? 'Turn them on in Rules → Government → Elections (the world restarts).' : 'Run 2 adds <code>--elections 80:0.5</code> to regulate.mjs.'} Approval is only counted in a world with elections.</p>`)); }
-  // 12. The whitelist: what it can see, what it never sees
-  { const ind = X?.ind;
-    C.push(gxCard('whitelist', 'What it sees, and what it never sees', specA('8.2', 'The whitelist'), 'It sees only what a participant could observe plus its treasury\'s books, written field by field into state/; never hidden values, anything built from them, the bots\' networks, the seed or the planned length. The scripted arms read only the indicators below.',
-      `<div class="gx__two"><div><h4>Indicators it reads (this week)</h4>${ind ? `<dl class="gx__kv gx__kv--ind">${GOV_INDICATORS.map((k, i) => `<dt><code>${k}</code></dt><dd>${esc(gxN(ind[i]))}</dd>`).join('')}</dl>` : noX}<h4>Files in state/</h4><p class="gx__chips">${['now.json', 'ledger.csv', 'history.csv', 'trades.jsonl (52 wk)', 'market.json', 'guide.json', 'league.json', 'board.md', 'decisions.jsonl', 'record.md', 'rules.md', 'notebooks/'].map((x) => `<code>${x}</code>`).join('')}</p></div>`
-      + `<div><h4>Never in its view (spec 8.3; the leak test scans for each)</h4><p class="gx__chips gx__chips--no">${GOV_EXCLUDED.map((x) => `<code>${esc(x)}</code>`).join('')}</p><p class="note">Nor this page: the health board, hidden values, the bots' networks and tactics are shown here for you, never to it.</p></div></div>`, true)); }
-  // 13. Fitness: which flows count in a bot's return
-  { const lump = S?.lumpSums || [...(EXO[cfg.fitnessExo] || EXO.lumpSums)];
-    C.push(gxCard('fitness', 'What counts in a bot\'s return', specA('22.1', 'Already made by the owner'), 'Lump sums a bot did not choose are taken out of its return before selection and learning see it; taxes and fees tied to its holdings or activity stay in, so bots can learn to avoid taxes and over-taxing can shrink the base (fitnessExo, decided 2026-11-07).',
-      gxKV([['Booking', esc(S?.fitnessExo || cfg.fitnessExo || 'lumpSums')], ['Taken out (lump sums)', esc(lump.map((k) => ({ taxBack: 'tax paid back', transfer: 'transfers', pollTax: 'poll tax', levy: 'levies', shocks: 'cash shocks', living: 'living cost' }[k] || k)).join(', '))], ['Counted in the return', 'fees, holding costs, wealth tax, pack and outside sales tax, exit tax, subsidies'], ['Lump sums this week', X ? `${fmt(X.exo)} coins` : '–']]))); }
-  // 14. Not built yet
-  C.push(gxCard('deferred', 'Not built yet', specA('24.2', 'Not built yet'), 'Nothing here works yet, so nothing on this page shows it.',
-    `<ul class="gx__list gx__list--no">${['Snapshot and restore: --resume re-runs the logged weeks instead; forked counterfactuals wait for it', 'Tax bases: capital gains, interest income, short-borrow fees, estate tax, progressive brackets; matching grants; buying from the liquidator', 'Bonds and printing (later runs)', 'Credibility arms (always-lying against always-true boards), input-sensitivity ablation, the Laffer sweep, Gate B, A4 fitted to G1, Y1–Y3 log filters, the frozen analysis script', 'More than one world per process at a time', 'A concentration holding tax in place of positionLimit'].map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`));
+    C.push(gxCard('elections', 'Elections', specA('6', 'Elections (run 2)'), E ? 'Each term: a bot present all term approves if its worth grew; below the bar, a new government.' : '',
+      E ? gxMini([['term', `${E.term} wk`], ['kept at', pct(E.threshold)], ['next', `W${(Math.floor(t / E.term) + 1) * E.term}`], ['held', gxI(el.length)]])
+        + `<div class="gx__ratio"><span class="gx__pbar" aria-hidden="true"><i style="width:${ap?.share == null ? 0 : (ap.share * 100).toFixed(1)}%"></i><u style="left:${Math.min(100, E.threshold * 100)}%"></u></span><b>${ap?.share == null ? '–' : pct(ap.share)}</b><span>approval so far${ap ? ` · ${ap.approve} of ${ap.eligible}, ${ap.left} left` : ''}</span></div>`
+        + (el.length ? gxChips(el.slice(-6).map((e) => `W${e.week} ${e.approval?.share == null ? '–' : pct(e.approval.share)} ${e.retained ? 'kept' : 'replaced'}`)) : '')
+        + (govs.length > 1 ? `<table class="gx__t"><thead><tr><th>Gov</th><th>In office</th><th class="num">Terms</th><th class="num">Own acct</th></tr></thead><tbody>${govs.map((g) => `<tr><td>${esc(g.id)}</td><td>W${g.from}–${g.to ?? 'now'}</td><td class="num">${g.terms}</td><td class="num">${fmt(g.account)}</td></tr>`).join('')}</tbody></table>` : '')
+        + (handed.length ? `<p class="gx__leg">notebooks handed over: ${esc(handed.map((x) => x.id).join(', '))}</p>` : '')
+        : `<p class="gx__flag">Off in this world</p><p class="gx__leg">${page ? 'Rules → Government → Elections turns them on.' : 'Run 2 adds <code>--elections 80:0.5</code>.'}</p>`)); }
+  // Fitness: which flows count in a bot's return
+  { const lump = S?.lumpSums || [...(EXO[cfg.fitnessExo] || EXO.lumpSums)], LN = { taxBack: 'tax paid back', transfer: 'transfers', pollTax: 'poll tax', levy: 'levies', shocks: 'cash shocks', living: 'living cost' };
+    C.push(gxCard('fitness', 'A bot\'s return', specA('22.1', 'Already made by the owner'), `Lump sums it didn't choose are taken out; taxes on what it does stay in (${esc(S?.fitnessExo || cfg.fitnessExo || 'lumpSums')}).`,
+      `<h4>Taken out</h4>${gxChips(lump.map((k) => esc(LN[k] || k)), 'gx__chips--no')}<h4>Counted</h4>${gxChips(['fees', 'holding costs', 'wealth tax', 'pack and outside sales tax', 'exit tax', 'subsidies'])}` + gxMini([['lump sums this week', X ? fmt(X.exo) : '–']]))); }
+  // The indicators it reads, grouped, each with its last two years
+  { const ind = X?.ind, idx = new Map(GOV_INDICATORS.map((k, i) => [k, i])), used = new Set(GX_IND_GROUPS.flatMap(([, ks]) => ks)), groups = [...GX_IND_GROUPS, ['Other', GOV_INDICATORS.filter((k) => !used.has(k))]].map(([g, ks]) => [g, ks.filter((k) => idx.has(k))]).filter(([, ks]) => ks.length);
+    const series = (i) => FRAMES.map((x) => x.govX?.ind?.[i] ?? null);
+    C.push(gxCard('indicators', 'Indicators it reads', specA('8.2', 'The whitelist'), 'What a participant could observe, plus its own books.',
+      (ind ? groups.map(([g, ks]) => gxDet('ind-' + g, `${g} <span class="k">${ks.length}</span>`, `<div class="gx__tiles">${ks.map((k) => { const i = idx.get(k); return `<div class="gx__tile"><span>${k}</span><b>${esc(gxN(ind[i]))}</b>${k === 'week' ? '' : gxSpark([{ data: series(i), color: SYS.blue }], n, 104, 'gx__spark--tile')}</div>`; }).join('')}</div>`, g !== 'Distress' && g !== 'Credit' && g !== 'Other', 'gx__grp')).join('') : noX)
+      + gxDet('files', 'ⓘ Files in its state/ folder', gxChips(['now.json', 'ledger.csv', 'history.csv', 'trades.jsonl (52 wk)', 'market.json', 'guide.json', 'league.json', 'board.md', 'decisions.jsonl', 'record.md', 'rules.md', 'notebooks/'].map(esc)), false, 'gx__info')
+      + gxDet('never', `ⓘ Never in its view <span class="k">${GOV_EXCLUDED.length}</span>`, `${gxChips(GOV_EXCLUDED.map(esc), 'gx__chips--no')}<p class="gx__leg">Nor this page. The leak test scans for each (spec 8.3).</p>`, false, 'gx__info'), 'gx__c--wide')); }
+  // Not built yet
+  C.push(gxCard('deferred', 'Not built yet', specA('24.2', 'Not built yet'), '', gxDet('deferred', 'ⓘ 6 parts of the spec nobody can see working yet', `<ul class="gx__list gx__list--no">${['Snapshot and restore: --resume re-runs the logged weeks instead; forked counterfactuals wait for it', 'Tax bases: capital gains, interest income, short-borrow fees, estate tax, progressive brackets; matching grants; buying from the liquidator', 'Bonds and printing (later runs)', 'Credibility arms (always-lying against always-true boards), input-sensitivity ablation, the Laffer sweep, Gate B, A4 fitted to G1, Y1–Y3 log filters, the frozen analysis script', 'More than one world per process at a time', 'A concentration holding tax in place of positionLimit'].map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`, false, 'gx__info'), 'gx__c--slim'));
   $('gx').html = C.join('');
 }
+// The panel's controls: the external stats toggle, the timeline's filters and length, the ledger's period, the disclosures
+$('govXBtn')?.addEventListener('click', () => govXSet(!GOV_X));
+$('govPanel')?.addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.gf) { GOV_FILTER = b.dataset.gf === GOV_FILTER && b.dataset.gf.startsWith('dial:') ? 'all' : b.dataset.gf; GOV_LIMIT = 8; drawGov(); }
+  else if (b.dataset.gmore) { GOV_LIMIT += 10; drawGov(); } else if (b.dataset.gless) { GOV_LIMIT = 8; drawGov(); }
+  else if (b.dataset.per) { GX_PER = b.dataset.per; drawGov(); }
+});
+$('govPanel')?.addEventListener('toggle', (e) => { const d = e.target; if (d.matches?.('details[data-k]')) GX_DET.set(d.dataset.k, d.open); }, true);
+govXSet(GOV_X, false);
 /* ---------- Start ---------- */
 // Live AI run: the runner (node run.mjs --serve PORT) serves this page with window.LIVE_RUN set. New weeks stream in
 // every few seconds; the view follows the newest week unless it has been scrubbed back.
