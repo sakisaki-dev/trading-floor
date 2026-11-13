@@ -1424,7 +1424,8 @@ const uiGovVal = (v) => (typeof v === 'number' ? (Math.abs(v) >= 1000 ? fmt(v) :
 // filter and length, the ledger's period and which disclosures are open.
 const GOV_X_KEY = 'tf-gov-stats';
 let GOV_X = false; try { GOV_X = localStorage.getItem(GOV_X_KEY) === 'shown'; } catch {}
-let GOV_FILTER = 'all', GOV_LIMIT = 8, GX_PER = 'week'; const GX_DET = new Map();
+let GOV_FILTER = 'all', GOV_LIMIT = 8; const GOV_OPEN = new Set(); // turn cards opened with More (by week; kept across the live redraws)
+let GX_PER = 'week'; const GX_DET = new Map();
 function govXSet(v, save = true) {
   GOV_X = !!v; if (save) try { localStorage.setItem(GOV_X_KEY, GOV_X ? 'shown' : 'hidden'); } catch {}
   const b = $('govXBtn'), x = $('govX'); if (b) b.setAttribute('aria-expanded', String(GOV_X)); if ($('govXLbl')) $('govXLbl').textContent = GOV_X ? 'Hide external stats' : 'Show external stats'; if (x) x.hidden = !GOV_X;
@@ -1462,13 +1463,15 @@ function govFeed(R, D, t) {
       const tags = [!mv.length ? '<span class="gt__tag">no dial moved</span>' : '', d.budgetDay ? '<span class="gt__tag gt__tag--acc">budget day</span>' : '', d.wakeReason === 'trigger' ? `<span class="gt__tag gt__tag--acc" title="${esc((d.triggers || []).map((x) => `${x.field} ${x.op} ${x.value}`).join(', '))}">woken by a trigger</span>` : '', failed ? '<span class="gt__tag down">turn failed</span>' : ''].join('');
       const pr = (d.predictions || []).map((q) => { const s = scored.find((x) => x.turn === q.turn && x.metric === q.metric && x.due === q.due && x.direction === q.direction && x.hit != null && x.due <= t); return `<span class="gt__tag ${s ? (s.hit ? 'up' : 'down') : ''}" title="predicted from ${esc(gxN(q.base))} at W${q.from}${s ? `; was ${esc(gxN(s.value))}` : ''}">${esc(q.metric)} ${q.direction === 'up' ? '▲' : '▼'} by W${q.due}${s ? (s.hit ? ' ✓' : ' ✗') : ''}</span>`; }).join('');
       const wk = d.wake ? [d.wake.inWeeks ? `in ${d.wake.inWeeks} wk` : '', ...(d.wake.when || []).map((x) => `${esc(x.field)} ${esc(x.op)} ${esc(gxN(x.value))}`)].filter(Boolean).join(' or ') : '';
-      return `<li class="gt${mv.length ? ' gt--mv' : b ? ' gt--post' : ''}"><div class="gt__h"><time>W${d.weekEffective}</time><span class="gt__meta">${meta}</span>${tags}</div>`
+      const key = `${d.gov || ''}:${d.turn ?? d.weekEffective}`, open = GOV_OPEN.has(key), extra = (d.commentary && d.commentary.length > 220) || b || pr || wk || same.length;
+      return `<li class="gt${mv.length ? ' gt--mv' : b ? ' gt--post' : ''}${open ? ' gt--open' : ''}"><div class="gt__h"><time>W${d.weekEffective}</time><span class="gt__meta">${meta}</span>${tags}</div>`
         + (mv.length ? `<ul class="gt__mvs">${mv.map(govMove).join('')}</ul>` : '')
         + (d.commentary ? `<p class="gt__why">${esc(d.commentary)}</p>` : '')
-        + (b ? `<blockquote class="gt__post"><p>${esc(b.text)}</p><footer>${govTone(p.tone)}${(p.mentions || []).map((m) => `<span class="gt__tag ${m.dir > 0 ? 'up' : m.dir < 0 ? 'down' : ''}">${esc(m.name)} ${m.dir > 0 ? '▲' : m.dir < 0 ? '▼' : '·'}</span>`).join('')}${Object.entries(p.dials || {}).map(([k, v]) => `<span class="gt__tag gt__tag--acc">promises ${esc(k)} ${v > 0 ? '▲' : '▼'}</span>`).join('')}</footer></blockquote>` : '')
+        + (b && open ? `<blockquote class="gt__post"><p>${esc(b.text)}</p><footer>${govTone(p.tone)}${(p.mentions || []).map((m) => `<span class="gt__tag ${m.dir > 0 ? 'up' : m.dir < 0 ? 'down' : ''}">${esc(m.name)} ${m.dir > 0 ? '▲' : m.dir < 0 ? '▼' : '·'}</span>`).join('')}${Object.entries(p.dials || {}).map(([k, v]) => `<span class="gt__tag gt__tag--acc">promises ${esc(k)} ${v > 0 ? '▲' : '▼'}</span>`).join('')}</footer></blockquote>` : '')
         + (errs.length ? `<ul class="gt__errs">${errs.map((e) => `<li><b>rejected</b> <code>${esc(e.dial ?? 'controls')}</code>${e.value !== undefined ? ` = ${esc(govFmt(e.dial, e.value)).slice(0, 160)}` : ''}: ${esc(e.error)}</li>`).join('')}</ul>` : '')
         + (failed && d.facts.error ? `<p class="gt__errs">${esc(String(d.facts.error).slice(0, 300))}</p>` : '')
-        + (pr || wk || same.length ? `<div class="gt__foot">${pr}${wk ? `<span class="gt__tag">next look ${wk}</span>` : ''}${same.length ? `<span class="gt__tag" title="resubmitted at the value it already had">kept ${esc(same.map((c) => c.dial).join(', '))}</span>` : ''}</div>` : '')
+        + (open && (pr || wk || same.length) ? `<div class="gt__foot">${pr}${wk ? `<span class="gt__tag">next look ${wk}</span>` : ''}${same.length ? `<span class="gt__tag" title="resubmitted at the value it already had">kept ${esc(same.map((c) => c.dial).join(', '))}</span>` : ''}</div>` : '')
+        + (extra ? `<button type="button" class="gt__toggle" data-gopen="${esc(key)}" aria-expanded="${open}">${open ? 'Less' : `More${b ? ' · board post' : ''}${pr ? ' · predictions' : ''}`}</button>` : '')
         + '</li>'; })() });
   }
   for (const e of (R.elections || []).filter((e) => e.week <= t)) items.push({ w: e.week + 0.5, kind: 'event', html: `<li class="gt gt--ev"><div class="gt__h"><time>W${e.week}</time><span class="gt__tag ${e.retained ? 'up' : 'down'}">election</span><span>${esc(e.gov || '')} ${e.retained ? 'kept' : 'replaced'} · approval ${e.approval?.share == null ? '–' : pct(e.approval.share)}</span></div></li>` });
@@ -1662,6 +1665,7 @@ $('govXBtn')?.addEventListener('click', () => govXSet(!GOV_X));
 $('govPanel')?.addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.dataset.gf) { GOV_FILTER = b.dataset.gf === GOV_FILTER && b.dataset.gf.startsWith('dial:') ? 'all' : b.dataset.gf; GOV_LIMIT = 8; drawGov(); }
+  else if (b.dataset.gopen) { const k = b.dataset.gopen; GOV_OPEN.has(k) ? GOV_OPEN.delete(k) : GOV_OPEN.add(k); drawGov(); }
   else if (b.dataset.gmore) { GOV_LIMIT += 10; drawGov(); } else if (b.dataset.gless) { GOV_LIMIT = 8; drawGov(); }
   else if (b.dataset.per) { GX_PER = b.dataset.per; drawGov(); }
 });
