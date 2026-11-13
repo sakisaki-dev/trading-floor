@@ -6,6 +6,8 @@
 #   tools/gov.sh plumbing     the one-turn plumbing test (uses the subscription)
 #   tools/gov.sh plumbing200  200 weeks at 2 s a week with a real session, watched live (uses the subscription)
 #   tools/gov.sh replay200    replays plumbing-200 from its decision log and checks every week's hash (no session)
+#   tools/gov.sh long         the long steward experiment (subscription): a no-government baseline in the background,
+#                             then the steward, both open-ended (--weeks 0) until Ctrl-C; resume with: tools/gov.sh resume runs/s-long
 #   tools/gov.sh run1         run 1, watched live (uses the subscription); 7,000 weeks at 4 s, WEEKS= PACE= to override
 #   tools/gov.sh resume [run] picks a run back up after a crash (default runs/g1)
 #   tools/gov.sh view         opens the live view on this Mac and prints the phone address
@@ -43,6 +45,11 @@ case "${1:-help}" in
   replay200) node regulate.mjs --replay runs/plumbing-200 --out runs/plumbing-200-replay ;;
   run1) need; watching; caffeinate -dimsu node regulate.mjs --government claude --brief v1 --model claude-haiku-5-5 \
           --session-root "$ROOT/g1" --seed 1 --weeks "${WEEKS:-7000}" --pace "${PACE:-4}" --out runs/g1 --serve "$PORT" ;;
+  long) need; mkdir -p runs; [[ -e runs/s-long ]] && { echo "runs/s-long exists: carry on with tools/gov.sh resume runs/s-long"; exit 1; }
+        [[ -e runs/a0-long ]] || { nohup nice -n 10 node regulate.mjs --government A0 --seed 1 --weeks 0 --pace 0 --out runs/a0-long > runs/a0-long.log 2>&1 &
+          echo "No-government baseline started in the background (runs/a0-long.log); stop it with: pkill -f 'out runs/a0-long'"; }
+        watching; caffeinate -dimsu node regulate.mjs --government claude --brief steward --own-account off --model claude-haiku-5-5 \
+          --session-root "$ROOT/s-long" --seed 1 --weeks 0 --pace "${PACE:-4}" --out runs/s-long --serve "$PORT" --baseline runs/a0-long/run.json ;;
   resume) need; watching; caffeinate -dimsu node regulate.mjs --resume "${2:-runs/g1}" --serve "$PORT" ;;
   view) open "http://localhost:$PORT"; watching ;;
   *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//' ;;
