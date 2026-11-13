@@ -44,6 +44,14 @@ Part 1 above is unchanged. Each deviation is listed here as it happens.
    `lifestyle` 0.001 (about the same total, in proportion to equity), the setting tested as `livingProp`. Gate B is
    started over on 2.1.0 in `runs/gateb/`; nothing run before is part of it. The Claude government is not re-run in
    this stretch (no subscription use), so G1 waits.
+8. **A printing dial, a steward arm and open-ended runs** (2026-11-13, engine 2.2.0). Three 300-week trials on seed 1
+   (A0, G1 with `--brief v1`, and a steward with a mission brief) showed card prices falling in every arm because packs
+   keep minting copies while coins drain out, and no dial reached either cause. The owner chose to give the government
+   one supply lever: `printRate`, the share of the normal packs released a week (0 to 1; copies already out are never
+   removed). Unset it reads as 1, so every earlier run replays identically (checked: the first 30 weeks of A0 seed 1
+   hash the same as on 2.1.0); it is not a bot input. Also new: the steward brief (`--brief steward`, its own label;
+   the sleeping paragraph was added after the first trial) with `--own-account off`, and `--weeks 0` for runs that go
+   on until stopped. The trials are exploratory; none is part of G1 or Gate B.
 
 ## Part 1
 

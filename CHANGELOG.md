@@ -15,6 +15,13 @@ Versions before 1.0.0 were not tagged at the time. They are assigned here to the
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-13
+
+### Added
+- `printRate`, a government dial: the share of the normal `packsPerWeek` released a week (0 to 1). Copies already out
+  are never removed; it is not a bot input. Unset it reads as 1, so results without it are unchanged (A0 seed 1 hashes
+  the same as on 2.1.0). `--set '{"printRate":0.5}'` halves printing from week 0.
+
 ## [2.1.0] - 2026-11-12
 
 ### Changed

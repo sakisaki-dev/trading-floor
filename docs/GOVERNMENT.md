@@ -32,6 +32,22 @@ npm run test:gov
 Open <http://localhost:4322> to watch: the page shows the Government panel (status, treasury, ledger, commentary, board,
 notebook, dials). A finished run replays on the page with Load run → `runs/<id>/run.json`.
 
+### Prosperity and the no-government baseline
+
+Above the external stats the Government panel shows four Prosperity meters (display only): median bot welfare at bid
+value (`f.welfare`, the series `tools/compare_arms.mjs` reports as `welfareMedian`), the poorest half's share of it with
+the broke bots, the bots in the market with newcomers and trades per bot, and the market price ÷ hidden value with the
+gap between the trade-price index and the marks index (both 100 at week 0); the vault index is shown as the card price level. Each delta is against a
+no-government run at the same week when one is loaded, else against the first week. Load one in the page with
+**Compare with a no-government run** (an A0 run's `run.json`), or serve it with a live run:
+
+```bash
+node regulate.mjs --government claude ... --serve 4322 --baseline runs/a0-1/run.json
+```
+
+`--baseline` only adds the HTTP route `/baseline` (the file is read when the page asks for it). It is not part of the
+run: it never reaches the world, `meta.json`, the frames or the hashes, so the run and its replay are unchanged.
+
 ## The short way: `tools/gov.sh`
 
 One launcher does every step below. It keeps the subscription token in the macOS Keychain (never in a file or the
@@ -122,6 +138,17 @@ caffeinate -dimsu node regulate.mjs --government claude --brief v1 --model claud
   government sees (rules.md, now.json, history.csv, the owed and paid tables) and rejects a `consumption` control with an
   error; every other run's rules text is byte-identical (same hash). Compare it with v1 and with A0 (no government) on the
   same seed and engine.
+- **Long runs.** `--weeks 0` runs until stopped (Ctrl-C; `--resume` carries on from the decision log). The steward's
+  brief tells it to sleep long while things go well (up to 100 weeks a turn) and to wake on its own triggers, which keeps
+  subscription use down over a long run. Since engine 2.2.0 it also has `printRate` (packs printed a week, 0 to 1; never
+  removes cards). A long steward experiment, with a long no-government run beside it for the Prosperity baseline:
+
+  ```bash
+  node regulate.mjs --government A0 --seed 1 --weeks 0 --pace 0 --out runs/a0-long          # no Claude use; CPU only
+  caffeinate -dimsu node regulate.mjs --government claude --brief steward --own-account off --model claude-haiku-5-5 \
+    --session-root /Users/Shared/tf-gov/s-long --seed 1 --weeks 0 --pace 4 --out runs/s-long \
+    --serve 4322 --baseline runs/a0-long/run.json
+  ```
 
 ## The pace
 

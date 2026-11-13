@@ -1481,6 +1481,69 @@ function govFeed(R, D, t) {
   items.sort((a, b) => b.w - a.w);
   return items;
 }
+/* ---------- Prosperity: how the bots are doing (always shown in the Government panel, above the external stats) ---------- */
+// Display only, from the frames. Prosperity is the median bot welfare at bid value: f.welfare, the engine's welfareStats
+// (spec 2.3), the same series tools/compare_arms.mjs reports as welfareMedian. Inclusion is the poorest half's share of
+// that welfare and the broke bots; Vitality the bots in the market, newcomers joined and trades per bot; Price health the
+// market price of every card ÷ its hidden value (mkt.mcap ÷ mkt.vcap) and the gap between the trade-price index
+// (vaultIndex) and the index of every card's mark (marksIndex), both 100 at week 0. The vault index is the card price level. A week whose frame lacks a value is drawn as a gap.
+// The baseline is a run with no government (an A0 run) loaded here, or served by regulate.mjs --baseline at /baseline:
+// each delta compares the same week; without one, the first week that has the value.
+const P_IX = (k) => GOV_INDICATORS.indexOf(k);
+const PCACHE = new WeakMap();
+function prosOf(f) {
+  let p = PCACHE.get(f); if (p) return p;
+  const ind = (k) => { const i = P_IX(k); return i >= 0 ? f.govX?.ind?.[i] ?? null : null; }, w = f.welfare, bots = ind('bots'), trades = ind('trades'), vi = ind('vaultIndex'), mi = ind('marksIndex');
+  const n = w ? bots : null; // welfareStats ranks every bot alive; the bottom half is round(n / 2) of them
+  p = { welfare: w?.median ?? null, incl: w && n && w.mean > 0 ? (w.bottom50Mean * Math.round(n / 2)) / (w.mean * n) : null, broke: f.mkt?.broke ?? null, bots, joined: ind('joined'), tpb: trades != null && bots ? trades / bots : null,
+    pv: f.mkt?.mcap != null && f.mkt?.vcap ? f.mkt.mcap / f.mkt.vcap : null, gap: vi != null && mi ? vi / mi - 1 : null, vi };
+  PCACHE.set(f, p); return p;
+}
+// Newcomers since week 0, week by week (the indicator is per week)
+const prosJoined = (frames) => { let c = 0, any = false; return frames.map((f) => { const j = prosOf(f).joined; if (j != null) { c += j; any = true; } return any ? c : null; }); };
+let PBASE = null; // { id, gov, by: Map(week -> prosOf + cumulative joined) }
+function prosSetBase(run, id) {
+  const F = run?.frames || []; if (!F.length) throw new Error('no weeks in that file'); const cj = prosJoined(F);
+  PBASE = { id: id || run.meta?.id || 'baseline', gov: run.meta?.government ?? run.meta?.args?.government ?? (F.some((f) => f.gov) ? 'unknown' : 'none'), weeks: F.at(-1).t, by: new Map(F.map((f, i) => [f.t, { ...prosOf(f), joinedCum: cj[i] }])) };
+}
+const PROS_DEF = {
+  welfare: 'Median bot welfare: what the typical bot could sell everything for this week (cash, minus debt and arrears, plus every card at what bids would pay after the fee). Spec 2.3 also adds consumption paid and leavers\' wealth; the frames don\'t carry those yet.',
+  incl: 'The poorest half\'s share of all bot welfare (50% = everyone equal), and the bots with no cash left.',
+  vital: 'Bots in the market, newcomers joined since week 0, and trades per bot this week.',
+  price: 'Total market price of every card ÷ its hidden value: near 1 is fair, well above a bubble, well below a fire sale. Trades vs marks: how far the trade-price index (vaultIndex) has moved from the index of every card\'s mark (marksIndex) since week 0, when both are 100.',
+};
+function drawProsperity(n) {
+  const el = $('prosGrid'); if (!el) return; const f = FRAMES[n - 1]; if (!f) return; const t = f.t, P = prosOf(f), B = PBASE?.by.get(t) || null, F = FRAMES.slice(0, n);
+  const cj = prosJoined(F), first = (k) => { for (const x of F) { const v = prosOf(x)[k]; if (v != null) return [v, x.t]; } return [null, null]; };
+  const ser = (k) => F.map((x) => prosOf(x)[k]), bser = (k) => F.map((x) => PBASE?.by.get(x.t)?.[k] ?? null);
+  const spark = (k, mine, base) => gxSpark([...(PBASE ? [{ data: base ?? bser(k), color: 'var(--faint)', dash: true }] : []), { data: mine ?? ser(k), color: SYS.blue }], n, n, 'pt__spark');
+  // a delta against the baseline at this week, else against the first week with a value: rel = percent change, pts = percentage points, abs = a count
+  const delta = (k, v, how, bv) => { const ref = PBASE ? [bv !== undefined ? bv : B?.[k] ?? null, t] : first(k), r = ref[0]; if (v == null || r == null) return `<span class="pt__d k">${PBASE ? `no-gov run has no W${t}` : '–'}</span>`;
+    const d = how === 'rel' ? (r ? (v - r) / Math.abs(r) : null) : v - r, s = d == null ? '–' : how === 'rel' ? `${d >= 0 ? '+' : '−'}${Math.abs(d * 100).toFixed(Math.abs(d) < 0.1 ? 1 : 0)}%` : how === 'pts' ? `${d >= 0 ? '+' : '−'}${Math.abs(d * 100).toFixed(1)} pts` : how === 'x' ? `${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(2)}` : `${d >= 0 ? '+' : '−'}${fmt(Math.abs(d))}`;
+    return `<span class="pt__d ${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${s} <span class="k">vs ${PBASE ? `no gov ${how === 'rel' ? fmt(r) : how === 'pts' ? pct(r) : how === 'x' ? `×${r.toFixed(2)}` : fmt(r)}` : `W${ref[1]}`}</span></span>`; };
+  const miss = (k) => { const s = ser(k), i0 = s.findIndex((v) => v != null); const m = i0 < 0 ? n : s.slice(i0).filter((v) => v == null).length; return m ? `<p class="pt__gap">${i0 < 0 ? 'not in this run\'s frames' : `${m} ${m === 1 ? 'week' : 'weeks'} missing (gaps)`}</p>` : ''; };
+  const tile = (k, title, body) => `<article class="pt" data-k="${k}"><header><h3>${title}</h3>${gxDet('pi-' + k, '<span aria-label="What this measures">ⓘ</span>', `<p>${PROS_DEF[k]}</p>`, false, 'pt__i')}</header>${body}</article>`;
+  const big = (v, lab) => `<div class="pt__v"><b>${v}</b><span>${lab}</span></div>`, sub = (rows) => `<dl class="pt__sub">${rows.map(([a, b, c]) => `<dt>${a}</dt><dd>${b}${c ? ` ${c}` : ''}</dd>`).join('')}</dl>`;
+  const brokeShare = P.broke != null && P.bots ? P.broke / P.bots : null, bBroke = B?.broke != null && B?.bots ? B.broke / B.bots : null;
+  // the price band: log scale from ×0.25 to ×4, fair 0.8–1.25
+  const band = (v) => (v == null ? '' : v < 0.8 ? 'fire sale' : v > 1.25 ? 'bubble' : 'fair'), pos = (v) => (Math.max(0, Math.min(1, (Math.log(v) - Math.log(0.25)) / (Math.log(4) - Math.log(0.25)))) * 100).toFixed(1);
+  const gauge = `<div class="pt__band" role="img" aria-label="Price ÷ hidden value ${P.pv == null ? 'unknown' : P.pv.toFixed(2)}: ${band(P.pv) || 'no data'}"><i class="fs" style="left:0;width:${pos(0.8)}%"></i><i class="fa" style="left:${pos(0.8)}%;width:${pos(1.25) - pos(0.8)}%"></i><i class="bu" style="left:${pos(1.25)}%;right:0"></i>${B?.pv != null ? `<u class="b" style="left:${pos(B.pv)}%" title="no-gov run ${B.pv.toFixed(2)}"></u>` : ''}${P.pv != null ? `<u style="left:${pos(P.pv)}%"></u>` : ''}</div><div class="pt__bandk"><span>fire sale</span><span>fair</span><span>bubble</span></div>`;
+  el.html = [
+    tile('welfare', 'Prosperity', big(P.welfare == null ? '–' : fmt(P.welfare), 'median welfare, coins') + delta('welfare', P.welfare, 'rel') + spark('welfare') + miss('welfare')),
+    tile('incl', 'Inclusion', big(P.incl == null ? '–' : pct(P.incl), 'poorest half\'s share') + delta('incl', P.incl, 'pts') + spark('incl')
+      + sub([['broke', P.broke == null ? '–' : `${gxI(P.broke)}${brokeShare != null ? ` <span class="k">(${pct(brokeShare)})</span>` : ''}`, PBASE ? `<span class="k">no gov ${B?.broke == null ? '–' : `${gxI(B.broke)}${bBroke != null ? ` (${pct(bBroke)})` : ''}`}</span>` : '']]) + miss('incl')),
+    tile('vital', 'Vitality', big(P.bots == null ? '–' : gxI(P.bots), 'bots in the market') + delta('bots', P.bots, 'rel') + spark('bots')
+      + sub([['joined', cj[n - 1] == null ? '–' : gxI(cj[n - 1]), PBASE ? `<span class="k">no gov ${B?.joinedCum == null ? '–' : gxI(B.joinedCum)}</span>` : '<span class="k">since W0</span>'], ['trades / bot', P.tpb == null ? '–' : P.tpb.toFixed(2), PBASE ? `<span class="k">no gov ${B?.tpb == null ? '–' : B.tpb.toFixed(2)}</span>` : '']])),
+    tile('price', 'Price health', big(P.pv == null ? '–' : `×${P.pv.toFixed(2)}`, `price ÷ hidden value · <b class="pt__lab pt__lab--${(band(P.pv) || 'none').replace(' ', '')}">${band(P.pv) || 'no data'}</b>`) + delta('pv', P.pv, 'x') + gauge
+      + sub([['trades vs marks', P.gap == null ? '–' : `${P.gap >= 0 ? '+' : '−'}${Math.abs(P.gap * 100).toFixed(1)}%`, P.gap == null ? '' : `<span class="k">${Math.abs(P.gap) < 0.05 ? 'in line' : P.gap > 0 ? 'trades ahead' : 'trades behind'}${PBASE ? ` · no gov ${B?.gap == null ? '–' : `${B.gap >= 0 ? '+' : '−'}${Math.abs(B.gap * 100).toFixed(1)}%`}` : ''}</span>`]]) + spark('pv')),
+  ].join('');
+  { const [v0, t0] = first('vi'); $('prosCtx').html = `<b>Card price level</b> (vault index) <span class="pt__num">${P.vi == null ? '–' : gxN(P.vi)}</span> ${v0 != null && P.vi != null ? `<span class="${P.vi >= v0 ? 'up' : 'down'}">${P.vi >= v0 ? '+' : '−'}${Math.abs(((P.vi - v0) / v0) * 100).toFixed(0)}% since W${t0}</span>` : ''}${PBASE && B?.vi != null ? ` <span class="k">· no gov ${gxN(B.vi)}</span>` : ''} <span class="k">· what cards cost: up is inflation, down deflation; not anyone's wealth</span>`; }
+  $('prosBase').html = PBASE ? `<span class="pt__chip" title="${esc(PBASE.id)}: ${PBASE.weeks} weeks, government ${esc(PBASE.gov)}"><i></i>vs ${esc(PBASE.id)}${PBASE.gov && !['A0', 'none'].includes(PBASE.gov) ? ` <b class="down">(has government ${esc(PBASE.gov)})</b>` : ''}<button type="button" data-pclear="1" aria-label="Stop comparing">✕</button></span>` : '';
+  const ld = document.querySelector('.pros__load'); if (ld) ld.hidden = !!PBASE;
+}
+$('prosFile')?.addEventListener('change', (e) => { const file = e.target.files?.[0]; if (!file) return; const rd = new FileReader();
+  rd.onload = () => { try { { const run = JSON.parse(rd.result); prosSetBase(run, run.meta?.id || file.name.replace(/\.json$/, '')); } } catch (err) { $('prosBase').html = `<span class="pt__chip down">Not a run file (${esc(err.message)})</span>`; } e.target.value = ''; drawGov(); };
+  rd.readAsText(file); });
 function drawGov() {
   const P = $('govPanel'); if (!P || P.hidden || !seen('govPanel')) return; const n = nNow(), f = cur(), G = f?.gov, R = govRec(); if (!G) return;
   const t = f.t, D = (R.decisions || []).filter((d) => d.weekEffective <= t + 1), turns = D.filter((d) => d.type === 'turn' || d.type === 'arm'); // a scripted arm's decisions are its turns
@@ -1511,6 +1574,7 @@ function drawGov() {
   { const V = (R.nbVersions || []).filter((v) => v.week <= t + 1), cur1 = V.at(-1), prev = cur1 ? V.slice(0, -1).reverse().find((v) => v.gov === cur1.gov) : null, old = new Set((prev?.text || '').split('\n'));
     $('govNbNote').textContent = cur1 ? `${cur1.gov} · as of week ${cur1.week} · new lines marked` : 'its own file · new lines marked';
     $('govNb').html = cur1 ? cur1.text.split('\n').map((l) => (l && !old.has(l) ? `<span class="new">${esc(l)}</span>` : esc(l))).join('\n') : '<span class="note">Empty.</span>'; }
+  drawProsperity(n); // always shown, above the external stats
   { const b = $('govXBtn'); if (b && b.getAttribute('aria-expanded') !== String(GOV_X)) govXSet(GOV_X, false); }
   if (!GOV_X) return; // the external stats are folded: nothing below is drawn until they are shown
   { const cash = f.h?.money ?? 0, cards = f.mkt?.mcap ?? 0, share = G.T / Math.max(1, cash + G.T + cards), ap = G.approval;
@@ -1551,9 +1615,10 @@ function gxSpark(series, n, k = 104, cls = '') {
   const from = Math.max(0, n - k), pts = series.map((s) => ({ ...s, d: s.data.slice(from, n) })); let lo = Infinity, hi = -Infinity;
   for (const s of pts) for (const v of s.d) if (v != null && isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
   if (!isFinite(lo)) return `<div class="gx__spark gx__spark--empty ${cls}"></div>`; if (hi - lo < 1e-9) { hi += 1; lo -= 1; } const Wd = 240, Ht = 44, m = Math.max(1, pts[0].d.length - 1);
-  const path = (d) => d.map((v, i) => (v == null ? null : `${((i / m) * Wd).toFixed(1)},${(Ht - 3 - ((v - lo) / (hi - lo)) * (Ht - 6)).toFixed(1)}`)).filter(Boolean).join(' ');
+  // a week with no value breaks the line (a gap, never a bridge between the weeks either side)
+  const path = (d) => { const segs = [[]]; d.forEach((v, i) => { if (v == null || !isFinite(v)) { if (segs.at(-1).length) segs.push([]); return; } segs.at(-1).push(`${((i / m) * Wd).toFixed(1)},${(Ht - 3 - ((v - lo) / (hi - lo)) * (Ht - 6)).toFixed(1)}`); }); return segs.filter((x) => x.length).map((x) => (x.length === 1 ? [x[0], x[0]] : x).join(' ')); };
   const zero = lo < 0 && hi > 0 ? `<line x1="0" x2="${Wd}" y1="${(Ht - 3 - ((0 - lo) / (hi - lo)) * (Ht - 6)).toFixed(1)}" y2="${(Ht - 3 - ((0 - lo) / (hi - lo)) * (Ht - 6)).toFixed(1)}" class="z"/>` : '';
-  return `<svg class="gx__spark ${cls}" viewBox="0 0 ${Wd} ${Ht}" preserveAspectRatio="none" aria-hidden="true">${zero}${pts.map((s) => `<polyline points="${path(s.d)}" style="stroke:${s.color}"${s.dash ? ' stroke-dasharray="3 3"' : ''}/>`).join('')}</svg>`;
+  return `<svg class="gx__spark ${cls}" viewBox="0 0 ${Wd} ${Ht}" preserveAspectRatio="none" aria-hidden="true">${zero}${pts.map((s) => path(s.d).map((pp) => `<polyline points="${pp}" style="stroke:${s.color}"${s.dash ? ' stroke-dasharray="3 3"' : ''}${s.op ? ` opacity="${s.op}"` : ''}/>`).join('')).join('')}</svg>`;
 }
 const gxCard = (id, title, sec, line, body, cls = '') => `<article class="gx__c ${cls}" id="gx-${id}"><header><h3>${title}</h3>${sec}</header>${line ? `<p class="gx__why">${line}</p>` : ''}${body}</article>`;
 const gxBar = (v, span = 1) => { const x = Math.max(-1, Math.min(1, (v || 0) / span)); return `<span class="gx__bar" aria-hidden="true"><i style="${x >= 0 ? `left:50%;width:${x * 50}%` : `left:${50 + x * 50}%;width:${-x * 50}%`}"></i></span>`; };
@@ -1671,6 +1736,7 @@ $('govPanel')?.addEventListener('click', (e) => {
   else if (b.dataset.gopen) { const k = b.dataset.gopen; GOV_OPEN.has(k) ? GOV_OPEN.delete(k) : GOV_OPEN.add(k); drawGov(); }
   else if (b.dataset.gmore) { GOV_LIMIT += 10; drawGov(); } else if (b.dataset.gless) { GOV_LIMIT = 8; drawGov(); }
   else if (b.dataset.per) { GX_PER = b.dataset.per; drawGov(); }
+  else if (b.dataset.pclear) { PBASE = null; drawGov(); }
 });
 $('govPanel')?.addEventListener('toggle', (e) => { const d = e.target; if (d.matches?.('details[data-k]')) GX_DET.set(d.dataset.k, d.open); }, true);
 govXSet(GOV_X, false);
@@ -1680,6 +1746,8 @@ govXSet(GOV_X, false);
 function followNewest() { if (FRAMES.length) { cursor = FRAMES.length - 1; redrawAll(); } }
 async function followLive(url) {
   let run = null;
+  // a no-government run served next to this one (regulate.mjs --baseline): the Prosperity meters compare against it
+  fetch(url.replace(/frames$/, 'baseline'), { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((b) => { if (b?.frames?.length && !PBASE) { prosSetBase(b, b.meta?.id || 'baseline'); drawGov(); } }).catch(() => {});
   const pull = async () => {
     if (run && RUN !== run) return; // the page left this run: stop, so its weeks never go into another world
     try {

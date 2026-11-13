@@ -31,7 +31,7 @@ export class StateWriter {
   week(W, extra = {}) {
     const ind = E.govIndicators(W), G = W.gov, t = W.t, f = W.moneyWeek?.treasury;
     if (!this.ownAccount) { delete ind.consumption; delete ind.ownAccount; } // --own-account off
-    const dials = {}; for (const k of Object.keys(E.GOV_DIALS)) { if (!this.ownAccount && k === 'consumption') continue; const D = E.GOV_DIALS[k]; dials[k] = D.cfg ? W.cfg[k] : G.d[k]; }
+    const dials = {}; for (const k of Object.keys(E.GOV_DIALS)) { if (!this.ownAccount && k === 'consumption') continue; const D = E.GOV_DIALS[k]; dials[k] = D.cfg ? W.cfg[k] ?? D.def : G.d[k]; }
     const lines = f ? Object.fromEntries(Object.entries(f.lines).filter(([, v]) => v).map(([k, v]) => [k, R(v)])) : {};
     const now = { week: t, season: W.seasonLabel || null, indicators: Object.fromEntries(Object.entries(ind).map(([k, v]) => [k, typeof v === 'number' ? R(v, 4) : v])),
       dials, transfers: G.transfers, payOrder: G.payOrder, publish: G.pub, rules: G.rules,

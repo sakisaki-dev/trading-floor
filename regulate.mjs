@@ -11,7 +11,8 @@
 // Options: --preset regulated (configs/<preset>.json) · --set JSON (merged last) · --seed N · --weeks N (the planned
 // length: never shown to the government) · --pace S (weekSeconds; 0 = no clock) · --lockstep K (tests: the world waits
 // for each turn and its controls land K weeks after the week it read) · --wake N (default wake interval) · --brief v1|neutral|steward · --own-account off (no consumption dial or own account: the steward arm)
-// · --elections TERM[:THRESHOLD] (run 2) · --serve PORT (the live page) · --practice N (practiceGens) · --allow-dirty.
+// · --elections TERM[:THRESHOLD] (run 2) · --serve PORT (the live page) · --baseline RUN.json (with --serve: a no-government
+// run the page's Prosperity meters compare against; served at /baseline, display only) · --practice N (practiceGens) · --allow-dirty.
 // Files in --out: meta.json (the fingerprint), decisions.jsonl (every turn, election and prediction score), hashes.txt
 // (sha1 of every week's full frame), frames.jsonl.gz (every full frame), clock.jsonl (pace and lag), run.json (for the
 // page: frames thinned past 104 weeks, plus the government record), state/ (what the government saw last).
@@ -95,11 +96,15 @@ newGovernment(0); if (A.elections) E.govTermStart(W);
 // ---------- The live page (--serve) ----------
 const meta = (extra = {}) => ({ id: path.basename(out), source: 'regulate.mjs', government: A.government, seed: '(hidden)', weeksRun: W.t, pace: A.pace, setupSecs, rng: W.rngLayout, status: STATUS, ...extra });
 let STATUS = { state: 'starting', week: 0, since: Date.now() }, behindMs = 0, slowWeeks = 0;
+const BASELINE = opt('baseline') ? path.resolve(opt('baseline')) : null; // the page's comparison run (not part of the run: never in A or meta.json)
 if (A.serve) {
   const http = await import('node:http'), port = Number(A.serve) || 4322, pagePath = path.join(here, 'docs', 'trading-floor.html');
   const shell = (body) => `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body><script>window.LIVE_RUN = '/frames';</script>${body}</body></html>`;
   http.createServer((req, res) => {
     const u = new URL(req.url, 'http://x');
+    // --baseline FILE: a no-government run.json for the page's Prosperity meters to compare against (display only: read
+    // per request, never by the world, and kept out of meta.json, the frames and the hashes)
+    if (u.pathname === '/baseline') { if (!BASELINE || !fs.existsSync(BASELINE)) { res.writeHead(404, { 'content-type': 'text/plain' }); res.end('no baseline'); return; } res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); fs.createReadStream(BASELINE).pipe(res); return; }
     if (u.pathname === '/frames') { const since = Number(u.searchParams.get('since')) || 0; res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' }); res.end(JSON.stringify({ meta: meta(), config: W.cfg, total: frames.length, frames: frames.slice(since), gov: govRecord() })); return; }
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(shell(fs.readFileSync(pagePath, 'utf8')));
   }).listen(port, '0.0.0.0', () => console.log(`Live view: http://localhost:${port}`));
@@ -175,7 +180,7 @@ function scorePredictions() { const ind = E.govIndicators(W); for (const p of re
 function bookWeek(f) { const r = govRow(), L = f.gov.lines; for (const [k, v] of Object.entries(L)) { if (['fees', 'holding', 'wealthTax', 'packTax', 'outsideTax', 'exitTax', 'pollTax', 'levy'].includes(k)) r.revenue += v; else if (k === 'consumption') r.consumption -= v; else if (k !== 'openingGrant') r.transfers -= v; } r.pop1 = W.bots.length; r.account = W.gov.account; r.treasury = W.treasury; }
 
 // ---------- The run ----------
-const startWeek = 0, target = A.weeks;
+const startWeek = 0, target = A.weeks > 0 ? A.weeks : Infinity; // --weeks 0: open-ended, until stopped (resume picks it up)
 const f0 = E.frame(W, { full: true }); const h0 = frameHash(f0);
 if (priorHashes.length && priorHashes[0] !== h0) throw new Error(`week 0 differs from the run being ${resumeDir ? 'resumed' : 'replayed'}: this engine or data is not the one that made it`);
 if (!resumeDir) fs.appendFileSync(hashF, h0 + '\n'); gz.write(JSON.stringify(f0) + '\n'); f0.govX = E.govView(W); frames.push(f0);

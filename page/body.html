@@ -301,6 +301,16 @@
         <div id="govNb" class="gov__nb"></div>
       </aside>
     </div>
+    <!-- Prosperity: how the bots are doing, always shown (drawProsperity in ui.js); display only. A no-government run
+         loaded here (or served by regulate.mjs --baseline at /baseline) is drawn on every sparkline and gives each delta -->
+    <div class="pros" id="pros" aria-labelledby="pros-h">
+      <div class="head pros__head"><h2 class="h3" id="pros-h">Prosperity</h2>
+        <span class="pros__base" id="prosBase"></span>
+        <label class="pros__load" title="Load a run.json with no government (an A0 run, e.g. runs/a0-trial/run.json) to compare at the same week"><input type="file" id="prosFile" accept=".json,application/json"><span>Compare with a no-government run</span></label>
+      </div>
+      <div class="pros__grid" id="prosGrid"></div>
+      <p class="pros__ctx" id="prosCtx"></p>
+    </div>
     <!-- External stats: the treasury, the ledger, every dial and how the layer works (drawGovHow in ui.js), folded away
          by default; the choice is remembered in localStorage -->
     <div class="gov__xhead">

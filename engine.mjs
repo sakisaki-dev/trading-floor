@@ -677,7 +677,7 @@ function packAuction(W) {
   const cfg = W.cfg, bidsP = W.packBids || []; W.packBids = []; W.packWeek = {};
   const carry = (W.packCarry ||= {}), px = (W.packPx ||= {});
   for (const type of Object.keys(PACK_TYPES)) {
-    const supply = (carry[type] || 0) + (cfg.packsPerWeek || 0) * (W.fillK ?? 1) * (cfg.packMix?.[type] || 0), n0 = Math.floor(supply); carry[type] = supply - n0;
+    const supply = (carry[type] || 0) + (cfg.packsPerWeek || 0) * (cfg.printRate ?? 1) * (W.fillK ?? 1) * (cfg.packMix?.[type] || 0), n0 = Math.floor(supply); carry[type] = supply - n0;
     const bs = bidsP.filter((x) => x.type === type).sort((x, y) => y.p - x.p), n = Math.min(n0, bs.length);
     let sold = 0;
     if (n > 0) { const clearPx = bs[n - 1].p; for (const x of bs.slice(0, n)) if (x.b.cash >= clearPx && ripPack(W, x.b, false, type, clearPx)) sold++; if (sold) px[type] = clearPx; }
@@ -3547,6 +3547,10 @@ export const GOV_DIALS = {
   positionLimit: { cfg: true, lo: 0, hi: Infinity, s: 0.2, unit: 'most of a card\'s circulation one bot may hold, as a share (at least 3 copies; 0 = off)' },
   guideEvery: { cfg: true, lo: 1, hi: Infinity, int: true, s: 4, unit: 'weeks between price guide issues' },
   guideLag: { cfg: true, lo: 1, hi: Infinity, int: true, s: 1, unit: 'weeks the price guide\'s values lag' },
+  // 2.2.0 (owner: "give the ai model the ability to reduce the number of new cards being printed, never removing"): unset
+  // reads as 1 (frames and hashes of runs that never set it are unchanged); it scales packsPerWeek only, so copies already
+  // out are never removed. Not a bot input (GOV_STANCE): bots feel it through pack prices.
+  printRate: { cfg: true, lo: 0, hi: 1, def: 1, s: 0.2, unit: 'share of the normal packs released a week (1 = all of them, 0 = none; cards already out are never removed)' },
 };
 // The structured controls: transfers, payOrder, publish, rules (validated in govCheck)
 export const GOV_LINES = ['allowance', 'transfers', 'royalties', 'consumption', 'wealthSubsidy', 'holdSubsidy']; // the weekly spending lines (payOrder names them)
