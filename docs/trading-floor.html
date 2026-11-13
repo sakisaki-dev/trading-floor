@@ -6844,7 +6844,10 @@ function drawAcct() {
     longs = d.positions.map(([cid, q, ac]) => { const P = (f.prices?.[cid >> 4] ?? 0) * mktMult(cid); return { pid: cid >> 4, label: mktLabel(cid), q, ac, P, pnl: (P - ac) * q }; });
   }
   longs.sort((x, y) => y.q * y.P - x.q * x.P);
-  const cardVal = longs.reduce((s, p) => s + p.q * p.P, 0), shortVal = shorts.reduce((s, p) => s + p.P, 0);
+  // No position detail (a replay records positions for AI bots only): the card value is estimated as worth minus cash
+  // (it includes anything owed and any shorts, which aren't recorded), and what isn't recorded shows as unknown, not 0
+  const known = !!bot || (isAi && !!f.aiDetail?.[name]);
+  const cardVal = known ? longs.reduce((s, p) => s + p.q * p.P, 0) : Math.max(0, w - cash), shortVal = shorts.reduce((s, p) => s + p.P, 0);
   const unreal = longs.reduce((s, p) => s + (p.pnl || 0), 0) + shorts.reduce((s, p) => s + p.pnl, 0);
   const sg = (v) => (v == null ? '–' : `<span class="${v >= 0 ? 'up' : 'down'}">${v >= 0 ? '+' : ''}${fmt(v)}</span>`);
   const ws = []; for (let i = Math.max(0, nNow() - 80); i < nNow(); i++) ws.push(botMap(FRAMES[i]).get(id) ?? null);
@@ -6869,8 +6872,8 @@ function drawAcct() {
   <div class="ah__chips"><span class="chip">${kindOf(b)}${model ? ' · ' + esc(model) : ''}</span><span class="chip" style="color:${grpColor(b)}">${GROUPS[b[17] ?? 2].label}</span><span class="chip${soc === 2 ? ' k-notes' : ''}">${SOC[soc]}</span><span class="chip">gen ${gen}</span>${flaggedBy >= 5 ? `<span class="chip k-credit">flagged by ${flaggedBy}</span>` : ''}</div>
   <div class="aw"><div><span>Worth</span><b>${fmt(w)}</b><small>${ch4 == null ? '' : `${sg(ch4)} in 4 wk`}</small></div><canvas id="acctSpark" aria-label="${esc(name)} worth over the last 80 weeks"></canvas></div>
   <div class="alloc" aria-label="What its worth is made of">${seg(cash, 'cash', 'Cash')}${seg(cardVal, 'trade', 'Cards')}${seg(debt || 0, 'credit', 'Owes')}${seg(shortVal, 'short', 'Shorts to buy back')}</div>
-  <div class="alloc__k"><span><i class="k-cash"></i>Cash ${fmt(cash)}</span><span><i class="k-trade"></i>Cards ${fmt(cardVal)}</span><span><i class="k-credit"></i>Owes ${fmt(debt || 0)}</span>${shorts.length ? `<span><i class="k-short"></i>Shorts ${fmt(shortVal)}</span>` : ''}</div>
-  <div class="am">${[['Realized', sg(realized)], ['Unrealized', sg(unreal)], ['Cards', n], ['Notes', notes], ['Avg OVR', b[15] ?? '–'], ['Research 8 wk', bot?.research ?? '–']].map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
+  <div class="alloc__k"><span><i class="k-cash"></i>Cash ${fmt(cash)}</span><span><i class="k-trade"></i>Cards ${known ? '' : '≈ '}${fmt(cardVal)}</span><span><i class="k-credit"></i>Owes ${known ? fmt(debt || 0) : '–'}</span>${known ? '' : '<span class="k" title="Replays record positions for AI bots only: cards are worth minus cash">estimated</span>'}${shorts.length ? `<span><i class="k-short"></i>Shorts ${fmt(shortVal)}</span>` : ''}</div>
+  <div class="am">${[['Realized', sg(realized)], ['Unrealized', known ? sg(unreal) : '–'], ['Cards', n], ['Notes', notes], ['Avg OVR', b[15] ?? '–'], ['Research 8 wk', bot?.research ?? '–']].map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
   ${g ? `<div class="ag">${gbar(`Cash target ${pct(g.keep)}`, g.keep, 0.6)}${gbar(`Borrows ${g.lev.toFixed(2)}×`, g.lev, 1.5)}${gbar(`Lends ${pct(g.lendShare)} of cash`, g.lendShare, 0.7)}${gbar(`Lends ${pct(bot.lendCards || 0)} of cards`, bot.lendCards || 0, 1)}</div>` : ''}
   <h3 class="ah3">Holdings<span>${longs.length} cards · ${fmt(cardVal)}</span></h3>
   <table class="atab"><tbody>${posRows}</tbody></table><button type="button" class="more" id="acctAll"${longs.length > 8 ? '' : ' disabled'}>${longs.length > 8 ? (ACCT_UI.allPos ? 'Show top 8' : `Show all ${longs.length}`) : mode === 'replay' && !isAi ? 'Replays record positions for AI bots only' : 'All shown'}</button>
