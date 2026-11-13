@@ -10,7 +10,7 @@
 //
 // Options: --preset regulated (configs/<preset>.json) · --set JSON (merged last) · --seed N · --weeks N (the planned
 // length: never shown to the government) · --pace S (weekSeconds; 0 = no clock) · --lockstep K (tests: the world waits
-// for each turn and its controls land K weeks after the week it read) · --wake N (default wake interval) · --brief v1|neutral
+// for each turn and its controls land K weeks after the week it read) · --wake N (default wake interval) · --brief v1|neutral|steward · --own-account off (no consumption dial or own account: the steward arm)
 // · --elections TERM[:THRESHOLD] (run 2) · --serve PORT (the live page) · --practice N (practiceGens) · --allow-dirty.
 // Files in --out: meta.json (the fingerprint), decisions.jsonl (every turn, election and prediction score), hashes.txt
 // (sha1 of every week's full frame), frames.jsonl.gz (every full frame), clock.jsonl (pace and lag), run.json (for the
@@ -29,7 +29,7 @@ const resumeDir = opt('resume'), replayDir = opt('replay');
 const prior = resumeDir ? JSON.parse(fs.readFileSync(path.join(resumeDir, 'meta.json'), 'utf8')) : replayDir ? JSON.parse(fs.readFileSync(path.join(replayDir, 'meta.json'), 'utf8')) : null;
 const A = prior ? { ...prior.args, ...(replayDir ? { government: 'replay', pace: 0, serve: opt('serve') ?? null } : {}) } : {
   government: opt('government', 'stub'), seed: +opt('seed', 1), weeks: +opt('weeks', 300), pace: +opt('pace', 4), lockstep: opt('lockstep') != null ? +opt('lockstep') : null,
-  preset: opt('preset', 'regulated'), set: JSON.parse(opt('set', '{}')), wake: +opt('wake', 10), brief: opt('brief', 'v1'), model: opt('model', CS.MODEL), practice: opt('practice') != null ? +opt('practice') : null,
+  preset: opt('preset', 'regulated'), set: JSON.parse(opt('set', '{}')), wake: +opt('wake', 10), brief: opt('brief', 'v1'), ownAccount: opt('own-account', 'on') !== 'off', model: opt('model', CS.MODEL), practice: opt('practice') != null ? +opt('practice') : null,
   elections: opt('elections') ? { term: +opt('elections').split(':')[0], threshold: +(opt('elections').split(':')[1] ?? 0.5) } : null, thinkMs: +opt('think-ms', 0),
   armOptions: JSON.parse(opt('arm-options', '{}')), sessionRoot: opt('session-root', null), turnTimeoutMs: +opt('turn-timeout', 15 * 60 * 1000), serve: opt('serve') ?? null };
 const out = path.resolve(resumeDir || opt('out', path.join(here, 'runs', `gov-${A.government}-${A.seed}`)));
@@ -58,7 +58,7 @@ if (!BRIEFS[A.brief]) { console.error(`--brief must be one of ${Object.keys(BRIE
 const tSetup = Date.now(); const W = E.createWorld(lib, cfg0);
 const setupSecs = (Date.now() - tSetup) / 1000;
 fingerprint.config = prior?.fingerprint?.config || JSON.parse(JSON.stringify(W.cfg)); fingerprint.rng = W.rngLayout; fingerprint.pins = E.GOV_PINS;
-fingerprint.rulesSha256 = sha(rulesMarkdown({ elections: A.elections, defaultWake: A.wake })); fingerprint.boardWordsSha256 = sha(JSON.stringify(E.BOARD_WORDS));
+fingerprint.rulesSha256 = sha(rulesMarkdown({ elections: A.elections, defaultWake: A.wake, ownAccount: A.ownAccount })); fingerprint.boardWordsSha256 = sha(JSON.stringify(E.BOARD_WORDS));
 
 // ---------- Files ----------
 const frameHash = (f) => sha1(JSON.stringify(f));
@@ -82,7 +82,7 @@ const isChild = A.government === 'stub' || A.government === 'claude';
 if (A.government === 'claude') { if (!A.sessionRoot) { console.error('--government claude needs --session-root (a folder outside your home, e.g. /Users/Shared/tf-gov/g1)'); process.exit(2); } S = CS.prepareSession(A.sessionRoot); fingerprint.cli = { version: S.version, sha256: S.binSha256, source: S.source }; }
 else if (A.government === 'stub') { const root = path.join(out, 'session'); fs.mkdirSync(path.join(root, 'state'), { recursive: true }); for (const f of CS.WRITABLE) if (!fs.existsSync(path.join(root, f))) fs.writeFileSync(path.join(root, f), ''); S = { cwd: root }; }
 const stateDir = S ? path.join(S.cwd, 'state') : path.join(out, 'state'); fs.mkdirSync(stateDir, { recursive: true });
-const SW = new StateWriter(stateDir, { elections: A.elections, defaultWake: A.wake }); SW.rules(rulesMarkdown({ elections: A.elections, defaultWake: A.wake }));
+const SW = new StateWriter(stateDir, { elections: A.elections, defaultWake: A.wake, ownAccount: A.ownAccount }); SW.rules(rulesMarkdown({ elections: A.elections, defaultWake: A.wake, ownAccount: A.ownAccount }));
 const arm = ARMS[A.government]?.({ seed: A.seed, ...(A.armOptions || {}) }) || null;
 if (!isChild && !arm && A.government !== 'replay' && A.government !== 'none') { console.error(`unknown --government ${A.government} (stub, claude, none, ${Object.keys(ARMS).join(', ')})`); process.exit(2); }
 
@@ -140,7 +140,9 @@ function parseControls(text) {
 const diffLines = (a, b) => { const A0 = a.split('\n'), B0 = b.split('\n'), sa = new Set(A0), sb = new Set(B0); return { added: B0.filter((l) => l && !sa.has(l)).length, removed: A0.filter((l) => l && !sb.has(l)).length, chars: b.length }; };
 // Apply a finished turn now (W.t is the last finished week; it takes effect in week W.t + 1)
 function applyTurn(d) {
-  const P = parseControls(d.readFiles.controlsText), res = E.applyControls(W, P.eng), errors = [...P.errors, ...res.errors], eff = W.t + 1;
+  const P = parseControls(d.readFiles.controlsText);
+  if (!A.ownAccount && P.eng && typeof P.eng === 'object' && 'consumption' in P.eng) { P.errors.push({ dial: 'consumption', value: P.eng.consumption, error: 'there is no government consumption or own account in this world' }); delete P.eng.consumption; } // --own-account off
+  const res = E.applyControls(W, P.eng), errors = [...P.errors, ...res.errors], eff = W.t + 1;
   const text = d.readFiles.board.trim(); let parsed = null; if (text) { parsed = E.noteBoard(W, text); SW.post(eff, text, parsed); record.posts.push({ week: eff, text, parsed }); }
   if (P.wakeIn) { wake.inWeeks = P.wakeIn.inWeeks ?? wake.inWeeks ?? A.wake; wake.when = P.wakeIn.when; } // without a wake entry the last setting stands (at first, the default)
   wake.at = W.t + (wake.inWeeks ?? A.wake);

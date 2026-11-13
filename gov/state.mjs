@@ -19,25 +19,27 @@ const TRADE_WINDOW = 52; // weeks of trades kept in state/trades.jsonl (older we
 const LEAGUE_KINDS = new Set(['champion', 'award', 'hof', 'retire', 'rookie', 'injury', 'return', 'season']);
 function atomic(file, text) { const tmp = file + '.tmp'; fs.writeFileSync(tmp, text); fs.renameSync(tmp, file); } // the session never reads a half-written file
 export class StateWriter {
-  constructor(dir, { elections = null, defaultWake = 10 } = {}) {
+  constructor(dir, { elections = null, defaultWake = 10, ownAccount = true } = {}) {
+    this.ownAccount = ownAccount;
     this.dir = dir; fs.mkdirSync(path.join(dir, 'notebooks'), { recursive: true }); this.trades = []; this.hist = []; this.ledgerRows = []; this.board = []; this.decisions = []; this.record = [];
     this.opts = { elections, defaultWake };
     atomic(path.join(dir, 'decisions.jsonl'), ''); atomic(path.join(dir, 'board.md'), '# The public board\n\n');
-    atomic(path.join(dir, 'ledger.csv'), 'week,line,coins\n'); atomic(path.join(dir, 'history.csv'), `${['week', ...E.GOV_INDICATORS.filter((k) => k !== 'week')].join(',')}\n`);
+    atomic(path.join(dir, 'ledger.csv'), 'week,line,coins\n'); atomic(path.join(dir, 'history.csv'), `${['week', ...E.GOV_INDICATORS.filter((k) => k !== 'week' && (this.ownAccount || (k !== 'consumption' && k !== 'ownAccount')))].join(',')}\n`);
   }
   rules(md) { atomic(path.join(this.dir, 'rules.md'), md); }
   // One finished week: now.json, the ledger and history rows, the trade window, the order book, marks, guide and league
   week(W, extra = {}) {
     const ind = E.govIndicators(W), G = W.gov, t = W.t, f = W.moneyWeek?.treasury;
-    const dials = {}; for (const k of Object.keys(E.GOV_DIALS)) { const D = E.GOV_DIALS[k]; dials[k] = D.cfg ? W.cfg[k] : G.d[k]; }
+    if (!this.ownAccount) { delete ind.consumption; delete ind.ownAccount; } // --own-account off
+    const dials = {}; for (const k of Object.keys(E.GOV_DIALS)) { if (!this.ownAccount && k === 'consumption') continue; const D = E.GOV_DIALS[k]; dials[k] = D.cfg ? W.cfg[k] : G.d[k]; }
     const lines = f ? Object.fromEntries(Object.entries(f.lines).filter(([, v]) => v).map(([k, v]) => [k, R(v)])) : {};
     const now = { week: t, season: W.seasonLabel || null, indicators: Object.fromEntries(Object.entries(ind).map(([k, v]) => [k, typeof v === 'number' ? R(v, 4) : v])),
       dials, transfers: G.transfers, payOrder: G.payOrder, publish: G.pub, rules: G.rules,
-      treasury: { balance: R(W.treasury), ownAccount: R(G.account), openingGrant: R(G.grant), lastWeek: lines, owedLastWeek: G.owed ? Object.fromEntries(Object.entries(G.owed).map(([k, v]) => [k, R(v)])) : null, fractionsPaid: G.frac ? Object.fromEntries(Object.entries(G.frac).map(([k, v]) => [k, R(v, 4)])) : null },
+      treasury: { balance: R(W.treasury), ...(this.ownAccount ? { ownAccount: R(G.account) } : {}), openingGrant: R(G.grant), lastWeek: lines, owedLastWeek: G.owed ? Object.fromEntries(Object.entries(G.owed).filter(([k]) => this.ownAccount || k !== 'consumption').map(([k, v]) => [k, R(v)])) : null, fractionsPaid: G.frac ? Object.fromEntries(Object.entries(G.frac).filter(([k]) => this.ownAccount || k !== 'consumption').map(([k, v]) => [k, R(v, 4)])) : null },
       statistics: deep(E.govStats(W)), ruleErrors: G.ruleErr, ...extra };
     atomic(path.join(this.dir, 'now.json'), JSON.stringify(now, null, 1));
     fs.appendFileSync(path.join(this.dir, 'ledger.csv'), Object.entries(lines).map(([k, v]) => `${t},${k},${v}\n`).join(''));
-    fs.appendFileSync(path.join(this.dir, 'history.csv'), `${[t, ...E.GOV_INDICATORS.filter((k) => k !== 'week').map((k) => (ind[k] == null ? '' : R(ind[k], 4)))].join(',')}\n`);
+    fs.appendFileSync(path.join(this.dir, 'history.csv'), `${[t, ...E.GOV_INDICATORS.filter((k) => k !== 'week' && (this.ownAccount || (k !== 'consumption' && k !== 'ownAccount'))).map((k) => (ind[k] == null ? '' : R(ind[k], 4)))].join(',')}\n`);
     // trades as they happen: card, price, quantity, week (no names); auction results and pack clearing prices
     const wk = []; for (const j of W.journal) { if (j.t !== t) continue;
       if (j.type === 'trade') wk.push({ week: t, kind: 'trade', card: j.card, price: j.price, qty: 1, outside: j.buyer === 'outside collector' || j.seller === 'outside collector' || j.seller === 'Vault store' || j.seller === 'liquidator', ...(j.seller === 'liquidator' ? { liquidator: true } : {}) });

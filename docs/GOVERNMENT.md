@@ -113,6 +113,15 @@ caffeinate -dimsu node regulate.mjs --government claude --brief v1 --model claud
   lost and the session is woken at once; the gap is in `clock.jsonl`.
 - **Run 2** (elections) adds `--elections 80:0.5` (term in weeks, approval threshold).
 - **The neutral-brief arm** (G1n) is the same command with `--brief neutral`, another session root and fewer weeks.
+- **The steward arm** (G1s; owner, 2026-11-13: "it's a benevolent force it's trying to create a healthy economy pop bubbles,
+  create wealth elevate etc etc", and "remove its own money it never uses it it's redundant") is the same command with
+  `--brief steward --own-account off`, another session root and out folder. Its brief (`BRIEF_STEWARD` in `gov/brief.mjs`)
+  names the goals: prices that hold and rise with demand (let bubbles out, cushion crashes), a living market (bots trade,
+  join and stay), wealth growing across the whole population, nobody ruined by debt, forced sales or bills; the treasury
+  is a tool, not a goal. `--own-account off` removes the consumption dial and the own account from everything the
+  government sees (rules.md, now.json, history.csv, the owed and paid tables) and rejects a `consumption` control with an
+  error; every other run's rules text is byte-identical (same hash). Compare it with v1 and with A0 (no government) on the
+  same seed and engine.
 
 ## The pace
 
